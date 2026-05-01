@@ -15,18 +15,17 @@ import OwnerDashboard from './pages/dashboard/OwnerDashboard'
 
 const router = createBrowserRouter (
   createRoutesFromElements(
-    <>
-    <Route path="/" element={<AuthLayout />}>  
-      <Route index element={<LandingPage />} /> 
-      <Route path="/Login" element={<Login />} /> 
-      <Route path="/Register" element={<Register />} /> 
-    </Route>
+    <Route>
+      <Route path="/" element={<AuthLayout />}>
+        <Route index element={<LandingPage />} />
+        <Route path="login" element={<Login />} />
+        <Route path="register" element={<Register />} />
+      </Route>
 
-    <Route path="/dashboard" element={<DashboardLayout />}>
-      <Route path="/dashboard/owner" element={<OwnerDashboard />} />
+      <Route path="/dashboard" element={<DashboardLayout />}>
+        <Route path="owner" element={<OwnerDashboard />} />
+      </Route>
     </Route>
-    </>
-    
   )
 )
 
