@@ -23,4 +23,4 @@ const DashboardLayout = () => {
   )
 }
 
-export default AuthLayout
+export default DashboardLayout
