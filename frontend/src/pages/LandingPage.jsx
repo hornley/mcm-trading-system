@@ -14,7 +14,7 @@ const LandingPage = () => {
             <Button onClick={() => navigate('/Login')}type="primary">
               Login
             </Button>
-            <Divider type="vertical"></Divider>
+            <Divider orientation="vertical"></Divider>
             <Button onClick={() => navigate('/Register')}>
               Sign Up
             </Button>
