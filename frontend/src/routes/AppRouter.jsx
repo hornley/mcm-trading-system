@@ -14,6 +14,12 @@ import Owner from '../pages/dashboard/Owner'
 import Manager from '../pages/dashboard/Manager'
 import Admin from '../pages/dashboard/Admin'
 import ProtectedRoute from './ProtectedRoute'
+
+import Inventory from '../pages/module/Inventory'
+import Maintentance from '../pages/module/Maintentance'
+import StockManagement from '../pages/module/StockManagement'
+import UserAccess from '../pages/module/UserAccess'
+import Report from '../pages/module/UserAccess'
 //Contains all paths to pages
 
 const router = createBrowserRouter (

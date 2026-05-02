@@ -7,17 +7,17 @@ import { useAuth } from '../../context/AuthContext.jsx';
 const mockUsers = [
   {
     username: 'owner1',
-    password: '1234',
+    password: '123',
     role: 'owner'
   },
   {
     username: 'manager1',
-    password: '1234',
+    password: '123',
     role: 'manager'
   },
   {
     username: 'admin1',
-    password: '1234',
+    password: '123',
     role: 'admin'
   }
 ]
@@ -66,7 +66,8 @@ const Login = () => {
                         <Button type="primary" htmlType="submit">
                             Login
                         </Button>
-                        <Divider orientation="vertical"></Divider>                       <Button onClick={() => navigate('/')}>
+                        <Divider orientation="vertical"></Divider>                       
+                        <Button onClick={() => navigate('/')}>
                             Back
                         </Button>
                     </form>
