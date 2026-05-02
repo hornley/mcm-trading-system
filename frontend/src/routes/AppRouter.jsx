@@ -12,7 +12,7 @@ import Register from './../pages/auth/Register'
 import DashboardLayout from './../layouts/DashboardLayout'
 import Owner from '../pages/dashboard/Owner'
 import Manager from '../pages/dashboard/Manager'
-import Admin from '../pages/dashboard/Manager'
+import Admin from '../pages/dashboard/Admin'
 import ProtectedRoute from './ProtectedRoute'
 //Contains all paths to pages
 
@@ -35,7 +35,7 @@ const router = createBrowserRouter (
             <Route  element={<ProtectedRoute allowedRoles={["manager"]} />}>
                 <Route path="manager" element={<Manager />} />
             </Route>
-            <Route>  element={<ProtectedRoute allowedRoles={["admin"]} />}
+            <Route element={<ProtectedRoute allowedRoles={["manager"]} />}>  
                 <Route path="admin" element={<Admin />} />
             </Route>
         </Route>
