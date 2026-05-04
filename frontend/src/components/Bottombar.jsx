@@ -1,14 +1,18 @@
 import React from 'react'
-import {Typography} from 'antd';
+import {Typography, Row, Col} from 'antd';
 import {colors} from '../theme.js';
 
 const {Text} = Typography;
 
 const Bottombar = () => {
   return (
-    <Text level={1} style={{color: colors.secondaryText, margin: 0}}>
-        © 2026 FanThree
-    </Text>
+    <Row justify="center" align= 'middle' style={{ width: '100%', height: '100%' }}>
+      <Col>
+        <Text style={{ color: colors.secondaryText }}>
+          © 2026 FanThree
+        </Text>
+      </Col>
+    </Row>
   )
 }
 
