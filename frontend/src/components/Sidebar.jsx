@@ -16,15 +16,17 @@ const ownerModules = [
   { key: '2', label: 'Inventory', path: '/dashboard/inventory' },
   { key: '3', label: 'Stock Management', path: '/dashboard/stock-management' },
   { key: '4', label: 'Manage Users', path: '/dashboard/users' },
-  { key: '5', label: 'Report', path: '/dashboard/report' },
+  { key: '5', label: 'Sales', path: '/dashboard/sales' },
+  { key: '6', label: 'Report', path: '/dashboard/report' },
 ];
 
 const managerModules = [
   { key: '1', label: 'Dashboard', path: '/dashboard/manager' },
   { key: '2', label: 'Inventory', path: '/dashboard/inventory' },
-  { key: '3', label: 'Stock Management', path: '/dashboard/stock' },
-  { key: '4', label: 'Manage Staff', path: '/dashboard/users' },
-  { key: '5', label: 'Report', path: '/dashboard/report' },
+  { key: '3', label: 'Sales', path: '/dashboard/sales' },
+  { key: '4', label: 'Stock Management', path: '/dashboard/stock' },
+  { key: '5', label: 'Manage Staff', path: '/dashboard/users' },
+  { key: '6', label: 'Report', path: '/dashboard/report' },
 ];
 
 const adminModules = [
@@ -32,11 +34,6 @@ const adminModules = [
   { key: '2', label: 'Maintenance', path: '/dashboard/maintenance' },
   { key: '3', label: 'Report', path: '/dashboard/report' },
 ];
-
-const staffModules = [
-  { key: '1', label: 'Inventory', path: '/dashboard/inventory/staff' },
-];
-
 const Sidebar = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -45,7 +42,6 @@ const Sidebar = () => {
         user?.role === 'owner' ? ownerModules :
         user?.role === 'admin' ? adminModules :
         user?.role === 'manager' ? managerModules :
-        user?.role === 'staff' ? staffModules :
     [];
 
   return (
