@@ -3,24 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {colors} from '../../theme.js';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
-
-const mockUsers = [
-  {
-    username: 'owner1',
-    password: '123',
-    role: 'owner'
-  },
-  {
-    username: 'manager1',
-    password: '123',
-    role: 'manager'
-  },
-  {
-    username: 'admin1',
-    password: '123',
-    role: 'admin'
-  }
-]
+import { mockUsers } from '../../data/mockUsers.js';
 
 const Login = () => {
     const {login} = useAuth();
