@@ -21,7 +21,7 @@ import Maintenance from '../pages/module/Maintentance'
 import StockManagement from '../pages/module/StockManagement'
 import Sales from '../pages/module/Sales'
 import UserAccess from '../pages/module/UserAccess'
-import Report from '../pages/module/UserAccess'
+import Report from '../pages/module/Reports'
 //Contains all paths to pages
 
 const router = createBrowserRouter (
