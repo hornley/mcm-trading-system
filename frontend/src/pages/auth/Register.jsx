@@ -38,7 +38,7 @@ const Register = () => {
                         <Input
                             placeholder='Address'
                             value={address} 
-                            onChange={(e)=> setEmail(e.target.value)}
+                            onChange={(e)=> setAddress(e.target.value)}
                         />
                         <Input
                             placeholder='Phone Number'

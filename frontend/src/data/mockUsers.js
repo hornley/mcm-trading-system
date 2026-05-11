@@ -31,13 +31,4 @@ export const mockUsers = [
     phoneNumber: '099999997',
     avatar: adminAvatar,
   },
-  {
-    username: 'staff1',
-    password: '123',
-    role: 'staff',
-    email: 'staff@gmail.com',
-    address: 'yur street',
-    phoneNumber: '099999996',
-    avatar: staffAvatar,
-  }
 ]
