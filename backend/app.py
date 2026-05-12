@@ -3,6 +3,7 @@ from flask import Flask, send_from_directory
 from flask_cors import CORS
 from config import Config, FRONTEND_DIST
 from models import db
+from routes.auth import auth_bp
 
 
 def create_app():
@@ -10,6 +11,7 @@ def create_app():
     app.config.from_object(Config)
     CORS(app)
     db.init_app(app)
+    app.register_blueprint(auth_bp)
 
     with app.app_context():
         from models import (
