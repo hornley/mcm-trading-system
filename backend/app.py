@@ -4,6 +4,7 @@ from flask_cors import CORS
 from config import Config, FRONTEND_DIST
 from models import db
 from routes.auth import auth_bp
+from routes.accountControl import account_bp 
 
 
 def create_app():
@@ -11,6 +12,7 @@ def create_app():
     app.config.from_object(Config)
     CORS(app)
     db.init_app(app)
+    app.register_blueprint(account_bp)
     app.register_blueprint(auth_bp)
 
     with app.app_context():
@@ -23,9 +25,9 @@ def create_app():
 
         if User.query.count() == 0:
             defaults = [
-                User(username='owner',   email='owner@mcm.com',   password=generate_password_hash('password'), usertype=1),
-                User(username='manager', email='manager@mcm.com', password=generate_password_hash('password'), usertype=2),
-                User(username='admin',   email='admin@mcm.com',   password=generate_password_hash('password'), usertype=3),
+                User(username='owner',   email='owner@mcm.com',   password=generate_password_hash('password'), usertype=1, location_id=0, employee_code='260512001'),
+                User(username='manager', email='manager@mcm.com', password=generate_password_hash('password'), usertype=2, location_id=2, employee_code='260512002'),
+                User(username='admin',   email='admin@mcm.com',   password=generate_password_hash('password'), usertype=3, location_id=1, employee_code='260512003'),
             ]
             db.session.add_all(defaults)
             db.session.commit()
