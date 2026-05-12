@@ -6,7 +6,7 @@ account_bp = Blueprint("account", __name__)
 
 ALLOWED_TYPES = {1, 3}
 
-LOCATION_MAP = {0: "all", 1: "storehouse", 2: "store"}
+LOCATION_MAP = {0: "all", 1: "storehouse", 2: "branch 1", 3: "branch 2"}
 
 
 def _location_name(location_id):
@@ -19,19 +19,16 @@ def _generate_employee_code():
     return f"{prefix}{count + 1:03d}"
 
 
-def _check_access(user_id):
-    user = User.query.get(user_id)
-    if not user or user.usertype not in ALLOWED_TYPES:
-        return None
-    return user
+def _check_access(usertype):
+    return usertype in ALLOWED_TYPES
 
 
 @account_bp.route("/api/account/users", methods=["GET"])
 def list_users():
-    user_id = request.args.get("user_id", type=int)
-    if not user_id:
-        return jsonify({"error": "user_id query parameter is required"}), 400
-    if not _check_access(user_id):
+    auth_usertype = request.args.get("usertype", type=int)
+    if auth_usertype is None:
+        return jsonify({"error": "usertype query parameter is required"}), 400
+    if not _check_access(auth_usertype):
         return jsonify({"error": "Forbidden"}), 403
 
     query = User.query
@@ -42,9 +39,9 @@ def list_users():
             User.username.ilike(f"%{search}%") | User.email.ilike(f"%{search}%")
         )
 
-    usertype = request.args.get("usertype", type=int)
-    if usertype:
-        query = query.filter_by(usertype=usertype)
+    filter_usertype = request.args.get("filter_usertype", type=int)
+    if filter_usertype:
+        query = query.filter_by(usertype=filter_usertype)
 
     location_id = request.args.get("location_id", type=int)
     if location_id is not None:
@@ -54,8 +51,10 @@ def list_users():
 
     return jsonify([
         {
+            "user_id": u.user_id,
             "employee_code": u.employee_code,
             "username": u.username,
+            "usertype": u.usertype,
             "location": _location_name(u.location_id),
         }
         for u in users
@@ -68,17 +67,17 @@ def edit_user_access(target_id):
     if not data:
         return jsonify({"error": "Request body is required"}), 400
 
-    requester_id = data.get("user_id")
-    if not requester_id:
-        return jsonify({"error": "user_id is required"}), 400
-    if not _check_access(requester_id):
+    requester_usertype = data.get("requester_usertype")
+    if requester_usertype is None:
+        return jsonify({"error": "requester_usertype is required"}), 400
+    if not _check_access(requester_usertype):
         return jsonify({"error": "Forbidden"}), 403
 
     target = User.query.get(target_id)
     if not target:
         return jsonify({"error": "User not found"}), 404
 
-    new_usertype = data.get("usertype")
+    new_usertype = data.get("new_usertype")
     if new_usertype is None or new_usertype not in ALLOWED_TYPES | {2, 4}:
         return jsonify({"error": "usertype must be 1 (owner), 2 (manager), 3 (admin), or 4 (staff)"}), 400
 
