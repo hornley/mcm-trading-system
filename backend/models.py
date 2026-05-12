@@ -1,0 +1,113 @@
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+
+db = SQLAlchemy()
+
+
+class User(db.Model):
+    __tablename__ = "Users"
+    user_id = db.Column(db.Integer, primary_key=True)
+    usertype = db.Column(db.Integer, nullable=False)
+    username = db.Column(db.String, nullable=False)
+    email = db.Column(db.String, nullable=False, unique=True)
+    password = db.Column(db.String, nullable=False)
+
+
+class Location(db.Model):
+    __tablename__ = "Locations"
+    location_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, nullable=False)
+    address = db.Column(db.String)
+
+
+class Category(db.Model):
+    __tablename__ = "Categories"
+    category_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, nullable=False)
+    description = db.Column(db.String)
+
+
+class Product(db.Model):
+    __tablename__ = "Products"
+    product_id = db.Column(db.Integer, primary_key=True)
+    category_id = db.Column(db.Integer, db.ForeignKey("Categories.category_id"), nullable=False)
+    name = db.Column(db.String, nullable=False)
+    price = db.Column(db.Integer, nullable=False)
+    reorder_level = db.Column(db.String)
+    category = db.relationship("Category", backref="products")
+
+
+class Order(db.Model):
+    __tablename__ = "Orders"
+    order_id = db.Column(db.Integer, primary_key=True)
+    location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
+    order_date = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    status = db.Column(db.String, nullable=False)
+    total_amount = db.Column(db.Float, nullable=False)
+    location = db.relationship("Location", backref="orders")
+
+
+class OrderItem(db.Model):
+    __tablename__ = "Order_Items"
+    order_item_id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("Orders.order_id"), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    price = db.Column(db.Integer, nullable=False)
+    order = db.relationship("Order", backref="items")
+    product = db.relationship("Product")
+
+
+class Payment(db.Model):
+    __tablename__ = "Payments"
+    payment_id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("Orders.order_id"), nullable=False)
+    payment_method = db.Column(db.String, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    price = db.Column(db.Integer, nullable=False)
+    order = db.relationship("Order", backref="payments")
+
+
+class Inventory(db.Model):
+    __tablename__ = "Inventory"
+    inventory_id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False, default=0)
+    product = db.relationship("Product")
+    location = db.relationship("Location")
+
+
+class StockTransfer(db.Model):
+    __tablename__ = "Stock_Transfers"
+    transfer_id = db.Column(db.Integer, primary_key=True)
+    from_location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
+    to_location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    transfer_date = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    status = db.Column(db.String, nullable=False)
+    from_location = db.relationship("Location", foreign_keys=[from_location_id])
+    to_location = db.relationship("Location", foreign_keys=[to_location_id])
+    user = db.relationship("User")
+
+
+class StockAdjustment(db.Model):
+    __tablename__ = "Stock_Adjustments"
+    adjustment_id = db.Column(db.Integer, primary_key=True)
+    location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
+    quantity_change = db.Column(db.Integer, nullable=False)
+    reason = db.Column(db.String)
+    date = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    location = db.relationship("Location")
+    user = db.relationship("User")
+
+
+class ActivityLog(db.Model):
+    __tablename__ = "Activity_Log"
+    log_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
+    action = db.Column(db.String, nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    user = db.relationship("User")
