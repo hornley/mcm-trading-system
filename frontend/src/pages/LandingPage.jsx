@@ -11,11 +11,11 @@ const LandingPage = () => {
       <Col span={8}>
         <Card title={<span style={{ color: colors.primaryText, textAlign:'center'}}>Welcome User!</span>}>
           <Row justify="center" align="middle">
-            <Button onClick={() => navigate('/Login')}type="primary">
+            <Button onClick={() => navigate('/login')} type="primary">
               Login
             </Button>
             <Divider orientation="vertical"></Divider>
-            <Button onClick={() => navigate('/Register')}>
+            <Button onClick={() => navigate('/register')}>
               Sign Up
             </Button>
           </Row>
