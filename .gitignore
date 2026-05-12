@@ -152,6 +152,7 @@ venv/
 env/
 *.egg-info/
 *.sqlite3
+*.db
 instance/
 
 # OS

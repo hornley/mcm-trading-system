@@ -1,30 +1,42 @@
-import { Card, Col, Row, Button, Divider, Input, Space } from 'antd';
+import { Card, Col, Row, Button, Divider, Input, Space, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import {colors} from '../../theme.js';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { mockUsers } from '../../data/mockUsers.js';
 
 const Login = () => {
     const {login} = useAuth();
 
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
 
     const navigate = useNavigate();
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
+        setLoading(true);
 
-        const foundUser = mockUsers.find(
-            (user) => 
-                user.username === username &&
-                user.password === password
-        )
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password }),
+            });
 
-        if (foundUser) {
-            login(foundUser);
-            navigate(`/dashboard/${foundUser.role}`)
+            const data = await res.json();
+
+            if (!res.ok) {
+                message.error(data.error);
+                return;
+            }
+
+            login(data);
+            navigate(`/dashboard/${data.role}`);
+        } catch {
+            message.error('Connection error. Is the server running?');
+        } finally {
+            setLoading(false);
         }
     }
 
@@ -46,7 +58,7 @@ const Login = () => {
                             onChange={(e)=> setPassword(e.target.value)}
                         />
                         <Divider></Divider> 
-                        <Button type="primary" htmlType="submit">
+                        <Button type="primary" htmlType="submit" loading={loading}>
                             Login
                         </Button>
                         <Divider orientation="vertical"></Divider>                       

@@ -1,7 +1,6 @@
 import { Menu, Layout, Col, Row, Typography} from "antd"
 import { Avatar } from 'antd';
 import { Space } from 'antd';
-import sampleUser from '../assets/ownerAvatar.png'
 import { colors } from '../theme.js' 
 import { useAuth } from "../context/AuthContext";
 import {UserOutlined} from '@ant-design/icons'

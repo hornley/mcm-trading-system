@@ -18,7 +18,17 @@ def create_app():
             User, Location, Category, Product, Order, OrderItem,
             Payment, Inventory, StockTransfer, StockAdjustment, ActivityLog,
         )
+        from werkzeug.security import generate_password_hash
         db.create_all()
+
+        if User.query.count() == 0:
+            defaults = [
+                User(username='owner',   email='owner@mcm.com',   password=generate_password_hash('password'), usertype=1),
+                User(username='manager', email='manager@mcm.com', password=generate_password_hash('password'), usertype=2),
+                User(username='admin',   email='admin@mcm.com',   password=generate_password_hash('password'), usertype=3),
+            ]
+            db.session.add_all(defaults)
+            db.session.commit()
 
     @app.route("/api/health")
     def health():
