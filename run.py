@@ -16,17 +16,16 @@ signal.signal(signal.SIGINT, cleanup)
 signal.signal(signal.SIGTERM, cleanup)
 
 print("Seeding database...")
-subprocess.run(["python", "createDatabase.py"], cwd=os.path.join(BASE_DIR, "backend"), check=True, shell=True)
+subprocess.run(["python", "createDatabase.py"], cwd=os.path.join(BASE_DIR, "backend"), check=True)
 
 print("Starting Vite dev server (hot reload)...")
 vite_process = subprocess.Popen(
     ["npm", "run", "dev"],
     cwd=os.path.join(BASE_DIR, "frontend"),
-    shell=True,
 )
 
 print("Starting Flask backend (hot reload)...")
 try:
-    subprocess.run(["python", "app.py"], cwd=os.path.join(BASE_DIR, "backend"), shell=True)
+    subprocess.run(["python", "app.py"], cwd=os.path.join(BASE_DIR, "backend"))
 finally:
     cleanup(None, None)

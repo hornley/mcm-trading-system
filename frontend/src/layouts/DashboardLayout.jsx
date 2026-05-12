@@ -1,35 +1,29 @@
 import React from 'react'
-import { Layout, Menu } from 'antd';
+import { Layout } from 'antd';
 import { Outlet } from 'react-router-dom';
 import {colors} from '../theme.js';
 import Topbar from '../components/Topbar.jsx'
 import Bottombar from '../components/Bottombar.jsx'
 import Sidebar from '../components/Sidebar.jsx';
 
-const { Header, Content, Footer, Sider } = Layout;
-
-const items = [
-  { key: '1', label: 'Dashboard'},
-  { key: '2', label: 'Dashboard'},
-];
+const { Header, Content, Footer } = Layout;
 
 const DashboardLayout = () => {
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
       <Sidebar />
-      <Layout>
-        <Header style={{ backgroundColor: colors.headerBg, padding: '0 24px', height: '64px'}}>
+      <Layout style={{ overflow: 'hidden' }}>
+        <Header style={{ backgroundColor: colors.headerBg, padding: '0 24px', height: '64px', position: 'sticky', top: 0, zIndex: 1 }}>
           <Topbar />
         </Header>
-        <Content>
+        <Content style={{ overflow: 'auto', padding: 0 }}>
           <Outlet />
         </Content>
-        <Footer style={{ backgroundColor: colors.headerBg, padding: '0 24px', height: '64px'}}>
+        <Footer style={{ backgroundColor: colors.headerBg, padding: '0 24px', height: '64px' }}>
           <Bottombar />
         </Footer>
-        </Layout>
+      </Layout>
     </Layout>
-
   )
 }
 
