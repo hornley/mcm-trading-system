@@ -11,6 +11,8 @@ class User(db.Model):
     username = db.Column(db.String, nullable=False)
     email = db.Column(db.String, nullable=False, unique=True)
     password = db.Column(db.String, nullable=False)
+    location_id = db.Column(db.Integer, nullable=False, default=0)
+    employee_code = db.Column(db.String, nullable=False, unique=True)
 
 
 class Location(db.Model):
