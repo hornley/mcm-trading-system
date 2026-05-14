@@ -494,6 +494,7 @@ def adjust_inventory():
     inventory.quantity = new_quantity
 
     adjustment = StockAdjustment(
+        product_id=data["product_id"],
         location_id=data["location_id"],
         user_id=data.get("user_id"),
         quantity_change=quantity_change,
@@ -574,3 +575,112 @@ def get_low_stock():
                 })
 
     return success_response(low_stock)
+
+
+@inventory_bp.route("/api/stock/transfer", methods=["POST"])
+def transfer_stock():
+    data = request.get_json()
+    if not data:
+        return error_response("Request body is required", "MISSING_BODY", 400)
+
+    usertype = data.get("usertype")
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+
+    if not _can_update(usertype):
+        return error_response("You don't have permission to transfer stock", "FORBIDDEN", 403)
+
+    error = validate_required(data, ["product_id", "from_location_id", "to_location_id", "quantity"])
+    if error:
+        return error
+
+    if usertype == 2:
+        manager = User.query.get(data.get("user_id"))
+        if not manager:
+            return error_response("User not found", "NOT_FOUND", 404)
+        if manager.location_id != data.get("from_location_id"):
+            return error_response("You can only transfer stock from your assigned location", "FORBIDDEN", 403)
+
+    try:
+        quantity = int(data["quantity"])
+        if quantity <= 0:
+            raise ValueError
+    except (ValueError, TypeError):
+        return error_response("quantity must be a positive integer", "INVALID_VALUE", 400)
+
+    product = Product.query.get(data["product_id"])
+    if not product:
+        return error_response("Product not found", "NOT_FOUND", 404)
+
+    from_location = Location.query.get(data["from_location_id"])
+    if not from_location:
+        return error_response("Source location not found", "NOT_FOUND", 404)
+
+    to_location = Location.query.get(data["to_location_id"])
+    if not to_location:
+        return error_response("Destination location not found", "NOT_FOUND", 404)
+
+    if data["from_location_id"] == data["to_location_id"]:
+        return error_response("Source and destination locations must be different", "SAME_LOCATION", 400)
+
+    from_inventory = Inventory.query.filter_by(
+        product_id=data["product_id"],
+        location_id=data["from_location_id"]
+    ).first()
+
+    if not from_inventory or from_inventory.quantity < quantity:
+        return error_response("Insufficient stock at source location", "INSUFFICIENT_STOCK", 400)
+
+    to_inventory = Inventory.query.filter_by(
+        product_id=data["product_id"],
+        location_id=data["to_location_id"]
+    ).first()
+
+    from_inventory.quantity -= quantity
+
+    if to_inventory:
+        to_inventory.quantity += quantity
+    else:
+        to_inventory = Inventory(
+            product_id=data["product_id"],
+            location_id=data["to_location_id"],
+            quantity=quantity,
+        )
+        db.session.add(to_inventory)
+
+    transfer = StockTransfer(
+        product_id=data["product_id"],
+        from_location_id=data["from_location_id"],
+        to_location_id=data["to_location_id"],
+        user_id=data.get("user_id"),
+        quantity=quantity,
+    )
+    db.session.add(transfer)
+    db.session.commit()
+
+    log_activity(
+        user_id=data.get("user_id"),
+        module="inventory",
+        action_type="transfer",
+        action=f"Transferred {product.name}: {quantity} from {from_location.name} to {to_location.name}",
+        details={
+            "product_id": product.product_id,
+            "from_location_id": from_location.location_id,
+            "to_location_id": to_location.location_id,
+            "quantity": quantity,
+        }
+    )
+
+    return success_response(
+        {
+            "transfer_id": transfer.transfer_id,
+            "product_id": product.product_id,
+            "product_name": product.name,
+            "from_location_id": from_location.location_id,
+            "from_location_name": from_location.name,
+            "to_location_id": to_location.location_id,
+            "to_location_name": to_location.name,
+            "quantity": quantity,
+        },
+        "Stock transferred successfully"
+    )
