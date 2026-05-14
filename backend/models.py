@@ -25,6 +25,9 @@ class Location(db.Model):
     location_id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
     address = db.Column(db.String)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.now)
 
 
 class Category(db.Model):
@@ -32,6 +35,9 @@ class Category(db.Model):
     category_id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
     description = db.Column(db.String)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.now)
 
 
 class Product(db.Model):
@@ -41,6 +47,12 @@ class Product(db.Model):
     name = db.Column(db.String, nullable=False)
     price = db.Column(db.Integer, nullable=False)
     reorder_level = db.Column(db.String)
+    description = db.Column(db.Text)
+    sku = db.Column(db.String, unique=True)
+    unit = db.Column(db.String)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.now)
     category = db.relationship("Category", backref="products")
 
 
@@ -81,6 +93,7 @@ class Inventory(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
     location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=0)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.now)
     product = db.relationship("Product")
     location = db.relationship("Location")
 
@@ -115,6 +128,9 @@ class ActivityLog(db.Model):
     __tablename__ = "Activity_Log"
     log_id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
+    module = db.Column(db.String, nullable=False)
+    action_type = db.Column(db.String, nullable=False)
     action = db.Column(db.String, nullable=False)
+    details = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
     user = db.relationship("User")
