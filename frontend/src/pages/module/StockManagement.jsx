@@ -352,9 +352,10 @@ const StockManagement = () => {
           </Form.Item>
           <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: 'Please enter quantity' }]}>
             <InputNumber min={1} style={{ width: '100%' }} placeholder="Enter quantity" />
-            <Typography.Text type="secondary" style={{ fontSize: 12, marginTop: 4, display: 'block' }}>
-              Available: {selectedRecord?.quantity ?? 0} units
-            </Typography.Text>
+          </Form.Item>
+          <Typography.Text type="secondary" style={{ fontSize: 12, marginTop: -16, marginBottom: 16, display: 'block' }}>
+            Available: {selectedRecord?.quantity ?? 0} units
+          </Typography.Text>
           </Form.Item>
           <Form.Item name="date" label="Transfer Date" rules={[{ required: true, message: 'Please select date' }]}>
             <DatePicker style={{ width: '100%' }} />
