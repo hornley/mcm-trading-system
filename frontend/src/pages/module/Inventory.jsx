@@ -80,7 +80,7 @@ const Inventory = () => {
     { title: 'Category', dataIndex: 'category', key: 'category' },
     { title: 'Subcategory', dataIndex: 'subcategory', key: 'subcategory' },
     { title: 'Stock Quantity', dataIndex: 'stockQuantity', key: 'stockQuantity' },
-    { title: 'Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}` },
+    { title: 'Base Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}` },
     { title: 'Reorder Level', dataIndex: 'reorderLevel', key: 'reorderLevel' },
     {
       title: 'Status',
@@ -214,7 +214,7 @@ const Inventory = () => {
           </Form.Item>
           <Form.Item
             name="price"
-            label="Price"
+            label="Base Price"
             rules={[{ required: true, message: 'Please enter price' }]}
           >
             <InputNumber min={0} style={{ width: '100%' }} placeholder="Enter price" prefix="₱" />
