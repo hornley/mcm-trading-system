@@ -2,6 +2,7 @@ import subprocess
 import os
 import signal
 import sys
+import shutil
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 vite_process = None
@@ -15,12 +16,24 @@ def cleanup(signum, frame):
 signal.signal(signal.SIGINT, cleanup)
 signal.signal(signal.SIGTERM, cleanup)
 
+npm_executable = shutil.which("npm") or shutil.which("npm.cmd") or shutil.which("npm.exe")
+if not npm_executable:
+    raise FileNotFoundError(
+        "npm was not found on PATH. Install Node.js or add npm to PATH, then retry."
+    )
+
+print("Installing frontend dependencies...")
+subprocess.run([npm_executable, "install"], cwd=os.path.join(BASE_DIR, "frontend"), check=True)
+
+print("Building frontend...")
+subprocess.run([npm_executable, "run", "build"], cwd=os.path.join(BASE_DIR, "frontend"), check=True)
+
 print("Seeding database...")
 subprocess.run(["python", "createDatabase.py"], cwd=os.path.join(BASE_DIR, "backend"), check=True)
 
 print("Starting Vite dev server (hot reload)...")
 vite_process = subprocess.Popen(
-    ["npm", "run", "dev"],
+    [npm_executable, "run", "dev"],
     cwd=os.path.join(BASE_DIR, "frontend"),
 )
 

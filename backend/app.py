@@ -6,7 +6,7 @@ from models import db
 from routes.auth import auth_bp
 from routes.accountControl import account_bp
 from routes.inventory import inventory_bp
-
+from routes.settings import settings_bp
 
 def create_app():
     app = Flask(__name__, static_folder=FRONTEND_DIST, static_url_path="")
