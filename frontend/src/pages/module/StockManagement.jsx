@@ -151,9 +151,10 @@ const StockManagement = () => {
         transferForm.resetFields();
         fetchData();
       } else {
-        message.error(data.message);
+        message.error(data.message || 'Failed to transfer stock');
       }
-    } catch {
+    } catch (err) {
+      if (err?.errorFields) return;
       message.error('Failed to transfer stock');
     }
   };
