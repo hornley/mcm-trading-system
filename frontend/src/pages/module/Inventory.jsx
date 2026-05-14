@@ -76,13 +76,13 @@ const Inventory = () => {
   };
 
   const handleAdjust = (record) => {
+    if (selectedLocationId === "all") {
+      message.warning('Select a specific branch from the top bar to adjust stock');
+      return;
+    }
     setAdjustProduct(record);
     adjustForm.resetFields();
-    const defaults = { direction: 'add' };
-    if (selectedLocationId !== "all") {
-      defaults.location_id = selectedLocationId;
-    }
-    adjustForm.setFieldsValue(defaults);
+    adjustForm.setFieldsValue({ direction: 'add' });
     setAdjustModalVisible(true);
   };
 
@@ -164,7 +164,7 @@ const Inventory = () => {
           usertype: user.usertype,
           user_id: user.user_id,
           product_id: adjustProduct.product_id,
-          location_id: values.location_id,
+          location_id: selectedLocationId,
           quantity_change: quantityChange,
           reason: values.reason || null,
         }),
@@ -215,7 +215,13 @@ const Inventory = () => {
             <Button type="link" onClick={() => handleEdit(record)}>Edit</Button>
           )}
           {can('update') && record.is_active && (
-            <Button type="link" onClick={() => handleAdjust(record)}>Adjust</Button>
+            <Button
+              type="link"
+              disabled={selectedLocationId === "all"}
+              onClick={() => handleAdjust(record)}
+            >
+              Adjust
+            </Button>
           )}
           {can('delete') && record.is_active && (
             <Popconfirm
@@ -350,13 +356,9 @@ const Inventory = () => {
         ]}
       >
         <Form form={adjustForm} layout="vertical">
-          <Form.Item name="location_id" label="Location" rules={[{ required: true, message: 'Please select location' }]}>
-            <Select placeholder="Select location">
-              {locations.filter((l) => l.is_active).map((loc) => (
-                <Select.Option key={loc.location_id} value={loc.location_id}>{loc.name}</Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+          <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+            Adjusting stock at: {locations.find((l) => l.location_id === selectedLocationId)?.name || 'Selected branch'}
+          </Typography.Text>
           <Form.Item name="direction" label="Direction">
             <Radio.Group>
               <Radio value="add">Add Stock</Radio>
