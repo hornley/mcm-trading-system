@@ -32,9 +32,6 @@ def seed():
         print("Seeding Users...")
         # usertype: 0=Staff(no access), 1=Owner, 2=Manager, 3=Admin
         users_data = [
-            (0, "staff1",   "staff1@mcm.com",   "260512004", 1),
-            (0, "staff2",   "staff2@mcm.com",   "260512005", 2),
-            (0, "staff3",   "staff3@mcm.com",   "260512006", 3),
             (1, "owner",    "owner@mcm.com",    "260512001", 0),
             (2, "manager",  "manager@mcm.com",  "260512002", 2),
             (2, "manager2", "manager2@mcm.com", "260512007", 1),
