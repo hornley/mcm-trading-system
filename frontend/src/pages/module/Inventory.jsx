@@ -1,95 +1,219 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Table,
-  Card,
-  Typography,
-  Tabs,
-  Row,
-  Col,
-  Input,
-  Select,
-  Button,
-  Tag,
-  Modal,
-  Form,
-  Space,
-  Popconfirm,
-  InputNumber,
+  Table, Card, Typography, Tabs, Row, Col, Input, Select, Button,
+  Tag, Modal, Form, Space, Popconfirm, InputNumber, message, Spin, Radio,
 } from 'antd';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 const { Title } = Typography;
 const { Search } = Input;
-
-const mockProducts = [
-  { key: '1', name: 'FELT HARD 1', category: 'Textiles', subcategory: 'Felt', stockQuantity: 25, price: 120, reorderLevel: '10', status: 'active' },
-  { key: '2', name: 'FELT HARD 2', category: 'Textiles', subcategory: 'Felt', stockQuantity: 30, price: 130, reorderLevel: '10', status: 'active' },
-  { key: '3', name: 'FLEECE', category: 'Textiles', subcategory: 'Fleece', stockQuantity: 15, price: 180, reorderLevel: '8', status: 'active' },
-  { key: '4', name: 'HI-PILE', category: 'Textiles', subcategory: 'Plush', stockQuantity: 10, price: 250, reorderLevel: '5', status: 'active' },
-  { key: '5', name: '12MM CIRCULAR', category: 'Textiles', subcategory: 'Plush', stockQuantity: 20, price: 200, reorderLevel: '10', status: 'active' },
-  { key: '6', name: '8MM AND 20MM PLUSH', category: 'Textiles', subcategory: 'Plush', stockQuantity: 12, price: 220, reorderLevel: '8', status: 'active' },
-  { key: '7', name: '7MM AND 20MM PLUSH', category: 'Textiles', subcategory: 'Plush', stockQuantity: 8, price: 230, reorderLevel: '8', status: 'active' },
-  { key: '8', name: '3MM PRINTED FUR', category: 'Textiles', subcategory: 'Fur', stockQuantity: 5, price: 280, reorderLevel: '5', status: 'active' },
-  { key: '9', name: 'SHAGGY FUR', category: 'Textiles', subcategory: 'Fur', stockQuantity: 7, price: 300, reorderLevel: '5', status: 'active' },
-  { key: '10', name: 'NYLEX 220G', category: 'Textiles', subcategory: 'Nylex', stockQuantity: 40, price: 90, reorderLevel: '15', status: 'active' },
-  { key: '11', name: 'VELBOA KOREA', category: 'Textiles', subcategory: 'Velboa', stockQuantity: 6, price: 350, reorderLevel: '5', status: 'active' },
-  { key: '12', name: 'LAMB FUR 2323', category: 'Textiles', subcategory: 'Fur', stockQuantity: 3, price: 400, reorderLevel: '3', status: 'active' },
-  { key: '13', name: 'VELVET 1', category: 'Textiles', subcategory: 'Velvet', stockQuantity: 18, price: 160, reorderLevel: '10', status: 'active' },
-  { key: '14', name: 'VELVET 2', category: 'Textiles', subcategory: 'Velvet', stockQuantity: 22, price: 170, reorderLevel: '10', status: 'active' },
-  { key: '15', name: 'VELBOA SUPER SOFT', category: 'Textiles', subcategory: 'Velboa', stockQuantity: 4, price: 380, reorderLevel: '5', status: 'active' },
-  { key: '16', name: 'PRINTED DESIGN', category: 'Textiles', subcategory: 'Printed', stockQuantity: 15, price: 150, reorderLevel: '10', status: 'active' },
-  { key: '17', name: 'SUEDE GAMOSA', category: 'Textiles', subcategory: 'Suede', stockQuantity: 10, price: 200, reorderLevel: '8', status: 'active' },
-  { key: '18', name: 'NEON WOVEN CLOTH', category: 'Textiles', subcategory: 'Woven', stockQuantity: 35, price: 100, reorderLevel: '15', status: 'active' },
-  { key: '19', name: 'FEATHERS', category: 'Textiles', subcategory: 'Decor', stockQuantity: 50, price: 50, reorderLevel: '20', status: 'active' },
-];
-
-const subcategories = ['Felt', 'Fleece', 'Plush', 'Fur', 'Nylex', 'Velboa', 'Velvet', 'Printed', 'Suede', 'Woven', 'Decor'];
+const { TextArea } = Input;
 
 const Inventory = () => {
-  const { can } = useAuth();
-  const [modalVisible, setModalVisible] = useState(false);
+  const { user, can } = useAuth();
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [inventoryMap, setInventoryMap] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [productModalVisible, setProductModalVisible] = useState(false);
+  const [adjustModalVisible, setAdjustModalVisible] = useState(false);
+  const [adjustProduct, setAdjustProduct] = useState(null);
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [form] = Form.useForm();
+  const [searchText, setSearchText] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState(null);
+  const [productForm] = Form.useForm();
+  const [adjustForm] = Form.useForm();
+
+  const fetchData = async () => {
+    if (!user) return;
+    setTableLoading(true);
+    try {
+      const [productsRes, categoriesRes, inventoryRes, locationsRes] = await Promise.all([
+        fetch(`/api/products?usertype=${user.usertype}`),
+        fetch(`/api/categories?usertype=${user.usertype}`),
+        fetch(`/api/inventory?usertype=${user.usertype}`),
+        fetch(`/api/locations?usertype=${user.usertype}`),
+      ]);
+      const productsData = await productsRes.json();
+      const categoriesData = await categoriesRes.json();
+      const inventoryData = await inventoryRes.json();
+      const locationsData = await locationsRes.json();
+
+      if (productsData.success) setProducts(productsData.data);
+      if (categoriesData.success) setCategories(categoriesData.data);
+      if (locationsData.success) setLocations(locationsData.data);
+      if (inventoryData.success) {
+        const map = {};
+        inventoryData.data.forEach((inv) => {
+          if (!map[inv.product_id]) map[inv.product_id] = [];
+          map[inv.product_id].push(inv);
+        });
+        setInventoryMap(map);
+      }
+    } catch {
+      message.error('Failed to load data');
+    } finally {
+      setTableLoading(false);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [user]);
+
+  const totalStock = (productId) => {
+    const invs = inventoryMap[productId];
+    if (!invs) return 0;
+    return invs.reduce((sum, inv) => sum + inv.quantity, 0);
+  };
 
   const handleAdd = () => {
     setSelectedRecord(null);
-    form.resetFields();
-    setModalVisible(true);
+    productForm.resetFields();
+    setProductModalVisible(true);
   };
 
   const handleEdit = (record) => {
     setSelectedRecord(record);
-    form.setFieldsValue(record);
-    setModalVisible(true);
-  };
-
-  const handleVoid = (record) => {
-    console.log('Void product:', record);
-  };
-
-  const handleSave = () => {
-    form.validateFields().then((values) => {
-      console.log('Save:', selectedRecord ? { ...selectedRecord, ...values } : values);
-      setModalVisible(false);
-      form.resetFields();
+    productForm.setFieldsValue({
+      name: record.name,
+      category_id: record.category_id,
+      price: record.price,
+      unit: record.unit,
+      reorder_level: record.reorder_level,
+      description: record.description,
     });
+    setProductModalVisible(true);
   };
+
+  const handleAdjust = (record) => {
+    setAdjustProduct(record);
+    adjustForm.resetFields();
+    adjustForm.setFieldsValue({ direction: 'add' });
+    setAdjustModalVisible(true);
+  };
+
+  const handleVoid = async (record) => {
+    try {
+      const res = await fetch(`/api/products/${record.product_id}/void`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usertype: user.usertype, user_id: user.user_id }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        message.success('Product voided');
+        fetchData();
+      } else {
+        message.error(data.message);
+      }
+    } catch {
+      message.error('Failed to void product');
+    }
+  };
+
+  const handleDelete = async (record) => {
+    try {
+      const res = await fetch(`/api/products/${record.product_id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usertype: user.usertype, user_id: user.user_id }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        message.success('Product deleted');
+        fetchData();
+      } else {
+        message.error(data.message);
+      }
+    } catch {
+      message.error('Failed to delete product');
+    }
+  };
+
+  const handleSaveProduct = async () => {
+    try {
+      const values = await productForm.validateFields();
+      const isEdit = !!selectedRecord;
+      const url = isEdit ? `/api/products/${selectedRecord.product_id}` : '/api/products';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...values, usertype: user.usertype, user_id: user.user_id }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        message.success(isEdit ? 'Product updated' : 'Product created');
+        setProductModalVisible(false);
+        productForm.resetFields();
+        fetchData();
+      } else {
+        message.error(data.message);
+      }
+    } catch {
+      if (!selectedRecord) message.error('Failed to save product');
+    }
+  };
+
+  const handleSaveAdjust = async () => {
+    try {
+      const values = await adjustForm.validateFields();
+      const quantityChange = values.direction === 'remove'
+        ? -Math.abs(values.quantity)
+        : Math.abs(values.quantity);
+
+      const res = await fetch('/api/inventory/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          usertype: user.usertype,
+          user_id: user.user_id,
+          product_id: adjustProduct.product_id,
+          location_id: values.location_id,
+          quantity_change: quantityChange,
+          reason: values.reason || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        message.success('Stock adjusted');
+        setAdjustModalVisible(false);
+        adjustForm.resetFields();
+        fetchData();
+      } else {
+        message.error(data.message);
+      }
+    } catch {
+      message.error('Failed to adjust stock');
+    }
+  };
+
+  const filteredProducts = products.filter((p) => {
+    if (searchText && !p.name.toLowerCase().includes(searchText.toLowerCase())) return false;
+    if (categoryFilter && p.category_id !== categoryFilter) return false;
+    return true;
+  });
 
   const columns = [
     { title: 'Product Name', dataIndex: 'name', key: 'name' },
     { title: 'Category', dataIndex: 'category', key: 'category' },
-    { title: 'Subcategory', dataIndex: 'subcategory', key: 'subcategory' },
-    { title: 'Stock Quantity', dataIndex: 'stockQuantity', key: 'stockQuantity' },
+    {
+      title: 'Stock Quantity', key: 'stockQuantity',
+      render: (_, record) => totalStock(record.product_id),
+    },
     { title: 'Base Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}` },
-    { title: 'Reorder Level', dataIndex: 'reorderLevel', key: 'reorderLevel' },
+    { title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level' },
     {
       title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => (
-        <Tag color={status === 'active' ? 'green' : 'red'}>
-          {status === 'active' ? 'Active' : 'Voided'}
-        </Tag>
+      dataIndex: 'is_active',
+      key: 'is_active',
+      render: (active) => (
+        <Tag color={active ? 'green' : 'red'}>{active ? 'Active' : 'Voided'}</Tag>
       ),
     },
     {
@@ -97,10 +221,13 @@ const Inventory = () => {
       key: 'actions',
       render: (_, record) => (
         <Space>
-          {can('update') && (
+          {can('update') && record.is_active && (
             <Button type="link" onClick={() => handleEdit(record)}>Edit</Button>
           )}
-          {can('delete') && (
+          {can('update') && record.is_active && (
+            <Button type="link" onClick={() => handleAdjust(record)}>Adjust</Button>
+          )}
+          {can('delete') && record.is_active && (
             <Popconfirm
               title="Are you sure you want to void this product?"
               onConfirm={() => handleVoid(record)}
@@ -110,54 +237,68 @@ const Inventory = () => {
               <Button type="link" danger>Void</Button>
             </Popconfirm>
           )}
+          {can('delete') && !record.is_active && (
+            <Popconfirm
+              title="Permanently delete this product?"
+              onConfirm={() => handleDelete(record)}
+              okText="Yes"
+              cancelText="No"
+            >
+              <Button type="link" danger>Delete</Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
   ];
 
-  const Toolbar = ({ onSearch }) => (
+  const Toolbar = () => (
     <Row gutter={16} style={{ marginBottom: 16 }}>
       <Col xs={24} sm={12} md={14}>
         <Space wrap>
           <Search
             placeholder="Search by product name"
-            onSearch={onSearch}
+            onSearch={(val) => setSearchText(val)}
+            onChange={(e) => { if (!e.target.value) setSearchText(''); }}
             enterButton
             style={{ width: 200 }}
           />
           <Select
-            placeholder="Filter by subcategory"
+            placeholder="Filter by category"
             style={{ width: 180 }}
             allowClear
+            value={categoryFilter}
+            onChange={(val) => setCategoryFilter(val)}
           >
-            {subcategories.map((sub) => (
-              <Select.Option key={sub} value={sub}>{sub}</Select.Option>
+            {categories.map((cat) => (
+              <Select.Option key={cat.category_id} value={cat.category_id}>{cat.name}</Select.Option>
             ))}
           </Select>
         </Space>
       </Col>
       <Col xs={24} sm={12} md={10} style={{ textAlign: 'right' }}>
         {can('create') && (
-          <Button type="primary" onClick={handleAdd}>
-            Add Product
-          </Button>
+          <Button type="primary" onClick={handleAdd}>Add Product</Button>
         )}
       </Col>
     </Row>
   );
 
+  if (loading) return <Card style={{ margin: 24, textAlign: 'center' }}><Spin size="large" /></Card>;
+
   const items = [
     {
-      key: 'textiles',
-      label: 'Textiles',
+      key: 'products',
+      label: 'Products',
       children: (
         <>
           <Toolbar />
           <Table
-            dataSource={mockProducts}
+            dataSource={filteredProducts}
             columns={columns}
-            rowKey="key"
+            rowKey="product_id"
             pagination={{ pageSize: 10 }}
+            loading={tableLoading}
           />
         </>
       ),
@@ -168,63 +309,75 @@ const Inventory = () => {
     <Card style={{ margin: 24 }}>
       <Title level={2}>Inventory</Title>
       <Tabs items={items} />
+
       <Modal
         title={selectedRecord ? 'Edit Product' : 'Add Product'}
-        open={modalVisible}
-        onCancel={() => setModalVisible(false)}
+        open={productModalVisible}
+        onCancel={() => { setProductModalVisible(false); productForm.resetFields(); }}
         footer={[
-          <Button key="cancel" onClick={() => setModalVisible(false)}>Cancel</Button>,
-          <Button key="save" type="primary" onClick={handleSave}>Save</Button>,
+          <Button key="cancel" onClick={() => { setProductModalVisible(false); productForm.resetFields(); }}>Cancel</Button>,
+          <Button key="save" type="primary" onClick={handleSaveProduct}>Save</Button>,
         ]}
       >
-        <Form form={form} layout="vertical">
-          <Form.Item
-            name="name"
-            label="Product Name"
-            rules={[{ required: true, message: 'Please enter product name' }]}
-          >
+        <Form form={productForm} layout="vertical">
+          <Form.Item name="name" label="Product Name" rules={[{ required: true, message: 'Please enter product name' }]}>
             <Input placeholder="Enter product name" />
           </Form.Item>
-          <Form.Item
-            name="category"
-            label="Category"
-            rules={[{ required: true, message: 'Please select category' }]}
-          >
+          <Form.Item name="category_id" label="Category" rules={[{ required: true, message: 'Please select category' }]}>
             <Select placeholder="Select category">
-              <Select.Option value="Textiles">Textiles</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item
-            name="subcategory"
-            label="Subcategory"
-            rules={[{ required: true, message: 'Please select subcategory' }]}
-          >
-            <Select placeholder="Select subcategory">
-              {subcategories.map((sub) => (
-                <Select.Option key={sub} value={sub}>{sub}</Select.Option>
+              {categories.map((cat) => (
+                <Select.Option key={cat.category_id} value={cat.category_id}>{cat.name}</Select.Option>
               ))}
             </Select>
           </Form.Item>
-          <Form.Item
-            name="stockQuantity"
-            label="Stock Quantity"
-            rules={[{ required: true, message: 'Please enter stock quantity' }]}
-          >
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="Enter stock quantity" />
-          </Form.Item>
-          <Form.Item
-            name="price"
-            label="Base Price"
-            rules={[{ required: true, message: 'Please enter price' }]}
-          >
+          {!selectedRecord && (
+            <Form.Item name="sku" label="SKU">
+              <Input placeholder="Auto-generated if empty" />
+            </Form.Item>
+          )}
+          <Form.Item name="price" label="Base Price" rules={[{ required: true, message: 'Please enter price' }]}>
             <InputNumber min={0} style={{ width: '100%' }} placeholder="Enter price" prefix="₱" />
           </Form.Item>
-          <Form.Item
-            name="reorderLevel"
-            label="Reorder Level"
-            rules={[{ required: true, message: 'Please enter reorder level' }]}
-          >
+          <Form.Item name="unit" label="Unit">
+            <Input placeholder="e.g. piece, meter" />
+          </Form.Item>
+          <Form.Item name="reorder_level" label="Reorder Level">
             <InputNumber min={0} style={{ width: '100%' }} placeholder="Enter reorder level" />
+          </Form.Item>
+          <Form.Item name="description" label="Description">
+            <TextArea rows={3} placeholder="Enter description" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={adjustProduct ? `Adjust Stock — ${adjustProduct.name}` : 'Adjust Stock'}
+        open={adjustModalVisible}
+        onCancel={() => { setAdjustModalVisible(false); adjustForm.resetFields(); }}
+        footer={[
+          <Button key="cancel" onClick={() => { setAdjustModalVisible(false); adjustForm.resetFields(); }}>Cancel</Button>,
+          <Button key="save" type="primary" onClick={handleSaveAdjust}>Save</Button>,
+        ]}
+      >
+        <Form form={adjustForm} layout="vertical">
+          <Form.Item name="location_id" label="Location" rules={[{ required: true, message: 'Please select location' }]}>
+            <Select placeholder="Select location">
+              {locations.filter((l) => l.is_active).map((loc) => (
+                <Select.Option key={loc.location_id} value={loc.location_id}>{loc.name}</Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="direction" label="Direction">
+            <Radio.Group>
+              <Radio value="add">Add Stock</Radio>
+              <Radio value="remove">Remove Stock</Radio>
+            </Radio.Group>
+          </Form.Item>
+          <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: 'Please enter quantity' }]}>
+            <InputNumber min={1} style={{ width: '100%' }} placeholder="Enter quantity" />
+          </Form.Item>
+          <Form.Item name="reason" label="Reason">
+            <Input placeholder="e.g. New shipment, Damaged goods" />
           </Form.Item>
         </Form>
       </Modal>
