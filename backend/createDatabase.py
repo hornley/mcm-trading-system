@@ -21,9 +21,9 @@ def seed():
         # ── 1. LOCATIONS ──
         print("Seeding Locations...")
         locs = [
-            Location(name="Storehouse", address="123 Industrial Zone, Main City"),
-            Location(name="Branch 1", address="456 Commercial Ave, Downtown"),
-            Location(name="Branch 2", address="789 Suburb Road, North District"),
+            Location(name="Storehouse", address="123 Industrial Zone, Main City", is_active=True),
+            Location(name="Branch 1", address="456 Commercial Ave, Downtown", is_active=True),
+            Location(name="Branch 2", address="789 Suburb Road, North District", is_active=True),
         ]
         db.session.add_all(locs)
         db.session.flush()
@@ -54,39 +54,54 @@ def seed():
 
         # ── 3. CATEGORIES ──
         print("Seeding Categories...")
-        cat = Category(name="Fabrics", description="Fabric materials for upholstery and clothing")
+        cat = Category(name="Fabrics", description="Fabric materials for upholstery and clothing", is_active=True)
         db.session.add(cat)
+        db.session.flush()
+
+        cat2 = Category(name="Trims & Accessories", description="Trims, buttons, zippers and other accessories", is_active=True)
+        db.session.add(cat2)
         db.session.flush()
 
         # ── 4. PRODUCTS ──
         print("Seeding Products...")
         prods = [
-            Product(category_id=cat.category_id, name="FELT HARD 1", price=120, reorder_level="10"),
-            Product(category_id=cat.category_id, name="FELT HARD 2", price=130, reorder_level="10"),
-            Product(category_id=cat.category_id, name="FLEECE", price=180, reorder_level="8"),
-            Product(category_id=cat.category_id, name="HI-PILE", price=250, reorder_level="5"),
-            Product(category_id=cat.category_id, name="12MM CIRCULAR", price=200, reorder_level="10"),
-            Product(category_id=cat.category_id, name="8MM AND 20MM PLUSH", price=220, reorder_level="8"),
-            Product(category_id=cat.category_id, name="7MM AND 20MM PLUSH", price=230, reorder_level="8"),
-            Product(category_id=cat.category_id, name="3MM PRINTED FUR", price=280, reorder_level="5"),
-            Product(category_id=cat.category_id, name="SHAGGY FUR", price=300, reorder_level="5"),
-            Product(category_id=cat.category_id, name="NYLEX 220G", price=90, reorder_level="15"),
-            Product(category_id=cat.category_id, name="VELBOA KOREA", price=350, reorder_level="5"),
-            Product(category_id=cat.category_id, name="LAMB FUR 2323", price=400, reorder_level="3"),
-            Product(category_id=cat.category_id, name="VELVET 1", price=160, reorder_level="10"),
-            Product(category_id=cat.category_id, name="VELVET 2", price=170, reorder_level="10"),
-            Product(category_id=cat.category_id, name="VELBOA SUPER SOFT", price=380, reorder_level="5"),
-            Product(category_id=cat.category_id, name="PRINTED DESIGN (POLKADOTS, HEART SQUARE DOTS)", price=150, reorder_level="10"),
-            Product(category_id=cat.category_id, name="SUEDE GAMOSA", price=200, reorder_level="8"),
-            Product(category_id=cat.category_id, name="NEON WOVCEN CLOTH", price=100, reorder_level="15"),
-            Product(category_id=cat.category_id, name="FEATHERS", price=50, reorder_level="20"),
+            Product(category_id=cat.category_id, name="FELT HARD 1", price=120, reorder_level="10", sku="PROD-001", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="FELT HARD 2", price=130, reorder_level="10", sku="PROD-002", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="FLEECE", price=180, reorder_level="8", sku="PROD-003", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="HI-PILE", price=250, reorder_level="5", sku="PROD-004", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="12MM CIRCULAR", price=200, reorder_level="10", sku="PROD-005", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="8MM AND 20MM PLUSH", price=220, reorder_level="8", sku="PROD-006", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="7MM AND 20MM PLUSH", price=230, reorder_level="8", sku="PROD-007", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="3MM PRINTED FUR", price=280, reorder_level="5", sku="PROD-008", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="SHAGGY FUR", price=300, reorder_level="5", sku="PROD-009", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="NYLEX 220G", price=90, reorder_level="15", sku="PROD-010", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="VELBOA KOREA", price=350, reorder_level="5", sku="PROD-011", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="LAMB FUR 2323", price=400, reorder_level="3", sku="PROD-012", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="VELVET 1", price=160, reorder_level="10", sku="PROD-013", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="VELVET 2", price=170, reorder_level="10", sku="PROD-014", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="VELBOA SUPER SOFT", price=380, reorder_level="5", sku="PROD-015", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="PRINTED DESIGN (POLKADOTS, HEART SQUARE DOTS)", price=150, reorder_level="10", sku="PROD-016", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="SUEDE GAMOSA", price=200, reorder_level="8", sku="PROD-017", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="NEON WOVCEN CLOTH", price=100, reorder_level="15", sku="PROD-018", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="FEATHERS", price=50, reorder_level="20", sku="PROD-019", unit="piece", is_active=True),
         ]
         db.session.add_all(prods)
         db.session.flush()
 
+        # Add 4 new products under new category
+        new_prods = [
+            Product(category_id=cat2.category_id, name="Metallic Zipper 20cm", price=15, reorder_level="50", sku="PROD-020", unit="piece", is_active=True),
+            Product(category_id=cat2.category_id, name="Plastic Buttons 20mm", price=5, reorder_level="100", sku="PROD-021", unit="piece", is_active=True),
+            Product(category_id=cat2.category_id, name="Elastic Band 2cm", price=8, reorder_level="80", sku="PROD-022", unit="meter", is_active=True),
+            Product(category_id=cat2.category_id, name="Satin Ribbon 1cm", price=12, reorder_level="60", sku="PROD-023", unit="meter", is_active=True),
+        ]
+        db.session.add_all(new_prods)
+        db.session.flush()
+
         # ── 5. INVENTORY ──
         print("Seeding Inventory...")
-        for p in prods:
+        all_products = prods + new_prods
+        for p in all_products:
             for loc in locs:
                 db.session.add(Inventory(
                     product_id=p.product_id,
@@ -154,13 +169,25 @@ def seed():
 
         # ── 9. ACTIVITY LOGS ──
         print("Seeding Activity Logs...")
-        actions = ["Logged in", "Created order", "Updated inventory", "Processed payment",
-                    "Transferred stock", "Adjusted stock", "Added new product",
-                    "Updated user access", "Generated report", "Logged out"]
+        activities = [
+            ("auth", "login", "Logged in"),
+            ("auth", "login", "Logged in"),
+            ("products", "create", "Created product"),
+            ("products", "update", "Updated product"),
+            ("inventory", "adjust", "Adjusted inventory"),
+            ("categories", "create", "Created category"),
+            ("locations", "create", "Created location"),
+            ("inventory", "adjust", "Stock adjustment"),
+            ("products", "update", "Updated product price"),
+            ("inventory", "adjust", "Inventory count correction"),
+        ]
         for _ in range(100):
+            mod, typ, act = random.choice(activities)
             db.session.add(ActivityLog(
                 user_id=random.choice(users).user_id,
-                action=random.choice(actions),
+                module=mod,
+                action_type=typ,
+                action=act,
                 timestamp=now - timedelta(days=random.randint(0, 180),
                                           hours=random.randint(0, 23),
                                           minutes=random.randint(0, 59)),
@@ -171,9 +198,9 @@ def seed():
         print("\n[OK] Database seeded successfully!")
         print(f"  Locations:       {len(locs)}")
         print(f"  Users:           {len(users_data)}")
-        print(f"  Categories:      1")
-        print(f"  Products:        {len(prods)}")
-        print(f"  Inventory:       {len(prods) * len(locs)}")
+        print(f"  Categories:      2")
+        print(f"  Products:        {len(prods) + len(new_prods)}")
+        print(f"  Inventory:       {(len(prods) + len(new_prods)) * len(locs)}")
         print(f"  Orders:          50")
         print(f"  Transfers:       15")
         print(f"  Adjustments:     15")
