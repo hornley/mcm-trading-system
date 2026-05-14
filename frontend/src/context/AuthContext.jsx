@@ -1,5 +1,5 @@
 import React from 'react'
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useCallback } from 'react'
 
 export const AuthContext = createContext({ user: null, login: () => {}, logout: () => {}, can: () => false });
 
@@ -14,15 +14,22 @@ export const AuthProvider = ({children}) => {
       const stored = localStorage.getItem('mcm_user');
       return stored ? JSON.parse(stored) : null;
     });
+    const [selectedLocationId, setSelectedLocationId] = useState("all");
 
     const login = (userData) => {
       localStorage.setItem('mcm_user', JSON.stringify(userData));
       setUser(userData);
+      if (userData.usertype === 2) {
+        setSelectedLocationId(userData.location_id);
+      } else {
+        setSelectedLocationId("all");
+      }
     };
 
     const logout = () => {
       localStorage.removeItem('mcm_user');
       setUser(null);
+      setSelectedLocationId("all");
     };
 
     const can = (action) => {
@@ -31,7 +38,7 @@ export const AuthProvider = ({children}) => {
     };
 
   return (
-    <AuthContext.Provider value = {{user, login, logout, can}}>
+    <AuthContext.Provider value={{user, login, logout, can, selectedLocationId, setSelectedLocationId}}>
         {children}
     </AuthContext.Provider>
   )

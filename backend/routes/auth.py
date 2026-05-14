@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User
+from models import db, User, Location
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -26,12 +26,16 @@ def login():
     if not user or not check_password_hash(user.password, password):
         return jsonify({"error": "Invalid username or password"}), 401
 
+    location = Location.query.get(user.location_id) if user.location_id else None
+
     return jsonify({
         "user_id": user.user_id,
         "username": user.username,
         "email": user.email,
         "role": ROLE_MAP.get(user.usertype, "staff"),
         "usertype": user.usertype,
+        "location_id": user.location_id,
+        "location_name": location.name if location else None,
     })
 
 

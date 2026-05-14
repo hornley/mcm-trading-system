@@ -10,11 +10,10 @@ const { Search } = Input;
 const { TextArea } = Input;
 
 const Inventory = () => {
-  const { user, can } = useAuth();
+  const { user, can, selectedLocationId } = useAuth();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [inventoryMap, setInventoryMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(false);
   const [productModalVisible, setProductModalVisible] = useState(false);
@@ -30,28 +29,21 @@ const Inventory = () => {
     if (!user) return;
     setTableLoading(true);
     try {
-      const [productsRes, categoriesRes, inventoryRes, locationsRes] = await Promise.all([
-        fetch(`/api/products?usertype=${user.usertype}`),
+      const locationParam = selectedLocationId !== "all" ? `&location_id=${selectedLocationId}` : '';
+      const userIdParam = `&user_id=${user.user_id}`;
+
+      const [productsRes, categoriesRes, locationsRes] = await Promise.all([
+        fetch(`/api/products?usertype=${user.usertype}${locationParam}${userIdParam}`),
         fetch(`/api/categories?usertype=${user.usertype}`),
-        fetch(`/api/inventory?usertype=${user.usertype}`),
         fetch(`/api/locations?usertype=${user.usertype}`),
       ]);
       const productsData = await productsRes.json();
       const categoriesData = await categoriesRes.json();
-      const inventoryData = await inventoryRes.json();
       const locationsData = await locationsRes.json();
 
       if (productsData.success) setProducts(productsData.data);
       if (categoriesData.success) setCategories(categoriesData.data);
       if (locationsData.success) setLocations(locationsData.data);
-      if (inventoryData.success) {
-        const map = {};
-        inventoryData.data.forEach((inv) => {
-          if (!map[inv.product_id]) map[inv.product_id] = [];
-          map[inv.product_id].push(inv);
-        });
-        setInventoryMap(map);
-      }
     } catch {
       message.error('Failed to load data');
     } finally {
@@ -62,13 +54,7 @@ const Inventory = () => {
 
   useEffect(() => {
     fetchData();
-  }, [user]);
-
-  const totalStock = (productId) => {
-    const invs = inventoryMap[productId];
-    if (!invs) return 0;
-    return invs.reduce((sum, inv) => sum + inv.quantity, 0);
-  };
+  }, [user, selectedLocationId]);
 
   const handleAdd = () => {
     setSelectedRecord(null);
@@ -90,6 +76,10 @@ const Inventory = () => {
   };
 
   const handleAdjust = (record) => {
+    if (selectedLocationId === "all") {
+      message.warning('Select a specific branch from the top bar to adjust stock');
+      return;
+    }
     setAdjustProduct(record);
     adjustForm.resetFields();
     adjustForm.setFieldsValue({ direction: 'add' });
@@ -174,7 +164,7 @@ const Inventory = () => {
           usertype: user.usertype,
           user_id: user.user_id,
           product_id: adjustProduct.product_id,
-          location_id: values.location_id,
+          location_id: selectedLocationId,
           quantity_change: quantityChange,
           reason: values.reason || null,
         }),
@@ -204,7 +194,7 @@ const Inventory = () => {
     { title: 'Category', dataIndex: 'category', key: 'category' },
     {
       title: 'Stock Quantity', key: 'stockQuantity',
-      render: (_, record) => totalStock(record.product_id),
+      render: (_, record) => record.quantity ?? 0,
     },
     { title: 'Base Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}` },
     { title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level' },
@@ -225,7 +215,13 @@ const Inventory = () => {
             <Button type="link" onClick={() => handleEdit(record)}>Edit</Button>
           )}
           {can('update') && record.is_active && (
-            <Button type="link" onClick={() => handleAdjust(record)}>Adjust</Button>
+            <Button
+              type="link"
+              disabled={selectedLocationId === "all"}
+              onClick={() => handleAdjust(record)}
+            >
+              Adjust
+            </Button>
           )}
           {can('delete') && record.is_active && (
             <Popconfirm
@@ -360,13 +356,9 @@ const Inventory = () => {
         ]}
       >
         <Form form={adjustForm} layout="vertical">
-          <Form.Item name="location_id" label="Location" rules={[{ required: true, message: 'Please select location' }]}>
-            <Select placeholder="Select location">
-              {locations.filter((l) => l.is_active).map((loc) => (
-                <Select.Option key={loc.location_id} value={loc.location_id}>{loc.name}</Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+          <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+            Adjusting stock at: {locations.find((l) => l.location_id === selectedLocationId)?.name || 'Selected branch'}
+          </Typography.Text>
           <Form.Item name="direction" label="Direction">
             <Radio.Group>
               <Radio value="add">Add Stock</Radio>
