@@ -1,101 +1,164 @@
-# Feature: Full Inventory CRUD (Backend Only)
+# Full Inventory CRUD — API Usage Guide
 
-## Branch: `feature/full-inventory-crud`
+## Authentication
 
-## Commits
+Every request requires `usertype` and optionally `user_id` (for activity logging).
 
-### Commit 1 — Backend Cleanup
-- Create `backend/utils/__init__.py`
-- Create `backend/utils/response.py` — `success_response(data, message)`, `error_response(message, error_code)`, `paginated_response(data, page, limit, total)`
-- Create `backend/utils/validation.py` — `validate_required(data, fields)`, `validate_positive_int(val)`, `validate_non_negative(val)`
-- Create `backend/utils/activity_logger.py` — `log_activity(user_id, module, action_type, action, details=None)`
-- Update `ActivityLog` model: add `module` (String), `action_type` (String), `details` (Text) columns
+| usertype | Role |
+|----------|------|
+| 1        | Owner |
+| 2        | Manager |
+| 3        | Admin |
 
-### Commit 2 — Database Model Updates
-- **Product**: add `description` (Text), `sku` (String, unique), `unit` (String), `is_active` (Boolean, default=True), `created_at` (DateTime), `updated_at` (DateTime, onupdate)
-- **Category**: add `is_active` (Boolean, default=True), `created_at`, `updated_at`
-- **Location**: add `is_active` (Boolean, default=True), `created_at`, `updated_at`
-- **Inventory**: add `updated_at` (DateTime, onupdate)
-- Update `db/schema.sql` to match
+**Login first:**
+```
+POST /api/auth/login
+Body: { "username": "owner", "password": "password" }
+→ { "user_id": 4, "usertype": 1, "role": "owner", ... }
+```
 
-### Commit 3 — Quick Sort Utility
-- Create `backend/utils/sorting.py`
-- `quick_sort(items, key="name", order="asc")` — generic Quick Sort
-  - Case-insensitive string comparison
-  - Handles None values (sorted to end)
-  - Works with SQLAlchemy model objects or dicts
+Pass `usertype` as query param for GET, or in request body for POST/PUT/DELETE.
 
-### Commit 4 — Categories CRUD
-- Create `backend/routes/categories.py` blueprint
-- **GET** `/api/categories` — list with Quick Sort (`?sort_by=name&sort_order=asc`)
-- **GET** `/api/categories/<id>` — single category
-- **POST** `/api/categories` — create (name required)
-- **PUT** `/api/categories/<id>` — update
-- **PUT** `/api/categories/<id>/void` — set `is_active = false`
-- **DELETE** `/api/categories/<id>` — hard delete (Owner/Admin only)
-- Register blueprint in `app.py`
-
-### Commit 5 — Products CRUD
-- Extend `backend/routes/inventory.py`
-- **GET** `/api/products` — list with Quick Sort + search + filters (`?sort_by=name&sort_order=asc&q=&category_id=&is_active=`)
-- **GET** `/api/products/<id>` — single with inventory per location
-- **POST** `/api/products` — create (SKU auto-gen as `PROD-XXX` if empty, auto-creates Inventory rows for all locations)
-- **PUT** `/api/products/<id>` — update
-- **PUT** `/api/products/<id>/void` — set `is_active = false`
-- **DELETE** `/api/products/<id>` — hard delete
-
-### Commit 6 — Locations CRUD
-- Create `backend/routes/locations.py` blueprint
-- **GET** `/api/locations` — list with Quick Sort
-- **GET** `/api/locations/<id>` — single with inventory summary
-- **POST** `/api/locations` — create
-- **PUT** `/api/locations/<id>` — update
-- **PUT** `/api/locations/<id>/void` — soft-delete only (no hard delete)
-- Register blueprint in `app.py`
-
-### Commit 7 — Inventory CRUD
-- Extend `backend/routes/inventory.py`
-- **GET** `/api/inventory` — all stock across all locations
-- **GET** `/api/inventory/location/<id>` — stock at a specific location
-- **GET** `/api/inventory/product/<id>` — stock of a product across all locations
-- **POST** `/api/inventory/adjust` — adjust stock (body: `{ product_id, location_id, quantity_change, reason }`); auto-logs StockAdjustment + ActivityLog; enforces quantity >= 0
-- **GET** `/api/inventory/low-stock` — products where quantity < reorder_level
-
-### Commit 8 — Update Seed Script
-- Auto-generate SKUs `PROD-001` to `PROD-019` for existing products
-- Set `unit = "piece"` for all existing products
-- Add `is_active = True`, timestamps to all seed data
-- Add second Category: "Trims & Accessories"
-- Add 4 new products under new category with their own Inventory rows
-- All operations use updated models
+---
 
 ## Access Control
 
 | Operation | Owner | Manager | Admin |
 |-----------|-------|---------|-------|
-| List / View | ✅ | ✅ | ✅ |
+| List/View | ✅ | ✅ | ✅ |
 | Create | ✅ | ❌ | ✅ |
 | Update | ✅ | ✅ | ✅ |
 | Void | ✅ | ✅ | ✅ |
 | Delete | ✅ | ❌ | ✅ |
 
-## Standard API Response Format
+---
 
+## Categories
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/categories?usertype=<n>` | List all (sorted) |
+| GET | `/api/categories/<id>?usertype=<n>` | Get one |
+| POST | `/api/categories` | Create |
+| PUT | `/api/categories/<id>` | Update |
+| PUT | `/api/categories/<id>/void` | Soft-delete |
+| DELETE | `/api/categories/<id>` | Hard delete (Owner/Admin) |
+
+**List** supports `?sort_by=name&sort_order=asc`.
+
+**Create:**
 ```json
-// Success
-{ "success": true, "message": "...", "data": {...} }
-
-// Error
-{ "success": false, "message": "...", "error": "error_code" }
-
-// Paginated (future)
-{ "success": true, "data": [...], "pagination": { "page": 1, "limit": 10, "total": 57 } }
+{ "usertype": 1, "name": "Fabrics", "description": "..." }
 ```
+
+**Update** accepts partial fields:
+```json
+{ "usertype": 1, "name": "New Name" }
+```
+
+---
+
+## Products
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/products?usertype=<n>` | List (searchable, filterable, sorted) |
+| GET | `/api/products/<id>?usertype=<n>` | Get one with inventory per location |
+| POST | `/api/products` | Create |
+| PUT | `/api/products/<id>` | Update |
+| PUT | `/api/products/<id>/void` | Soft-delete |
+| DELETE | `/api/products/<id>` | Hard delete (Owner/Admin) |
+
+**List** supports:
+- `?sort_by=name&sort_order=asc`
+- `?q=search_term` — searches name & SKU
+- `?category_id=1` — filter by category
+- `?is_active=true` — filter by active status
+
+**Create** (SKU auto-generates as `PROD-XXX` if omitted; auto-creates Inventory rows for all active Locations):
+```json
+{
+  "usertype": 1,
+  "name": "FELT HARD 1",
+  "category_id": 1,
+  "price": 120,
+  "sku": "PROD-001",
+  "unit": "piece",
+  "reorder_level": "10",
+  "description": "..."
+}
+```
+
+---
+
+## Locations
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/locations?usertype=<n>` | List all (sorted) |
+| GET | `/api/locations/<id>?usertype=<n>` | Get one with inventory summary |
+| POST | `/api/locations` | Create |
+| PUT | `/api/locations/<id>` | Update |
+| PUT | `/api/locations/<id>/void` | Soft-delete only (no hard delete) |
+
+**Create** auto-creates Inventory rows for all active Products:
+```json
+{ "usertype": 1, "name": "Branch 3", "address": "..." }
+```
+
+---
+
+## Inventory
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/inventory?usertype=<n>` | All stock across all locations |
+| GET | `/api/inventory/location/<id>?usertype=<n>` | Stock at a specific location |
+| GET | `/api/inventory/product/<id>?usertype=<n>` | Stock of a product across all locations |
+| POST | `/api/inventory/adjust` | Adjust stock quantity |
+| GET | `/api/inventory/low-stock?usertype=<n>` | Products below reorder level |
+
+**Adjust stock:**
+```json
+{
+  "usertype": 1,
+  "user_id": 4,
+  "product_id": 1,
+  "location_id": 1,
+  "quantity_change": 10,
+  "reason": "New shipment received"
+}
+```
+- Negative `quantity_change` decreases stock
+- `quantity_change` as a positive integer
+- Enforces stock never goes below 0
+- Auto-logs `StockAdjustment` and `ActivityLog`
+
+---
+
+## Response Format
+
+**Success (single item):**
+```json
+{ "success": true, "message": "...", "data": { ... } }
+```
+
+**Success (list):**
+```json
+{ "success": true, "data": [ ... ] }
+```
+
+**Error:**
+```json
+{ "success": false, "message": "...", "error": "ERROR_CODE" }
+```
+
+---
 
 ## Activity Logging
 
-Auto-log on every CRUD operation:
+Every CRUD operation auto-logs with:
 - `module`: "categories", "products", "locations", "inventory"
 - `action_type`: "create", "update", "void", "delete", "adjust"
-- `action`: human-readable string like "Created category Fabrics"
-- `details`: JSON string with relevant IDs/context
+- `action`: human-readable string
+- `details`: JSON string with IDs/context
