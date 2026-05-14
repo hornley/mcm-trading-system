@@ -1,235 +1,193 @@
-git commands
-git status - check if any changes have been made
-git add (. - to add all changes || (insert file name) - to add a change done from one file)
-git commit - records changes that were added with git add to a snapshot
-	git commit - m "(insert message)"
-git push - pushes changes made from the commit to the remote repo
-git branch <branch_name> - makes a new branch
-git branch - checks which branch you are in
-git push origin <branch_name> - pushes the branch to a remote repo (github) to access it online
-git checkout <branch_name> - change accessed branch to the one named
-git checkout -b <branch_name> - makes and accesses a new branch
-git merge <branch_name> - merges the changes made into the branch to the root
-git branch -d <branch_name> - deletes the named branch
+# Contributing to MCM Trading System
 
+## Initial Setup
 
-========================================
-INITIAL SETUP
-========================================
-
-Clone repository:
+```bash
+# Clone the repository
 git clone <repository-url>
-
-Go into project folder:
 cd <project-name>
 
-Check current branches:
+# Check current branches
 git branch -a
+```
 
+## Workflow
 
-========================================
-STARTING A NEW TASK / FEATURE
-========================================
+### 1. Start a New Task
 
-1. Make sure main is updated
+Make sure `main` is up to date before creating a new branch.
 
+```bash
 git checkout main
 git pull origin main
-
-2. Create a new feature branch from main
-
 git checkout -b feature/<feature-name>
+git push origin -u feature/<feature-name>
+```
 
-Examples:
+**Branch naming convention:**
+- `feature/<feature-name>` — new features
+- `fix/<issue-name>` — bug fixes
+- `docs/<topic>` — documentation updates
+
+**Examples:**
+```bash
 git checkout -b feature/auth-ui
 git checkout -b feature/dashboard-layout
 git checkout -b fix/login-validation
+git checkout -b docs/contribution-guide
+```
 
+### 2. Make Changes
 
-========================================
-WORKING ON FEATURE
-========================================
-
-1. Check changed files
-
+```bash
+# Check what files have changed
 git status
 
-2. Stage files
+# Stage files
+git add .                  # stage all changes
+git add <file-name>        # stage specific file
 
-git add .
+# Commit changes
+git commit -m "feat: add login page"
+```
 
-(or specific files)
-git add src/App.jsx
+### 3. Open a Pull Request on GitHub
 
-3. Commit changes
+1. Go to the repository
+2. Click **"Compare & pull request"**
+3. Verify: base `main` ← compare `feature/<name>`
+4. Add a clear PR title and description
+5. Click **"Create Pull Request"**
 
-git commit -m "Add authentication UI screens"
+### 4. After Your PR is Merged
 
-4. Push branch to remote
+```bash
+git checkout main
+git pull origin main
+git branch -d feature/<name>            # delete local branch
+git push origin --delete feature/<name>  # delete remote branch
+```
 
-git push origin feature/auth-ui
+## Contribution Guidelines
 
+### Rules
 
-========================================
-OPENING A PULL REQUEST
-========================================
+1. **Never code directly on `main`**
 
-On GitHub:
+   Always create a feature branch for any changes.
 
-1. Go to repository
-2. Click "Compare & pull request"
-3. Verify:
+2. **One branch = one task**
 
-base: main
-compare: feature/auth-ui
+   Keep each branch focused on a single feature or fix.
 
-4. Add PR title
+   ```
+   feature/auth-ui          ✓
+   feature/dashboard-layout ✓
+   fix/navbar-bug           ✓
 
-Example:
-Add authentication UI screens
+   frontend                 ✗
+   backend                  ✗
+   authUI-forever           ✗
+   ```
 
-5. Add PR description
+3. **Delete branches after merging**
 
+   Branches are temporary workspaces. Clean up after yourself.
+
+4. **Branch from a fresh `main`**
+
+   Always pull the latest before creating a new branch.
+
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout -b feature/new-task
+   ```
+
+### Commit Message Format
+
+Prefix your commits with a type:
+
+```
+feat:     new feature
+fix:      bug fix
+docs:     documentation change
+refactor: code refactoring (no feature or bug change)
+style:    formatting, missing semicolons, etc.
+chore:    maintenance tasks (deps, config, etc.)
+```
+
+**Examples:**
+```
+feat: add authentication UI screens
+fix: resolve login validation error
+docs: update contribution guide
+refactor: simplify sidebar component
+```
+
+### PR Description Tips
+
+List what changed and why:
+
+```
+## Summary
 - Added landing page
-- Added login page
-- Added register page
-- Added auth routing
+- Added login and register pages
+- Set up auth routing
 
-6. Click "Create Pull Request"
+## Testing
+- Verified login flow works
+- Tested register with duplicate email
+```
 
+## Project Workflow Loop
 
-========================================
-AFTER PULL REQUEST IS MERGED
-========================================
-
-1. Return to main
-
-git checkout main
-
-2. Pull latest merged changes
-
-git pull origin main
-
-3. Delete old local branch
-
-git branch -d feature/auth-ui
-
-4. Delete remote branch (optional if not auto-deleted)
-
-git push origin --delete feature/auth-ui
-
-
-========================================
-START NEXT TASK
-========================================
-
-1. Create new branch from updated main
-
-git checkout -b feature/<next-feature>
-
-Example:
-git checkout -b feature/owner-dashboard
-
-
-========================================
-FULL PROJECT LOOP
-========================================
-
+```
 main
-↓
+  ↓
 pull latest
-↓
+  ↓
 create feature branch
-↓
-code changes
-↓
-git add
-↓
-git commit
-↓
-git push
-↓
+  ↓
+make code changes
+  ↓
+git add + commit + push
+  ↓
 open pull request
-↓
+  ↓
 merge into main
-↓
-checkout main
-↓
-pull latest
-↓
+  ↓
+checkout main + pull latest
+  ↓
 delete old branch
-↓
-create next feature branch
+  ↓
+repeat
+```
 
+## Useful Commands
 
-========================================
-IMPORTANT RULES
-========================================
+| Command | Description |
+|---|---|
+| `git status` | Check changed files |
+| `git branch` | Check current branch |
+| `git log --oneline` | View commit history |
+| `git restore .` | Discard unstaged changes |
+| `git reset HEAD .` | Unstage staged changes |
+| `git reset --hard HEAD` | Hard reset everything |
 
-1. Never code directly on main
-
-BAD:
-git checkout main
-(code here)
-
-2. One branch = one task
-
-GOOD:
-feature/auth-ui
-feature/dashboard-layout
-fix/navbar-bug
-
-BAD:
-frontend
-backend
-authUI forever
-
-3. Delete branches after merge
-
-Branches are temporary workspaces.
-
-4. Always branch from updated main
-
-git checkout main
-git pull origin main
-git checkout -b feature/new-task
-
-
-========================================
-USEFUL COMMANDS
-========================================
-
-Check branch:
-git branch
-
-Check status:
-git status
-
-View commit history:
-git log --oneline
-
-Switch branches:
-git checkout <branch-name>
-
-Pull latest:
-git pull origin main
-
-Push branch:
-git push origin <branch-name>
-
-Delete branch:
-git branch -d <branch-name>
-
-
-========================================
-EMERGENCY: DISCARD LOCAL CHANGES
-========================================
+## Emergency
 
 Discard unstaged changes:
+```bash
 git restore .
+```
 
-Discard staged changes:
+Unstage all staged changes:
+```bash
 git reset HEAD .
+```
 
-Hard reset everything:
+Hard reset (destroy all local changes):
+```bash
 git reset --hard HEAD
+```
