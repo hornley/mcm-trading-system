@@ -81,12 +81,14 @@ CREATE TABLE Inventory (
 
 CREATE TABLE Stock_Transfers (
     transfer_id      INTEGER PRIMARY KEY,
+    product_id       INTEGER NOT NULL,
     from_location_id INTEGER NOT NULL,
     to_location_id   INTEGER NOT NULL,
     user_id          INTEGER NOT NULL,
     quantity         INTEGER NOT NULL,
     transfer_date    DATETIME NOT NULL DEFAULT (datetime('now')),
-    status           VARCHAR NOT NULL,
+    status           VARCHAR NOT NULL DEFAULT 'completed',
+    FOREIGN KEY (product_id)       REFERENCES Products(product_id),
     FOREIGN KEY (from_location_id) REFERENCES Locations(location_id),
     FOREIGN KEY (to_location_id)   REFERENCES Locations(location_id),
     FOREIGN KEY (user_id)          REFERENCES Users(user_id)
@@ -94,11 +96,13 @@ CREATE TABLE Stock_Transfers (
 
 CREATE TABLE Stock_Adjustments (
     adjustment_id   INTEGER PRIMARY KEY,
+    product_id      INTEGER NOT NULL,
     location_id     INTEGER NOT NULL,
     user_id         INTEGER NOT NULL,
     quantity_change INTEGER NOT NULL,
     reason          VARCHAR,
     date            DATETIME NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (product_id)  REFERENCES Products(product_id),
     FOREIGN KEY (location_id) REFERENCES Locations(location_id),
     FOREIGN KEY (user_id)     REFERENCES Users(user_id)
 );

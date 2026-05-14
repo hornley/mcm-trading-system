@@ -101,12 +101,14 @@ class Inventory(db.Model):
 class StockTransfer(db.Model):
     __tablename__ = "Stock_Transfers"
     transfer_id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
     from_location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
     to_location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     transfer_date = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    status = db.Column(db.String, nullable=False)
+    status = db.Column(db.String, nullable=False, default="completed")
+    product = db.relationship("Product")
     from_location = db.relationship("Location", foreign_keys=[from_location_id])
     to_location = db.relationship("Location", foreign_keys=[to_location_id])
     user = db.relationship("User")
@@ -115,11 +117,13 @@ class StockTransfer(db.Model):
 class StockAdjustment(db.Model):
     __tablename__ = "Stock_Adjustments"
     adjustment_id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
     location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
     quantity_change = db.Column(db.Integer, nullable=False)
     reason = db.Column(db.String)
     date = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    product = db.relationship("Product")
     location = db.relationship("Location")
     user = db.relationship("User")
 

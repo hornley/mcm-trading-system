@@ -32,9 +32,6 @@ def seed():
         print("Seeding Users...")
         # usertype: 0=Staff(no access), 1=Owner, 2=Manager, 3=Admin
         users_data = [
-            (0, "staff1",   "staff1@mcm.com",   "260512004", 1),
-            (0, "staff2",   "staff2@mcm.com",   "260512005", 2),
-            (0, "staff3",   "staff3@mcm.com",   "260512006", 3),
             (1, "owner",    "owner@mcm.com",    "260512001", 0),
             (2, "manager",  "manager@mcm.com",  "260512002", 2),
             (2, "manager2", "manager2@mcm.com", "260512007", 1),
@@ -142,10 +139,12 @@ def seed():
 
         # ── 7. STOCK TRANSFERS ──
         print("Seeding Stock Transfers...")
+        all_products = prods + new_prods
         tstatus = ["pending", "approved", "completed", "cancelled"]
         for _ in range(15):
             fl, tl = random.sample(locs, 2)
             st = StockTransfer(
+                product_id=random.choice(all_products).product_id,
                 from_location_id=fl.location_id, to_location_id=tl.location_id,
                 user_id=random.choice(users).user_id,
                 quantity=random.randint(5, 30),
@@ -161,6 +160,7 @@ def seed():
                     "Quality check removal", "Supplier return"]
         for _ in range(15):
             sa = StockAdjustment(
+                product_id=random.choice(all_products).product_id,
                 location_id=random.choice(locs).location_id,
                 user_id=random.choice(users).user_id,
                 quantity_change=random.choice([-20, -10, -5, -3, 5, 10, 15]),
