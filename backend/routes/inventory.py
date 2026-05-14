@@ -278,3 +278,192 @@ def delete_product(product_id):
     )
 
     return success_response(message="Product deleted successfully")
+
+
+@inventory_bp.route("/api/inventory", methods=["GET"])
+def list_inventory():
+    usertype = request.args.get("usertype", type=int)
+    if usertype is None:
+        return error_response("usertype query parameter is required", "MISSING_PARAM", 400)
+
+    inventory = Inventory.query.join(Product).filter(
+        Product.is_active == True
+    ).all()
+
+    return success_response([
+        {
+            "inventory_id": inv.inventory_id,
+            "product_id": inv.product_id,
+            "product_name": inv.product.name,
+            "sku": inv.product.sku,
+            "location_id": inv.location_id,
+            "location_name": inv.location.name if inv.location else None,
+            "quantity": inv.quantity,
+        }
+        for inv in inventory
+    ])
+
+
+@inventory_bp.route("/api/inventory/location/<int:location_id>", methods=["GET"])
+def get_inventory_by_location(location_id):
+    usertype = request.args.get("usertype", type=int)
+    if usertype is None:
+        return error_response("usertype query parameter is required", "MISSING_PARAM", 400)
+
+    location = Location.query.get(location_id)
+    if not location:
+        return error_response("Location not found", "NOT_FOUND", 404)
+
+    inventory = Inventory.query.join(Product).filter(
+        Inventory.location_id == location_id,
+        Product.is_active == True
+    ).all()
+
+    return success_response([
+        {
+            "inventory_id": inv.inventory_id,
+            "product_id": inv.product_id,
+            "product_name": inv.product.name,
+            "sku": inv.product.sku,
+            "quantity": inv.quantity,
+        }
+        for inv in inventory
+    ])
+
+
+@inventory_bp.route("/api/inventory/product/<int:product_id>", methods=["GET"])
+def get_inventory_by_product(product_id):
+    usertype = request.args.get("usertype", type=int)
+    if usertype is None:
+        return error_response("usertype query parameter is required", "MISSING_PARAM", 400)
+
+    product = Product.query.get(product_id)
+    if not product:
+        return error_response("Product not found", "NOT_FOUND", 404)
+
+    inventory = Inventory.query.filter_by(product_id=product_id).all()
+
+    return success_response([
+        {
+            "inventory_id": inv.inventory_id,
+            "location_id": inv.location_id,
+            "location_name": inv.location.name if inv.location else None,
+            "quantity": inv.quantity,
+        }
+        for inv in inventory
+    ])
+
+
+@inventory_bp.route("/api/inventory/adjust", methods=["POST"])
+def adjust_inventory():
+    data = request.get_json()
+    if not data:
+        return error_response("Request body is required", "MISSING_BODY", 400)
+
+    usertype = data.get("usertype")
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+
+    if not _can_update(usertype):
+        return error_response("You don't have permission to adjust inventory", "FORBIDDEN", 403)
+
+    error = validate_required(data, ["product_id", "location_id", "quantity_change"])
+    if error:
+        return error
+
+    error = validate_non_negative(data.get("quantity_change"), "quantity_change")
+    if error:
+        return error
+
+    product = Product.query.get(data["product_id"])
+    if not product:
+        return error_response("Product not found", "NOT_FOUND", 404)
+
+    location = Location.query.get(data["location_id"])
+    if not location:
+        return error_response("Location not found", "NOT_FOUND", 404)
+
+    inventory = Inventory.query.filter_by(
+        product_id=data["product_id"],
+        location_id=data["location_id"]
+    ).first()
+
+    if not inventory:
+        return error_response("Inventory record not found", "NOT_FOUND", 404)
+
+    new_quantity = inventory.quantity + data["quantity_change"]
+    if new_quantity < 0:
+        return error_response("Insufficient stock. Resulting quantity would be negative", "INSUFFICIENT_STOCK", 400)
+
+    inventory.quantity = new_quantity
+
+    adjustment = StockAdjustment(
+        location_id=data["location_id"],
+        user_id=data.get("user_id"),
+        quantity_change=data["quantity_change"],
+        reason=data.get("reason"),
+    )
+    db.session.add(adjustment)
+    db.session.commit()
+
+    log_activity(
+        user_id=data.get("user_id"),
+        module="inventory",
+        action_type="adjust",
+        action=f"Adjusted inventory for {product.name} at {location.name}: {data['quantity_change']:+d}",
+        details={
+            "product_id": product.product_id,
+            "location_id": location.location_id,
+            "quantity_change": data["quantity_change"],
+            "new_quantity": new_quantity,
+        }
+    )
+
+    return success_response(
+        {
+            "inventory_id": inventory.inventory_id,
+            "product_id": product.product_id,
+            "product_name": product.name,
+            "location_id": location.location_id,
+            "location_name": location.name,
+            "previous_quantity": inventory.quantity - data["quantity_change"],
+            "quantity_change": data["quantity_change"],
+            "new_quantity": new_quantity,
+        },
+        "Inventory adjusted successfully"
+    )
+
+
+@inventory_bp.route("/api/inventory/low-stock", methods=["GET"])
+def get_low_stock():
+    usertype = request.args.get("usertype", type=int)
+    if usertype is None:
+        return error_response("usertype query parameter is required", "MISSING_PARAM", 400)
+
+    products = Product.query.filter_by(is_active=True).all()
+    low_stock = []
+
+    for product in products:
+        reorder_level = product.reorder_level
+        if reorder_level is None:
+            continue
+        try:
+            level = int(reorder_level)
+        except (ValueError, TypeError):
+            continue
+
+        inventory = Inventory.query.filter_by(product_id=product.product_id).all()
+        for inv in inventory:
+            if inv.quantity < level:
+                low_stock.append({
+                    "inventory_id": inv.inventory_id,
+                    "product_id": product.product_id,
+                    "product_name": product.name,
+                    "sku": product.sku,
+                    "location_id": inv.location_id,
+                    "location_name": inv.location.name if inv.location else None,
+                    "quantity": inv.quantity,
+                    "reorder_level": level,
+                })
+
+    return success_response(low_stock)
