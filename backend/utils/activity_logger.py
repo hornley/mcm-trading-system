@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from backend.models import db, ActivityLog
+from models import db, ActivityLog
 
 
 def log_activity(user_id, module, action_type, action, details=None):

@@ -1,7 +1,7 @@
 from flask import Blueprint, request
-from models import db, Product, Category, Location, Inventory
+from models import db, Product, Category, Location, Inventory, StockAdjustment
 from utils.response import success_response, error_response
-from utils.validation import validate_required
+from utils.validation import validate_required, validate_non_negative
 from utils.activity_logger import log_activity
 from utils.sorting import quick_sort
 
