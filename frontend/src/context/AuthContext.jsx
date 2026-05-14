@@ -1,7 +1,7 @@
 import React from 'react'
 import { createContext, useContext, useState, useCallback } from 'react'
 
-export const AuthContext = createContext(null);
+export const AuthContext = createContext({ user: null, login: () => {}, logout: () => {}, can: () => false });
 
 const PERMISSIONS = {
   1: { list: true, view: true, create: true, delete: true, update: true },
@@ -10,21 +10,26 @@ const PERMISSIONS = {
 };
 
 export const AuthProvider = ({children}) => {
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState(() => {
+      const stored = localStorage.getItem('mcm_user');
+      return stored ? JSON.parse(stored) : null;
+    });
     const [selectedLocationId, setSelectedLocationId] = useState("all");
 
     const login = (userData) => {
-        setUser(userData);
-        if (userData.usertype === 2) {
-            setSelectedLocationId(userData.location_id);
-        } else {
-            setSelectedLocationId("all");
-        }
+      localStorage.setItem('mcm_user', JSON.stringify(userData));
+      setUser(userData);
+      if (userData.usertype === 2) {
+        setSelectedLocationId(userData.location_id);
+      } else {
+        setSelectedLocationId("all");
+      }
     };
 
     const logout = () => {
-        setUser(null);
-        setSelectedLocationId("all");
+      localStorage.removeItem('mcm_user');
+      setUser(null);
+      setSelectedLocationId("all");
     };
 
     const can = (action) => {

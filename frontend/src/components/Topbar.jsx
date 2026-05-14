@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Typography, Row, Col, Button, Select, Space } from 'antd';
+import { LogoutOutlined } from '@ant-design/icons';
 import { colors } from '../theme.js';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -7,7 +8,7 @@ const { Title } = Typography;
 
 const Topbar = () => {
   const navigate = useNavigate();
-  const { user, selectedLocationId, setSelectedLocationId } = useAuth();
+  const { user, selectedLocationId, setSelectedLocationId, logout } = useAuth();
   const [locations, setLocations] = useState([]);
 
   useEffect(() => {
@@ -51,8 +52,10 @@ const Topbar = () => {
           Manco (MCM) Trading Shop Management System
         </Title>
       </Col>
-      <Col>
-        <Button onClick={() => navigate(-1)}>Back</Button>
+      <Col style={{ textAlign: 'right', paddingRight: '24px' }}>
+        <Button icon={<LogoutOutlined />} onClick={logout} style={{ backgroundColor: '#ffffff', color: '#ff4d4f', border: '1px solid #ff4d4f' }}>
+          Logout
+        </Button>
       </Col>
     </Row>
   )

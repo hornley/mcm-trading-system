@@ -1,10 +1,9 @@
 import { Menu, Layout, Col, Row, Typography} from "antd"
 import { Avatar } from 'antd';
 import { Space } from 'antd';
-import { colors } from '../theme.js' 
 import { useAuth } from "../context/AuthContext";
 import {UserOutlined} from '@ant-design/icons'
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const { Sider } = Layout;
 const { Text } = Typography;
@@ -23,7 +22,7 @@ const managerModules = [
   { key: '1', label: 'Dashboard', path: '/dashboard/manager' },
   { key: '2', label: 'Inventory', path: '/dashboard/inventory' },
   { key: '3', label: 'Sales', path: '/dashboard/sales' },
-  { key: '4', label: 'Stock Management', path: '/dashboard/stock' },
+  { key: '4', label: 'Stock Management', path: '/dashboard/stock-management' },
   { key: '5', label: 'Manage Staff', path: '/dashboard/users' },
   { key: '6', label: 'Report', path: '/dashboard/report' },
 ];
@@ -36,12 +35,15 @@ const adminModules = [
 const Sidebar = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const modules = 
         user?.role === 'owner' ? ownerModules :
         user?.role === 'admin' ? adminModules :
         user?.role === 'manager' ? managerModules :
     [];
+
+    const selectedKey = modules.find(m => m.path === location.pathname)?.key || '1';
 
   return (
     <Sider style={{padding: '16px 16px'}}>
@@ -51,14 +53,14 @@ const Sidebar = () => {
                 <Col>
                     <Space>
                         <Avatar src={user?.avatar || null} icon={!user?.avatar && <UserOutlined /> }/>
-                        <Text style={{color: colors.secondaryText }}>
+                        <Text style={{color: '#ffffff' }}>
                             {user?.username}
                         </Text>
                     </Space>
                 </Col>
             </Row>
             <Menu
-                defaultSelectedKeys={['1']}
+                selectedKeys={[selectedKey]}
                 mode='inline'
                 theme='dark'
                 items={modules}
