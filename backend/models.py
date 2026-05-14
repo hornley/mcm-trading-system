@@ -115,6 +115,9 @@ class ActivityLog(db.Model):
     __tablename__ = "Activity_Log"
     log_id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
+    module = db.Column(db.String, nullable=False)
+    action_type = db.Column(db.String, nullable=False)
     action = db.Column(db.String, nullable=False)
+    details = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
     user = db.relationship("User")

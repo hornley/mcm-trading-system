@@ -91,9 +91,12 @@ CREATE TABLE Stock_Adjustments (
 );
 
 CREATE TABLE Activity_Log (
-    log_id    INTEGER PRIMARY KEY,
-    user_id   INTEGER NOT NULL,
-    action    VARCHAR NOT NULL,
-    timestamp DATETIME NOT NULL DEFAULT (datetime('now')),
+    log_id       INTEGER PRIMARY KEY,
+    user_id      INTEGER NOT NULL,
+    module       VARCHAR NOT NULL,
+    action_type  VARCHAR NOT NULL,
+    action       VARCHAR NOT NULL,
+    details      TEXT,
+    timestamp    DATETIME NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES Users(user_id)
 );
