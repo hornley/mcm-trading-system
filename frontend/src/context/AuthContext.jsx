@@ -1,7 +1,7 @@
 import React from 'react'
 import { createContext, useContext, useState } from 'react'
 
-export const AuthContext = createContext(null);
+export const AuthContext = createContext({ user: null, login: () => {}, logout: () => {}, can: () => false });
 
 const PERMISSIONS = {
   1: { list: true, view: true, create: true, delete: true, update: true },
@@ -10,15 +10,20 @@ const PERMISSIONS = {
 };
 
 export const AuthProvider = ({children}) => {
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState(() => {
+      const stored = localStorage.getItem('mcm_user');
+      return stored ? JSON.parse(stored) : null;
+    });
 
     const login = (userData) => {
-        setUser(userData);
-    }
+      localStorage.setItem('mcm_user', JSON.stringify(userData));
+      setUser(userData);
+    };
 
     const logout = () => {
-        setUser(null)
-    }
+      localStorage.removeItem('mcm_user');
+      setUser(null);
+    };
 
     const can = (action) => {
       if (!user) return false;
