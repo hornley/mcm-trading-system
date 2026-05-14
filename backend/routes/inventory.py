@@ -1,5 +1,6 @@
 from flask import Blueprint, request
-from models import db, User, Product, Category, Location, Inventory, StockAdjustment
+from datetime import datetime
+from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer
 from utils.response import success_response, error_response
 from utils.validation import validate_required
 from utils.activity_logger import log_activity
@@ -655,6 +656,11 @@ def transfer_stock():
         user_id=data.get("user_id"),
         quantity=quantity,
     )
+    if data.get("transfer_date"):
+        try:
+            transfer.transfer_date = datetime.fromisoformat(data["transfer_date"])
+        except (ValueError, TypeError):
+            pass
     db.session.add(transfer)
     db.session.commit()
 

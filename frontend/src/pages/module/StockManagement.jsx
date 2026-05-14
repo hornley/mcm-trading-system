@@ -123,6 +123,7 @@ const StockManagement = () => {
   const handleTransferSave = async () => {
     try {
       const values = await transferForm.validateFields();
+      const transferDate = values.date ? values.date.toISOString() : new Date().toISOString();
 
       const res = await fetch('/api/stock/transfer', {
         method: 'POST',
@@ -134,6 +135,7 @@ const StockManagement = () => {
           from_location_id: values.from_location_id,
           to_location_id: values.to_location_id,
           quantity: values.quantity,
+          transfer_date: transferDate,
           remarks: values.remarks || null,
         }),
       });
