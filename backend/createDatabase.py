@@ -80,9 +80,9 @@ def seed():
             Product(category_id=cat.category_id, name="VELVET 1", price=160, reorder_level="10", sku="PROD-013", unit="piece", is_active=True),
             Product(category_id=cat.category_id, name="VELVET 2", price=170, reorder_level="10", sku="PROD-014", unit="piece", is_active=True),
             Product(category_id=cat.category_id, name="VELBOA SUPER SOFT", price=380, reorder_level="5", sku="PROD-015", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="PRINTED DESIGN (POLKADOTS, HEART SQUARE DOTS)", price=150, reorder_level="10", sku="PROD-016", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="PRINTED DESIGN", price=150, reorder_level="10", sku="PROD-016", unit="piece", is_active=True),
             Product(category_id=cat.category_id, name="SUEDE GAMOSA", price=200, reorder_level="8", sku="PROD-017", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="NEON WOVCEN CLOTH", price=100, reorder_level="15", sku="PROD-018", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="NEON WOVEN CLOTH", price=100, reorder_level="15", sku="PROD-018", unit="piece", is_active=True),
             Product(category_id=cat.category_id, name="FEATHERS", price=50, reorder_level="20", sku="PROD-019", unit="piece", is_active=True),
         ]
         db.session.add_all(prods)
@@ -100,14 +100,17 @@ def seed():
 
         # ── 5. INVENTORY ──
         print("Seeding Inventory...")
-        all_products = prods + new_prods
-        for p in all_products:
-            for loc in locs:
-                db.session.add(Inventory(
-                    product_id=p.product_id,
-                    location_id=loc.location_id,
-                    quantity=random.randint(0, 50),
-                ))
+        mock_stock = [25, 30, 15, 10, 20, 12, 8, 5, 7, 40, 6, 3, 18, 22, 4, 15, 10, 35, 50]
+        for idx, p in enumerate(prods):
+            qty = mock_stock[idx] if idx < len(mock_stock) else 0
+            db.session.add(Inventory(product_id=p.product_id, location_id=locs[0].location_id, quantity=qty))
+            for loc in locs[1:]:
+                db.session.add(Inventory(product_id=p.product_id, location_id=loc.location_id, quantity=0))
+
+        for p in new_prods:
+            db.session.add(Inventory(product_id=p.product_id, location_id=locs[0].location_id, quantity=random.randint(0, 20)))
+            for loc in locs[1:]:
+                db.session.add(Inventory(product_id=p.product_id, location_id=loc.location_id, quantity=0))
         db.session.flush()
 
         # ── 6. ORDERS + ITEMS + PAYMENTS ──
