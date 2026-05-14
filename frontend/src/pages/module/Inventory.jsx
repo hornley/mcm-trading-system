@@ -1,41 +1,49 @@
 import { useState, useEffect } from 'react';
 import {
   Table, Card, Typography, Tabs, Row, Col, Input, Select, Button,
-  Tag, Modal, Form, Space, Popconfirm, InputNumber, message, Spin,
+  Tag, Modal, Form, Space, Popconfirm, InputNumber, message, Spin, Radio,
 } from 'antd';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 const { Title } = Typography;
 const { Search } = Input;
+const { TextArea } = Input;
 
 const Inventory = () => {
   const { user, can } = useAuth();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [inventoryMap, setInventoryMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [productModalVisible, setProductModalVisible] = useState(false);
+  const [adjustModalVisible, setAdjustModalVisible] = useState(false);
+  const [adjustProduct, setAdjustProduct] = useState(null);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(null);
-  const [form] = Form.useForm();
+  const [productForm] = Form.useForm();
+  const [adjustForm] = Form.useForm();
 
   const fetchData = async () => {
     if (!user) return;
     setTableLoading(true);
     try {
-      const [productsRes, categoriesRes, inventoryRes] = await Promise.all([
+      const [productsRes, categoriesRes, inventoryRes, locationsRes] = await Promise.all([
         fetch(`/api/products?usertype=${user.usertype}`),
         fetch(`/api/categories?usertype=${user.usertype}`),
         fetch(`/api/inventory?usertype=${user.usertype}`),
+        fetch(`/api/locations?usertype=${user.usertype}`),
       ]);
       const productsData = await productsRes.json();
       const categoriesData = await categoriesRes.json();
       const inventoryData = await inventoryRes.json();
+      const locationsData = await locationsRes.json();
 
       if (productsData.success) setProducts(productsData.data);
       if (categoriesData.success) setCategories(categoriesData.data);
+      if (locationsData.success) setLocations(locationsData.data);
       if (inventoryData.success) {
         const map = {};
         inventoryData.data.forEach((inv) => {
@@ -64,22 +72,28 @@ const Inventory = () => {
 
   const handleAdd = () => {
     setSelectedRecord(null);
-    form.resetFields();
-    setModalVisible(true);
+    productForm.resetFields();
+    setProductModalVisible(true);
   };
 
   const handleEdit = (record) => {
     setSelectedRecord(record);
-    form.setFieldsValue({
+    productForm.setFieldsValue({
       name: record.name,
       category_id: record.category_id,
       price: record.price,
-      sku: record.sku,
       unit: record.unit,
       reorder_level: record.reorder_level,
       description: record.description,
     });
-    setModalVisible(true);
+    setProductModalVisible(true);
+  };
+
+  const handleAdjust = (record) => {
+    setAdjustProduct(record);
+    adjustForm.resetFields();
+    adjustForm.setFieldsValue({ direction: 'add' });
+    setAdjustModalVisible(true);
   };
 
   const handleVoid = async (record) => {
@@ -120,9 +134,9 @@ const Inventory = () => {
     }
   };
 
-  const handleSave = async () => {
+  const handleSaveProduct = async () => {
     try {
-      const values = await form.validateFields();
+      const values = await productForm.validateFields();
       const isEdit = !!selectedRecord;
       const url = isEdit ? `/api/products/${selectedRecord.product_id}` : '/api/products';
       const method = isEdit ? 'PUT' : 'POST';
@@ -135,8 +149,8 @@ const Inventory = () => {
       const data = await res.json();
       if (data.success) {
         message.success(isEdit ? 'Product updated' : 'Product created');
-        setModalVisible(false);
-        form.resetFields();
+        setProductModalVisible(false);
+        productForm.resetFields();
         fetchData();
       } else {
         message.error(data.message);
@@ -146,15 +160,47 @@ const Inventory = () => {
     }
   };
 
+  const handleSaveAdjust = async () => {
+    try {
+      const values = await adjustForm.validateFields();
+      const quantityChange = values.direction === 'remove'
+        ? -Math.abs(values.quantity)
+        : Math.abs(values.quantity);
+
+      const res = await fetch('/api/inventory/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          usertype: user.usertype,
+          user_id: user.user_id,
+          product_id: adjustProduct.product_id,
+          location_id: values.location_id,
+          quantity_change: quantityChange,
+          reason: values.reason || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        message.success('Stock adjusted');
+        setAdjustModalVisible(false);
+        adjustForm.resetFields();
+        fetchData();
+      } else {
+        message.error(data.message);
+      }
+    } catch {
+      message.error('Failed to adjust stock');
+    }
+  };
+
   const filteredProducts = products.filter((p) => {
-    if (searchText && !p.name.toLowerCase().includes(searchText.toLowerCase()) && !p.sku?.toLowerCase().includes(searchText.toLowerCase())) return false;
+    if (searchText && !p.name.toLowerCase().includes(searchText.toLowerCase())) return false;
     if (categoryFilter && p.category_id !== categoryFilter) return false;
     return true;
   });
 
   const columns = [
     { title: 'Product Name', dataIndex: 'name', key: 'name' },
-    { title: 'SKU', dataIndex: 'sku', key: 'sku' },
     { title: 'Category', dataIndex: 'category', key: 'category' },
     {
       title: 'Stock Quantity', key: 'stockQuantity',
@@ -177,6 +223,9 @@ const Inventory = () => {
         <Space>
           {can('update') && record.is_active && (
             <Button type="link" onClick={() => handleEdit(record)}>Edit</Button>
+          )}
+          {can('update') && record.is_active && (
+            <Button type="link" onClick={() => handleAdjust(record)}>Adjust</Button>
           )}
           {can('delete') && record.is_active && (
             <Popconfirm
@@ -208,7 +257,7 @@ const Inventory = () => {
       <Col xs={24} sm={12} md={14}>
         <Space wrap>
           <Search
-            placeholder="Search by name or SKU"
+            placeholder="Search by product name"
             onSearch={(val) => setSearchText(val)}
             onChange={(e) => { if (!e.target.value) setSearchText(''); }}
             enterButton
@@ -260,16 +309,17 @@ const Inventory = () => {
     <Card style={{ margin: 24 }}>
       <Title level={2}>Inventory</Title>
       <Tabs items={items} />
+
       <Modal
         title={selectedRecord ? 'Edit Product' : 'Add Product'}
-        open={modalVisible}
-        onCancel={() => { setModalVisible(false); form.resetFields(); }}
+        open={productModalVisible}
+        onCancel={() => { setProductModalVisible(false); productForm.resetFields(); }}
         footer={[
-          <Button key="cancel" onClick={() => { setModalVisible(false); form.resetFields(); }}>Cancel</Button>,
-          <Button key="save" type="primary" onClick={handleSave}>Save</Button>,
+          <Button key="cancel" onClick={() => { setProductModalVisible(false); productForm.resetFields(); }}>Cancel</Button>,
+          <Button key="save" type="primary" onClick={handleSaveProduct}>Save</Button>,
         ]}
       >
-        <Form form={form} layout="vertical">
+        <Form form={productForm} layout="vertical">
           <Form.Item name="name" label="Product Name" rules={[{ required: true, message: 'Please enter product name' }]}>
             <Input placeholder="Enter product name" />
           </Form.Item>
@@ -280,9 +330,11 @@ const Inventory = () => {
               ))}
             </Select>
           </Form.Item>
-          <Form.Item name="sku" label="SKU">
-            <Input placeholder="Auto-generated if empty" />
-          </Form.Item>
+          {!selectedRecord && (
+            <Form.Item name="sku" label="SKU">
+              <Input placeholder="Auto-generated if empty" />
+            </Form.Item>
+          )}
           <Form.Item name="price" label="Base Price" rules={[{ required: true, message: 'Please enter price' }]}>
             <InputNumber min={0} style={{ width: '100%' }} placeholder="Enter price" prefix="₱" />
           </Form.Item>
@@ -293,7 +345,39 @@ const Inventory = () => {
             <InputNumber min={0} style={{ width: '100%' }} placeholder="Enter reorder level" />
           </Form.Item>
           <Form.Item name="description" label="Description">
-            <Input.TextArea rows={3} placeholder="Enter description" />
+            <TextArea rows={3} placeholder="Enter description" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={adjustProduct ? `Adjust Stock — ${adjustProduct.name}` : 'Adjust Stock'}
+        open={adjustModalVisible}
+        onCancel={() => { setAdjustModalVisible(false); adjustForm.resetFields(); }}
+        footer={[
+          <Button key="cancel" onClick={() => { setAdjustModalVisible(false); adjustForm.resetFields(); }}>Cancel</Button>,
+          <Button key="save" type="primary" onClick={handleSaveAdjust}>Save</Button>,
+        ]}
+      >
+        <Form form={adjustForm} layout="vertical">
+          <Form.Item name="location_id" label="Location" rules={[{ required: true, message: 'Please select location' }]}>
+            <Select placeholder="Select location">
+              {locations.filter((l) => l.is_active).map((loc) => (
+                <Select.Option key={loc.location_id} value={loc.location_id}>{loc.name}</Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="direction" label="Direction">
+            <Radio.Group>
+              <Radio value="add">Add Stock</Radio>
+              <Radio value="remove">Remove Stock</Radio>
+            </Radio.Group>
+          </Form.Item>
+          <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: 'Please enter quantity' }]}>
+            <InputNumber min={1} style={{ width: '100%' }} placeholder="Enter quantity" />
+          </Form.Item>
+          <Form.Item name="reason" label="Reason">
+            <Input placeholder="e.g. New shipment, Damaged goods" />
           </Form.Item>
         </Form>
       </Modal>

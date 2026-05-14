@@ -371,9 +371,10 @@ def adjust_inventory():
     if error:
         return error
 
-    error = validate_non_negative(data.get("quantity_change"), "quantity_change")
-    if error:
-        return error
+    try:
+        quantity_change = int(data["quantity_change"])
+    except (ValueError, TypeError):
+        return error_response("quantity_change must be a valid integer", "INVALID_VALUE", 400)
 
     product = Product.query.get(data["product_id"])
     if not product:
@@ -391,7 +392,7 @@ def adjust_inventory():
     if not inventory:
         return error_response("Inventory record not found", "NOT_FOUND", 404)
 
-    new_quantity = inventory.quantity + data["quantity_change"]
+    new_quantity = inventory.quantity + quantity_change
     if new_quantity < 0:
         return error_response("Insufficient stock. Resulting quantity would be negative", "INSUFFICIENT_STOCK", 400)
 
@@ -400,7 +401,7 @@ def adjust_inventory():
     adjustment = StockAdjustment(
         location_id=data["location_id"],
         user_id=data.get("user_id"),
-        quantity_change=data["quantity_change"],
+        quantity_change=quantity_change,
         reason=data.get("reason"),
     )
     db.session.add(adjustment)
@@ -410,11 +411,11 @@ def adjust_inventory():
         user_id=data.get("user_id"),
         module="inventory",
         action_type="adjust",
-        action=f"Adjusted inventory for {product.name} at {location.name}: {data['quantity_change']:+d}",
+        action=f"Adjusted inventory for {product.name} at {location.name}: {quantity_change:+d}",
         details={
             "product_id": product.product_id,
             "location_id": location.location_id,
-            "quantity_change": data["quantity_change"],
+            "quantity_change": quantity_change,
             "new_quantity": new_quantity,
         }
     )
@@ -426,8 +427,8 @@ def adjust_inventory():
             "product_name": product.name,
             "location_id": location.location_id,
             "location_name": location.name,
-            "previous_quantity": inventory.quantity - data["quantity_change"],
-            "quantity_change": data["quantity_change"],
+            "previous_quantity": inventory.quantity - quantity_change,
+            "quantity_change": quantity_change,
             "new_quantity": new_quantity,
         },
         "Inventory adjusted successfully"
