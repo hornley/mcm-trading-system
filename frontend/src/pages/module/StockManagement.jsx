@@ -356,7 +356,6 @@ const StockManagement = () => {
           <Typography.Text type="secondary" style={{ fontSize: 12, marginTop: -16, marginBottom: 16, display: 'block' }}>
             Available: {selectedRecord?.quantity ?? 0} units
           </Typography.Text>
-          </Form.Item>
           <Form.Item name="date" label="Transfer Date" rules={[{ required: true, message: 'Please select date' }]}>
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
