@@ -11,13 +11,19 @@ CREATE TABLE Users (
 CREATE TABLE Locations (
     location_id INTEGER PRIMARY KEY,
     name        VARCHAR NOT NULL,
-    address     VARCHAR
+    address     VARCHAR,
+    is_active   INTEGER NOT NULL DEFAULT 1,
+    created_at  DATETIME NOT NULL DEFAULT (datetime('now')),
+    updated_at  DATETIME
 );
 
 CREATE TABLE Categories (
     category_id INTEGER PRIMARY KEY,
     name        VARCHAR NOT NULL,
-    description VARCHAR
+    description VARCHAR,
+    is_active   INTEGER NOT NULL DEFAULT 1,
+    created_at  DATETIME NOT NULL DEFAULT (datetime('now')),
+    updated_at  DATETIME
 );
 
 CREATE TABLE Products (
@@ -26,6 +32,12 @@ CREATE TABLE Products (
     name          VARCHAR NOT NULL,
     price         INTEGER NOT NULL,
     reorder_level VARCHAR,
+    description   TEXT,
+    sku           VARCHAR UNIQUE,
+    unit          VARCHAR,
+    is_active     INTEGER NOT NULL DEFAULT 1,
+    created_at    DATETIME NOT NULL DEFAULT (datetime('now')),
+    updated_at    DATETIME,
     FOREIGN KEY (category_id) REFERENCES Categories(category_id)
 );
 
@@ -62,6 +74,7 @@ CREATE TABLE Inventory (
     product_id   INTEGER NOT NULL,
     location_id  INTEGER NOT NULL,
     quantity     INTEGER NOT NULL DEFAULT 0,
+    updated_at   DATETIME,
     FOREIGN KEY (product_id)  REFERENCES Products(product_id),
     FOREIGN KEY (location_id) REFERENCES Locations(location_id)
 );
