@@ -8,6 +8,7 @@ from routes.accountControl import account_bp
 from routes.inventory import inventory_bp
 from routes.settings import settings_bp
 from routes.categories import categories_bp
+from routes.locations import locations_bp
 
 def create_app():
     app = Flask(__name__, static_folder=FRONTEND_DIST, static_url_path="")
@@ -18,6 +19,7 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(inventory_bp)
     app.register_blueprint(categories_bp)
+    app.register_blueprint(locations_bp)
 
     with app.app_context():
         from models import (
