@@ -27,6 +27,7 @@ const StockManagement = () => {
   const [adjustVisible, setAdjustVisible] = useState(false);
   const [transferVisible, setTransferVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [fromLocationId, setFromLocationId] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [adjustForm] = Form.useForm();
   const [transferForm] = Form.useForm();
@@ -83,12 +84,9 @@ const StockManagement = () => {
 
   const handleTransferStock = (record) => {
     setSelectedRecord(record);
+    setFromLocationId(record.location_id);
     transferForm.resetFields();
-    const defaults = {};
-    if (selectedLocationId !== "all") {
-      defaults.from_location_id = selectedLocationId;
-    }
-    transferForm.setFieldsValue(defaults);
+    transferForm.setFieldsValue({ from_location_id: record.location_id });
     setTransferVisible(true);
   };
 
@@ -148,6 +146,7 @@ const StockManagement = () => {
       if (data.success) {
         message.success('Stock transferred');
         setTransferVisible(false);
+        setFromLocationId(null);
         transferForm.resetFields();
         fetchData();
       } else {
@@ -329,15 +328,15 @@ const StockManagement = () => {
       <Modal
         title={`Transfer Stock - ${selectedRecord?.product_name}`}
         open={transferVisible}
-        onCancel={() => setTransferVisible(false)}
+        onCancel={() => { setTransferVisible(false); setFromLocationId(null); }}
         footer={[
-          <Button key="cancel" onClick={() => setTransferVisible(false)}>Cancel</Button>,
+          <Button key="cancel" onClick={() => { setTransferVisible(false); setFromLocationId(null); }}>Cancel</Button>,
           <Button key="save" type="primary" onClick={handleTransferSave}>Save</Button>,
         ]}
       >
         <Form form={transferForm} layout="vertical">
-          <Form.Item name="from_location_id" label="From Branch" rules={[{ required: true, message: 'Please select source branch' }]}>
-            <Select placeholder="Select source branch">
+          <Form.Item name="from_location_id" label="From Branch">
+            <Select disabled>
               {locations.map((loc) => (
                 <Select.Option key={loc.location_id} value={loc.location_id}>{loc.name}</Select.Option>
               ))}
@@ -345,7 +344,7 @@ const StockManagement = () => {
           </Form.Item>
           <Form.Item name="to_location_id" label="To Branch" rules={[{ required: true, message: 'Please select destination branch' }]}>
             <Select placeholder="Select destination branch">
-              {locations.map((loc) => (
+              {locations.filter((loc) => loc.location_id !== fromLocationId).map((loc) => (
                 <Select.Option key={loc.location_id} value={loc.location_id}>{loc.name}</Select.Option>
               ))}
             </Select>
