@@ -159,6 +159,8 @@ def seed():
 
         # ── 8. STOCK ADJUSTMENTS ──
         print("Seeding Stock Adjustments...")
+        reasons = ["Damaged goods", "Inventory count correction", "Sample material",
+                    "Quality check removal", "Supplier return"]
         for _ in range(15):
             sa = StockAdjustment(
                 product_id=random.choice(all_products).product_id,
