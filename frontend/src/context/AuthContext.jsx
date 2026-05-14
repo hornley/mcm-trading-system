@@ -1,5 +1,5 @@
 import React from 'react'
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useCallback } from 'react'
 
 export const AuthContext = createContext(null);
 
@@ -11,14 +11,21 @@ const PERMISSIONS = {
 
 export const AuthProvider = ({children}) => {
     const [user, setUser] = useState(null);
+    const [selectedLocationId, setSelectedLocationId] = useState("all");
 
     const login = (userData) => {
         setUser(userData);
-    }
+        if (userData.usertype === 2) {
+            setSelectedLocationId(userData.location_id);
+        } else {
+            setSelectedLocationId("all");
+        }
+    };
 
     const logout = () => {
-        setUser(null)
-    }
+        setUser(null);
+        setSelectedLocationId("all");
+    };
 
     const can = (action) => {
       if (!user) return false;
@@ -26,7 +33,7 @@ export const AuthProvider = ({children}) => {
     };
 
   return (
-    <AuthContext.Provider value = {{user, login, logout, can}}>
+    <AuthContext.Provider value={{user, login, logout, can, selectedLocationId, setSelectedLocationId}}>
         {children}
     </AuthContext.Provider>
   )

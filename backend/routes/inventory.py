@@ -1,11 +1,20 @@
 from flask import Blueprint, request
-from models import db, Product, Category, Location, Inventory, StockAdjustment
+from models import db, User, Product, Category, Location, Inventory, StockAdjustment
 from utils.response import success_response, error_response
-from utils.validation import validate_required, validate_non_negative
+from utils.validation import validate_required
 from utils.activity_logger import log_activity
 from utils.sorting import quick_sort
 
 inventory_bp = Blueprint("inventory", __name__)
+
+
+def _resolve_location_id(usertype, user_id, requested_location_id):
+    if usertype == 2:
+        user = User.query.get(user_id)
+        if not user:
+            return None, error_response("User not found", "NOT_FOUND", 404)
+        return user.location_id, None
+    return requested_location_id, None
 
 
 def _can_create(usertype):
@@ -60,11 +69,17 @@ def list_products():
     if usertype is None:
         return error_response("usertype query parameter is required", "MISSING_PARAM", 400)
 
+    user_id = request.args.get("user_id", type=int)
+    location_id = request.args.get("location_id")
     sort_by = request.args.get("sort_by", "name")
     sort_order = request.args.get("sort_order", "asc")
     search = request.args.get("q", "").strip()
     category_id = request.args.get("category_id", type=int)
     is_active = request.args.get("is_active")
+
+    resolved_location_id, error = _resolve_location_id(usertype, user_id, location_id)
+    if error:
+        return error
 
     query = Product.query
 
@@ -83,7 +98,21 @@ def list_products():
 
     products = quick_sort(query.all(), key=sort_by, order=sort_order)
 
-    return success_response([_serialize_product(p) for p in products])
+    result = []
+    for p in products:
+        data = _serialize_product(p)
+        if resolved_location_id and resolved_location_id != "all":
+            inventory = Inventory.query.filter_by(
+                product_id=p.product_id,
+                location_id=resolved_location_id
+            ).first()
+            data["quantity"] = inventory.quantity if inventory else 0
+        else:
+            total = db.session.query(db.func.sum(Inventory.quantity)).filter_by(product_id=p.product_id).scalar()
+            data["quantity"] = total or 0
+        result.append(data)
+
+    return success_response(result)
 
 
 @inventory_bp.route("/api/products/<int:product_id>", methods=["GET"])
@@ -92,11 +121,39 @@ def get_product(product_id):
     if usertype is None:
         return error_response("usertype query parameter is required", "MISSING_PARAM", 400)
 
+    user_id = request.args.get("user_id", type=int)
+    location_id = request.args.get("location_id")
+
+    resolved_location_id, error = _resolve_location_id(usertype, user_id, location_id)
+    if error:
+        return error
+
     product = Product.query.get(product_id)
     if not product:
         return error_response("Product not found", "NOT_FOUND", 404)
 
-    return success_response(_serialize_product(product, include_inventory=True))
+    data = _serialize_product(product)
+
+    if resolved_location_id and resolved_location_id != "all":
+        inventory = Inventory.query.filter_by(
+            product_id=product_id,
+            location_id=resolved_location_id
+        ).all()
+    else:
+        inventory = Inventory.query.filter_by(product_id=product_id).all()
+
+    data["inventory"] = [
+        {
+            "inventory_id": inv.inventory_id,
+            "location_id": inv.location_id,
+            "location_name": inv.location.name if inv.location else None,
+            "quantity": inv.quantity,
+        }
+        for inv in inventory
+    ]
+    data["quantity"] = sum(inv.quantity for inv in inventory)
+
+    return success_response(data)
 
 
 @inventory_bp.route("/api/products", methods=["POST"])
@@ -286,9 +343,19 @@ def list_inventory():
     if usertype is None:
         return error_response("usertype query parameter is required", "MISSING_PARAM", 400)
 
-    inventory = Inventory.query.join(Product).filter(
-        Product.is_active == True
-    ).all()
+    user_id = request.args.get("user_id", type=int)
+    location_id = request.args.get("location_id")
+
+    resolved_location_id, error = _resolve_location_id(usertype, user_id, location_id)
+    if error:
+        return error
+
+    query = Inventory.query.join(Product).filter(Product.is_active == True)
+
+    if resolved_location_id and resolved_location_id != "all":
+        query = query.filter(Inventory.location_id == resolved_location_id)
+
+    inventory = query.all()
 
     return success_response([
         {
@@ -309,6 +376,16 @@ def get_inventory_by_location(location_id):
     usertype = request.args.get("usertype", type=int)
     if usertype is None:
         return error_response("usertype query parameter is required", "MISSING_PARAM", 400)
+
+    user_id = request.args.get("user_id", type=int)
+
+    resolved_location_id, error = _resolve_location_id(usertype, user_id, str(location_id))
+    if error:
+        return error
+
+    if usertype == 2:
+        if not resolved_location_id or int(resolved_location_id) != location_id:
+            return error_response("You can only view inventory at your assigned location", "FORBIDDEN", 403)
 
     location = Location.query.get(location_id)
     if not location:
@@ -337,11 +414,22 @@ def get_inventory_by_product(product_id):
     if usertype is None:
         return error_response("usertype query parameter is required", "MISSING_PARAM", 400)
 
+    user_id = request.args.get("user_id", type=int)
+    location_id = request.args.get("location_id")
+
+    resolved_location_id, error = _resolve_location_id(usertype, user_id, location_id)
+    if error:
+        return error
+
     product = Product.query.get(product_id)
     if not product:
         return error_response("Product not found", "NOT_FOUND", 404)
 
-    inventory = Inventory.query.filter_by(product_id=product_id).all()
+    query = Inventory.query.filter_by(product_id=product_id)
+    if resolved_location_id and resolved_location_id != "all":
+        query = query.filter_by(location_id=resolved_location_id)
+
+    inventory = query.all()
 
     return success_response([
         {
@@ -366,6 +454,13 @@ def adjust_inventory():
 
     if not _can_update(usertype):
         return error_response("You don't have permission to adjust inventory", "FORBIDDEN", 403)
+
+    if usertype == 2:
+        manager = User.query.get(data.get("user_id"))
+        if not manager:
+            return error_response("User not found", "NOT_FOUND", 404)
+        if manager.location_id != data.get("location_id"):
+            return error_response("You can only adjust inventory at your assigned location", "FORBIDDEN", 403)
 
     error = validate_required(data, ["product_id", "location_id", "quantity_change"])
     if error:
@@ -441,6 +536,13 @@ def get_low_stock():
     if usertype is None:
         return error_response("usertype query parameter is required", "MISSING_PARAM", 400)
 
+    user_id = request.args.get("user_id", type=int)
+    location_id = request.args.get("location_id")
+
+    resolved_location_id, error = _resolve_location_id(usertype, user_id, location_id)
+    if error:
+        return error
+
     products = Product.query.filter_by(is_active=True).all()
     low_stock = []
 
@@ -453,7 +555,11 @@ def get_low_stock():
         except (ValueError, TypeError):
             continue
 
-        inventory = Inventory.query.filter_by(product_id=product.product_id).all()
+        query = Inventory.query.filter_by(product_id=product.product_id)
+        if resolved_location_id and resolved_location_id != "all":
+            query = query.filter_by(location_id=resolved_location_id)
+
+        inventory = query.all()
         for inv in inventory:
             if inv.quantity < level:
                 low_stock.append({

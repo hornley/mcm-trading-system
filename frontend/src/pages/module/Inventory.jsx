@@ -10,11 +10,10 @@ const { Search } = Input;
 const { TextArea } = Input;
 
 const Inventory = () => {
-  const { user, can } = useAuth();
+  const { user, can, selectedLocationId } = useAuth();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [inventoryMap, setInventoryMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(false);
   const [productModalVisible, setProductModalVisible] = useState(false);
@@ -30,28 +29,21 @@ const Inventory = () => {
     if (!user) return;
     setTableLoading(true);
     try {
-      const [productsRes, categoriesRes, inventoryRes, locationsRes] = await Promise.all([
-        fetch(`/api/products?usertype=${user.usertype}`),
+      const locationParam = selectedLocationId !== "all" ? `&location_id=${selectedLocationId}` : '';
+      const userIdParam = `&user_id=${user.user_id}`;
+
+      const [productsRes, categoriesRes, locationsRes] = await Promise.all([
+        fetch(`/api/products?usertype=${user.usertype}${locationParam}${userIdParam}`),
         fetch(`/api/categories?usertype=${user.usertype}`),
-        fetch(`/api/inventory?usertype=${user.usertype}`),
         fetch(`/api/locations?usertype=${user.usertype}`),
       ]);
       const productsData = await productsRes.json();
       const categoriesData = await categoriesRes.json();
-      const inventoryData = await inventoryRes.json();
       const locationsData = await locationsRes.json();
 
       if (productsData.success) setProducts(productsData.data);
       if (categoriesData.success) setCategories(categoriesData.data);
       if (locationsData.success) setLocations(locationsData.data);
-      if (inventoryData.success) {
-        const map = {};
-        inventoryData.data.forEach((inv) => {
-          if (!map[inv.product_id]) map[inv.product_id] = [];
-          map[inv.product_id].push(inv);
-        });
-        setInventoryMap(map);
-      }
     } catch {
       message.error('Failed to load data');
     } finally {
@@ -62,13 +54,7 @@ const Inventory = () => {
 
   useEffect(() => {
     fetchData();
-  }, [user]);
-
-  const totalStock = (productId) => {
-    const invs = inventoryMap[productId];
-    if (!invs) return 0;
-    return invs.reduce((sum, inv) => sum + inv.quantity, 0);
-  };
+  }, [user, selectedLocationId]);
 
   const handleAdd = () => {
     setSelectedRecord(null);
@@ -92,7 +78,11 @@ const Inventory = () => {
   const handleAdjust = (record) => {
     setAdjustProduct(record);
     adjustForm.resetFields();
-    adjustForm.setFieldsValue({ direction: 'add' });
+    const defaults = { direction: 'add' };
+    if (selectedLocationId !== "all") {
+      defaults.location_id = selectedLocationId;
+    }
+    adjustForm.setFieldsValue(defaults);
     setAdjustModalVisible(true);
   };
 
@@ -204,7 +194,7 @@ const Inventory = () => {
     { title: 'Category', dataIndex: 'category', key: 'category' },
     {
       title: 'Stock Quantity', key: 'stockQuantity',
-      render: (_, record) => totalStock(record.product_id),
+      render: (_, record) => record.quantity ?? 0,
     },
     { title: 'Base Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}` },
     { title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level' },
