@@ -47,13 +47,12 @@ const mockStock = [
 ];
 
 const StockManagement = () => {
-  const { can } = useAuth();
+  const { can, user, selectedLocationId } = useAuth();
   const [detailVisible, setDetailVisible] = useState(false);
   const [adjustVisible, setAdjustVisible] = useState(false);
   const [transferVisible, setTransferVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [searchText, setSearchText] = useState('');
-  const [branchFilter, setBranchFilter] = useState(null);
   const [adjustForm] = Form.useForm();
   const [transferForm] = Form.useForm();
 
@@ -63,8 +62,12 @@ const StockManagement = () => {
   };
 
   const handleAdjustStock = (record) => {
+    if (selectedLocationId === "all") {
+      message.warning('Select a specific branch from the top bar to adjust stock');
+      return;
+    }
     setSelectedItem(record);
-    adjustForm.setFieldsValue({ branch: record.branch });
+    adjustForm.resetFields();
     setAdjustVisible(true);
   };
 
@@ -80,17 +83,17 @@ const StockManagement = () => {
       const newQty = isIncrease
         ? selectedItem.stockQuantity + values.quantity
         : Math.max(0, selectedItem.stockQuantity - values.quantity);
-      const today = today();
+      const todayStr = today();
       const idx = mockStock.findIndex((s) => s.key === selectedItem.key);
       if (idx !== -1) {
         mockStock[idx] = {
           ...mockStock[idx],
           stockQuantity: newQty,
-          lastRestocked: today,
+          lastRestocked: todayStr,
           movements: [
             ...mockStock[idx].movements,
             {
-              date: today,
+              date: todayStr,
               qtyIn: isIncrease ? values.quantity : 0,
               qtyOut: isIncrease ? 0 : values.quantity,
               remarks: `${values.reason}${values.remarks ? ': ' + values.remarks : ''}`,
@@ -109,18 +112,18 @@ const StockManagement = () => {
       const fromBranch = values.fromBranch;
       const toBranch = values.toBranch;
       const qty = values.quantity;
-      const today = today();
+      const todayStr = today();
       const selectedIdx = mockStock.findIndex((s) => s.key === selectedItem.key);
       if (selectedIdx !== -1) {
         const sourceItem = mockStock.find((s) => s.name === selectedItem.name && s.branch === fromBranch);
         const destItem = mockStock.find((s) => s.name === selectedItem.name && s.branch === toBranch);
         if (sourceItem) {
           sourceItem.stockQuantity = Math.max(0, sourceItem.stockQuantity - qty);
-          sourceItem.movements.push({ date: today, qtyIn: 0, qtyOut: qty, remarks: `Transfer to ${toBranch}${values.remarks ? ': ' + values.remarks : ''}` });
+          sourceItem.movements.push({ date: todayStr, qtyIn: 0, qtyOut: qty, remarks: `Transfer to ${toBranch}${values.remarks ? ': ' + values.remarks : ''}` });
         }
         if (destItem) {
           destItem.stockQuantity += qty;
-          destItem.movements.push({ date: today, qtyIn: qty, qtyOut: 0, remarks: `Transfer from ${fromBranch}${values.remarks ? ': ' + values.remarks : ''}` });
+          destItem.movements.push({ date: todayStr, qtyIn: qty, qtyOut: 0, remarks: `Transfer from ${fromBranch}${values.remarks ? ': ' + values.remarks : ''}` });
         }
       }
       message.success(`Transfer of ${selectedItem.name} from ${values.fromBranch} to ${values.toBranch} recorded`);
@@ -131,8 +134,7 @@ const StockManagement = () => {
 
   const filteredData = mockStock.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(searchText.toLowerCase());
-    const matchesBranch = branchFilter && branchFilter !== 'All' ? item.branch === branchFilter : true;
-    return matchesSearch && matchesBranch;
+    return matchesSearch;
   });
 
   const filteredTotal = filteredData.length;
@@ -158,7 +160,7 @@ const StockManagement = () => {
       render: (_, record) => (
         <Space>
           {can('update') && (
-            <Button type="link" onClick={() => handleAdjustStock(record)}>
+            <Button type="link" disabled={selectedLocationId === "all"} onClick={() => handleAdjustStock(record)}>
               Adjust Stock
             </Button>
           )}
@@ -222,17 +224,6 @@ const StockManagement = () => {
               enterButton
               style={{ width: 220 }}
             />
-            <Select
-              placeholder="Filter by branch"
-              style={{ width: 180 }}
-              allowClear
-              value={branchFilter}
-              onChange={setBranchFilter}
-            >
-              <Select.Option value="All">All Branches</Select.Option>
-              <Select.Option value="Main Store">Main Store</Select.Option>
-              <Select.Option value="Storehouse">Storehouse</Select.Option>
-            </Select>
           </Space>
         </Col>
       </Row>
@@ -290,16 +281,9 @@ const StockManagement = () => {
         ]}
       >
         <Form form={adjustForm} layout="vertical">
-          <Form.Item
-            name="branch"
-            label="Branch"
-            rules={[{ required: true }]}
-          >
-            <Select>
-              <Select.Option value="Main Store">Main Store</Select.Option>
-              <Select.Option value="Storehouse">Storehouse</Select.Option>
-            </Select>
-          </Form.Item>
+          <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+            Adjusting stock at selected branch
+          </Typography.Text>
           <Form.Item
             name="adjustmentType"
             label="Adjustment Type"
