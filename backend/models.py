@@ -10,9 +10,14 @@ class User(db.Model):
     usertype = db.Column(db.Integer, nullable=False)
     username = db.Column(db.String, nullable=False)
     email = db.Column(db.String, nullable=False, unique=True)
+    phone = db.Column(db.String, nullable=True)
     password = db.Column(db.String, nullable=False)
     location_id = db.Column(db.Integer, nullable=False, default=0)
     employee_code = db.Column(db.String, nullable=False, unique=True)
+    theme = db.Column(db.String, default= "light")
+    fontsize = db.Column(db.String, default= "medium") 
+    # profile_picture = db.Column(db.String, nullable=True)
+
 
 
 class Location(db.Model):
