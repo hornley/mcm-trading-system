@@ -17,11 +17,12 @@ import Admin from '../pages/dashboard/Admin'
 import ProtectedRoute from './ProtectedRoute'
 
 import Inventory from '../pages/module/Inventory'
-import Maintenance from '../pages/module/Maintentance'
+import Maintenance from '../pages/module/Maintenance'
 import StockManagement from '../pages/module/StockManagement'
 import Sales from '../pages/module/Sales'
 import UserAccess from '../pages/module/UserAccess'
 import Report from '../pages/module/Reports'
+import SettingsPage from '../pages/module/Settings'
 //Contains all paths to pages
 
 const router = createBrowserRouter (
@@ -59,9 +60,14 @@ const router = createBrowserRouter (
             <Route path="users" element={<UserAccess />} />
           </Route>
 
-          {/* admin only */}
-          <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          {/* admin and owner - maintenance */}
+          <Route element={<ProtectedRoute allowedRoles={["admin", "owner"]} />}>
             <Route path="maintenance" element={<Maintenance />} />
+          </Route>
+
+          {/* settings - all roles */}
+          <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "admin"]} />}>
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
 
         </Route>
