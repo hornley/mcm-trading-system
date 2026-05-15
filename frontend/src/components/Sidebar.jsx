@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { Menu, Layout, Typography, Avatar, Space } from 'antd'
 import {
   DashboardOutlined, AppstoreOutlined, AuditOutlined, TeamOutlined,
   ShoppingCartOutlined, ToolOutlined, SettingOutlined, BarChartOutlined,
-  UserOutlined,
+  UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -56,6 +57,7 @@ const Sidebar = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('mcm_sidebar_collapsed') === 'true')
 
   const modules =
     user?.role === 'owner' ? ownerModules :
@@ -65,25 +67,35 @@ const Sidebar = () => {
 
   const selectedKey = modules.find((m) => m.path === location.pathname)?.key || '1'
 
+  const handleCollapse = (val) => {
+    setCollapsed(val)
+    localStorage.setItem('mcm_sidebar_collapsed', val)
+  }
+
   return (
-    <Sider width={220} style={{ background: '#001529' }}>
-      <div style={{ padding: '20px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <Space>
+    <Sider width={220} collapsedWidth={60} collapsible collapsed={collapsed} onCollapse={handleCollapse} style={{ background: '#001529' }}>
+      <div style={{ padding: collapsed ? '16px 10px' : '20px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: collapsed ? 'center' : 'left' }}>
+        {collapsed ? (
           <Avatar size={36} src={user?.avatar || null} icon={!user?.avatar && <UserOutlined />} style={{ backgroundColor: '#5b7ff0' }} />
-          <div style={{ lineHeight: 1.3 }}>
-            <Text style={{ color: '#ffffff', fontWeight: 600, fontSize: 14, display: 'block' }}>
-              {user?.username}
-            </Text>
-            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
-              {user?.role}
-            </Text>
-          </div>
-        </Space>
+        ) : (
+          <Space>
+            <Avatar size={36} src={user?.avatar || null} icon={!user?.avatar && <UserOutlined />} style={{ backgroundColor: '#5b7ff0' }} />
+            <div style={{ lineHeight: 1.3 }}>
+              <Text style={{ color: '#ffffff', fontWeight: 600, fontSize: 14, display: 'block' }}>
+                {user?.username}
+              </Text>
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
+                {user?.role}
+              </Text>
+            </div>
+          </Space>
+        )}
       </div>
       <Menu
         selectedKeys={[selectedKey]}
         mode="inline"
         theme="dark"
+        inlineCollapsed={collapsed}
         items={modules}
         onSelect={({ key }) => {
           const selected = modules.find((m) => m.key === key)
