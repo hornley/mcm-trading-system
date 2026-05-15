@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from models import db, User, Product, Location, Category, Inventory
 from models import StockTransfer, StockAdjustment, ActivityLog, Order, OrderItem, Payment
+from utils.sorting import quick_sort
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -58,8 +59,10 @@ def list_backups():
     if not _authorized(usertype):
         return jsonify({"success": False, "error": "Unauthorized"}), 403
     try:
+        sort_by = request.args.get("sort_by", "created_at")
+        sort_order = request.args.get("sort_order", "desc")
         files = []
-        for f in sorted(os.listdir(BACKUP_DIR), reverse=True):
+        for f in os.listdir(BACKUP_DIR):
             if f.endswith(".db"):
                 fpath = os.path.join(BACKUP_DIR, f)
                 stat = os.stat(fpath)
@@ -69,6 +72,7 @@ def list_backups():
                     "size_formatted": _format_size(stat.st_size),
                     "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
                 })
+        files = quick_sort(files, key=sort_by, order=sort_order)
         return jsonify({"success": True, "data": files})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -143,6 +147,10 @@ def system_info():
 
         db_bytes = _db_size()
         counts = _table_counts()
+        sort_by = request.args.get("sort_by", "name")
+        sort_order = request.args.get("sort_order", "asc")
+        counts_list = [{"name": k, "count": v} for k, v in counts.items()]
+        counts_list = quick_sort(counts_list, key=sort_by, order=sort_order)
         return jsonify({
             "success": True,
             "data": {
@@ -152,7 +160,7 @@ def system_info():
                 "database_size": db_bytes,
                 "database_size_formatted": _format_size(db_bytes),
                 "backup_count": len([f for f in os.listdir(BACKUP_DIR) if f.endswith(".db")]),
-                "table_counts": counts,
+                "table_counts": counts_list,
             }
         })
     except Exception as e:

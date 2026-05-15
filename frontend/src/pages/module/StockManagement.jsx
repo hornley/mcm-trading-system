@@ -167,14 +167,24 @@ const StockManagement = () => {
   const outOfStockCount = filteredData.filter((s) => s.quantity === 0).length;
 
   const columns = [
-    { title: 'Product Name', dataIndex: 'product_name', key: 'product_name' },
-    { title: 'Branch', dataIndex: 'location_name', key: 'location_name' },
-    { title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity' },
+    {
+      title: 'Product Name', dataIndex: 'product_name', key: 'product_name',
+      sorter: (a, b) => a.product_name.localeCompare(b.product_name),
+    },
+    {
+      title: 'Branch', dataIndex: 'location_name', key: 'location_name',
+      sorter: (a, b) => a.location_name.localeCompare(b.location_name),
+    },
+    {
+      title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
+      sorter: (a, b) => a.quantity - b.quantity,
+    },
     {
       title: 'Stock Status',
       dataIndex: 'quantity',
       key: 'stockStatus',
       render: (qty) => getStockStatus(qty).tag,
+      sorter: (a, b) => a.quantity - b.quantity,
     },
     {
       title: 'Actions',
@@ -200,13 +210,17 @@ const StockManagement = () => {
   ];
 
   const movementColumns = [
-    { title: 'Date', dataIndex: 'date', key: 'date' },
+    {
+      title: 'Date', dataIndex: 'date', key: 'date',
+      sorter: (a, b) => new Date(a.date) - new Date(b.date),
+    },
     {
       title: 'Type', dataIndex: 'type', key: 'type',
       render: (type) => {
         const labels = { adjustment: 'Adjustment', transfer_out: 'Transfer Out', transfer_in: 'Transfer In' };
         return labels[type] || type;
       },
+      sorter: (a, b) => (a.type || '').localeCompare(b.type || ''),
     },
     {
       title: 'Quantity Change', dataIndex: 'quantity_change', key: 'quantity_change',
@@ -215,9 +229,16 @@ const StockManagement = () => {
           {val >= 0 ? `+${val}` : val}
         </span>
       ),
+      sorter: (a, b) => a.quantity_change - b.quantity_change,
     },
-    { title: 'Location', dataIndex: 'location_name', key: 'location_name' },
-    { title: 'Reason / Remarks', dataIndex: 'remarks', key: 'remarks', render: (v) => v || '-' },
+    {
+      title: 'Location', dataIndex: 'location_name', key: 'location_name',
+      sorter: (a, b) => (a.location_name || '').localeCompare(b.location_name || ''),
+    },
+    {
+      title: 'Reason / Remarks', dataIndex: 'remarks', key: 'remarks', render: (v) => v || '-',
+      sorter: (a, b) => (a.remarks || '').localeCompare(b.remarks || ''),
+    },
   ];
 
   if (loading) return <Card style={{ margin: 24, textAlign: 'center' }}><Spin size="large" /></Card>;
