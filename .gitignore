@@ -158,3 +158,6 @@ instance/
 # OS
 .DS_Store
 Thumbs.dbcd
+
+# Brainstorming artifacts
+.superpowers/
