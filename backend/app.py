@@ -10,6 +10,7 @@ from routes.settings import settings_bp
 from routes.categories import categories_bp
 from routes.locations import locations_bp
 from routes.admin import admin_bp
+from routes.reports import reports_bp
 
 def create_app():
     app = Flask(__name__, static_folder=FRONTEND_DIST, static_url_path="")
@@ -23,6 +24,7 @@ def create_app():
     app.register_blueprint(locations_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(reports_bp)
 
     with app.app_context():
         from models import (
