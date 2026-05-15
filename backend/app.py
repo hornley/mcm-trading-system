@@ -1,5 +1,15 @@
 import os
+from dotenv import load_dotenv
 from flask import Flask, app, send_from_directory
+from supabase import create_client, Client
+
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
+
+supabase: Client = create_client(
+    os.environ.get("SUPABASE_URL"),
+    os.environ.get("SUPABASE_KEY"),
+)
+
 from flask_cors import CORS
 from config import Config, FRONTEND_DIST
 from models import db

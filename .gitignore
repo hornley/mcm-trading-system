@@ -161,3 +161,6 @@ Thumbs.dbcd
 
 # Brainstorming artifacts
 .superpowers/
+
+# Agent skill files
+.agents/
