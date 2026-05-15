@@ -1,5 +1,5 @@
 import { Card, Button, Input, message, Typography, Form, Space } from 'antd'
-import { UserOutlined, LockOutlined, MailOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { UserOutlined, LockOutlined, MailOutlined, HomeOutlined, PhoneOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 
@@ -33,7 +33,7 @@ const Register = () => {
 
   return (
     <Card
-      style={{ width: 400, borderRadius: 16, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
+      style={{ width: 420, borderRadius: 16, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
       styles={{ body: { padding: '40px 32px' } }}
     >
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
@@ -49,6 +49,12 @@ const Register = () => {
         </Form.Item>
         <Form.Item name="password" rules={[{ required: true, message: 'Please enter a password' }]}>
           <Input.Password prefix={<LockOutlined />} placeholder="Password" size="large" />
+        </Form.Item>
+        <Form.Item name="address">
+          <Input prefix={<HomeOutlined />} placeholder="Address (optional)" size="large" />
+        </Form.Item>
+        <Form.Item name="phoneNumber">
+          <Input prefix={<PhoneOutlined />} placeholder="Phone Number (optional)" size="large" />
         </Form.Item>
         <Form.Item style={{ marginBottom: 12 }}>
           <Button type="primary" htmlType="submit" loading={loading} block size="large" style={{ borderRadius: 8 }}>
