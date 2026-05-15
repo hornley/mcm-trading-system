@@ -25,9 +25,8 @@ const managerModules = [
   { key: '2', label: 'Inventory', path: '/dashboard/inventory' },
   { key: '3', label: 'Sales', path: '/dashboard/sales' },
   { key: '4', label: 'Stock Management', path: '/dashboard/stock-management' },
-  { key: '5', label: 'Manage Staff', path: '/dashboard/users' },
-  { key: '6', label: 'Settings', path: '/dashboard/settings' },
-  { key: '7', label: 'Report', path: '/dashboard/report' },
+  { key: '5', label: 'Settings', path: '/dashboard/settings' },
+  { key: '6', label: 'Report', path: '/dashboard/report' },
 ];
 
 const adminModules = [
