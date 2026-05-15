@@ -1,9 +1,7 @@
+import { useState, useEffect } from 'react';
 import { Row, Col, Card, Statistic, Table, Tag, Typography } from 'antd';
 import {
-  DatabaseOutlined,
-  ShoppingCartOutlined,
-  WarningOutlined,
-  TeamOutlined,
+  DatabaseOutlined, ShoppingCartOutlined, WarningOutlined, TeamOutlined,
 } from '@ant-design/icons';
 import {
   PieChart, Pie, Cell, BarChart, Bar,
@@ -12,68 +10,41 @@ import {
 import { useAuth } from '../../context/AuthContext.jsx';
 
 const { Title, Text } = Typography;
-
 const COLORS = ['#5b7ff0', '#fa8c16'];
 
-const mockStats = {
-  totalItems: 487,
-  salesToday: 23,
-  lowStockAlerts: 8,
-  totalStaff: 12,
-};
-
-const stockMovement = [
-  { day: 'Mon', stockIn: 42, stockOut: 28 },
-  { day: 'Tue', stockIn: 55, stockOut: 33 },
-  { day: 'Wed', stockIn: 31, stockOut: 39 },
-  { day: 'Thu', stockIn: 48, stockOut: 27 },
-  { day: 'Fri', stockIn: 62, stockOut: 45 },
-  { day: 'Sat', stockIn: 25, stockOut: 19 },
-  { day: 'Sun', stockIn: 36, stockOut: 22 },
-];
-
-const stockByCategory = [
-  { name: 'Textiles', value: 352 },
-  { name: 'Miscellaneous', value: 135 },
-];
-
-const recentSalesColumns = [
-  { title: 'Product', dataIndex: 'product', key: 'product' },
-  { title: 'Quantity', dataIndex: 'quantity', key: 'quantity' },
-  { title: 'Amount', dataIndex: 'amount', key: 'amount' },
-  { title: 'Date', dataIndex: 'date', key: 'date' },
-];
-
-const recentSalesData = [
-  { key: 1, product: 'Cotton Fabric', quantity: 10, amount: '₱2,500', date: '2025-05-15' },
-  { key: 2, product: 'Polyester Thread', quantity: 25, amount: '₱875', date: '2025-05-15' },
-  { key: 3, product: 'Silk Blend', quantity: 5, amount: '₱3,200', date: '2025-05-14' },
-  { key: 4, product: 'Denim Roll', quantity: 8, amount: '₱4,000', date: '2025-05-14' },
-  { key: 5, product: 'Lace Trim', quantity: 15, amount: '₱1,125', date: '2025-05-13' },
-];
-
-const lowStockColumns = [
-  { title: 'Product Name', dataIndex: 'name', key: 'name' },
-  { title: 'Category', dataIndex: 'category', key: 'category' },
-  { title: 'Current Stock', dataIndex: 'currentStock', key: 'currentStock' },
-  {
-    title: 'Status',
-    key: 'status',
-    render: () => <Tag color="orange">Low Stock</Tag>,
-  },
-];
-
-const lowStockData = [
-  { key: 1, name: 'HI-PILE', category: 'Textiles', currentStock: 3 },
-  { key: 2, name: '3MM PRINTED FUR', category: 'Textiles', currentStock: 5 },
-  { key: 3, name: 'VELBOA KOREA', category: 'Textiles', currentStock: 4 },
-  { key: 4, name: 'SUEDE GAMOSA', category: 'Textiles', currentStock: 2 },
-  { key: 5, name: 'LAMB FUR 2323', category: 'Textiles', currentStock: 1 },
-];
-
 const Manager = () => {
-  const { user } = useAuth();
-  const branchName = user?.location || 'Main Store';
+  const { user, selectedLocationId } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState({
+    stats: { total_items: 0, sales_today: 0, low_stock_count: 0, active_users: 0 },
+    stock_by_category: [],
+    stock_movement: [],
+    recent_transactions: [],
+    low_stock_items: [],
+  });
+
+  const fetchData = () => {
+    setLoading(true);
+    const params = new URLSearchParams({
+      usertype: user?.usertype,
+      user_id: user?.user_id,
+      location_id: selectedLocationId,
+    });
+    fetch(`/api/dashboard/summary?${params}`)
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success) setData(res.data);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (user) fetchData();
+  }, [user, selectedLocationId]);
+
+  const { stats, stock_by_category, stock_movement, recent_transactions, low_stock_items } = data;
+  const branchName = user?.location_name || `Branch #${user?.location_id}`;
 
   return (
     <div style={{ padding: 24 }}>
@@ -85,39 +56,22 @@ const Manager = () => {
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}>
           <Card>
-            <Statistic
-              title="Total Inventory Items"
-              value={mockStats.totalItems}
-              prefix={<DatabaseOutlined />}
-            />
+            <Statistic title="Total Inventory Items" value={stats.total_items} prefix={<DatabaseOutlined />} loading={loading} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card>
-            <Statistic
-              title="Total Sales Today"
-              value={mockStats.salesToday}
-              prefix={<ShoppingCartOutlined />}
-            />
+            <Statistic title="Sales Today" value={stats.sales_today} prefix={<ShoppingCartOutlined />} loading={loading} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card>
-            <Statistic
-              title="Low Stock Alerts"
-              value={mockStats.lowStockAlerts}
-              valueStyle={{ color: '#fa8c16' }}
-              prefix={<WarningOutlined />}
-            />
+            <Statistic title="Low Stock Alerts" value={stats.low_stock_count} valueStyle={{ color: '#fa8c16' }} prefix={<WarningOutlined />} loading={loading} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card>
-            <Statistic
-              title="Total Staff"
-              value={mockStats.totalStaff}
-              prefix={<TeamOutlined />}
-            />
+            <Statistic title="Total Staff" value={stats.active_users} prefix={<TeamOutlined />} loading={loading} />
           </Card>
         </Col>
       </Row>
@@ -126,14 +80,14 @@ const Manager = () => {
         <Col xs={24} lg={14}>
           <Card title="Stock Movement — Last 7 Days">
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={stockMovement}>
+              <BarChart data={stock_movement}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="stockIn" fill="#52c41a" name="Stock In" />
-                <Bar dataKey="stockOut" fill="#ff4d4f" name="Stock Out" />
+                <Bar dataKey="in" fill="#52c41a" name="Stock In" />
+                <Bar dataKey="out" fill="#ff4d4f" name="Stock Out" />
               </BarChart>
             </ResponsiveContainer>
           </Card>
@@ -143,14 +97,14 @@ const Manager = () => {
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
-                  data={stockByCategory}
+                  data={stock_by_category.length > 0 ? stock_by_category : [{ name: 'No Data', value: 1 }]}
                   cx="50%" cy="50%"
                   innerRadius={60} outerRadius={100}
                   dataKey="value"
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 >
-                  {stockByCategory.map((_, idx) => (
-                    <Cell key={idx} fill={COLORS[idx]} />
+                  {stock_by_category.map((_, idx) => (
+                    <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -164,20 +118,32 @@ const Manager = () => {
         <Col xs={24} lg={12}>
           <Card title="Recent Sales">
             <Table
-              dataSource={recentSalesData}
-              columns={recentSalesColumns}
+              dataSource={recent_transactions}
+              columns={[
+                { title: 'Product', dataIndex: 'product', key: 'product' },
+                { title: 'Quantity', dataIndex: 'quantity', key: 'quantity' },
+                { title: 'Amount', dataIndex: 'amount', key: 'amount' },
+                { title: 'Date', dataIndex: 'date', key: 'date' },
+              ]}
               pagination={false}
               size="small"
+              loading={loading}
             />
           </Card>
         </Col>
         <Col xs={24} lg={12}>
           <Card title="Low Stock Items">
             <Table
-              dataSource={lowStockData}
-              columns={lowStockColumns}
+              dataSource={low_stock_items}
+              columns={[
+                { title: 'Product Name', dataIndex: 'product_name', key: 'product_name' },
+                { title: 'Category', dataIndex: 'category', key: 'category' },
+                { title: 'Current Stock', dataIndex: 'quantity', key: 'quantity' },
+                { title: 'Status', key: 'status', render: () => <Tag color="orange">Low Stock</Tag> },
+              ]}
               pagination={false}
               size="small"
+              loading={loading}
             />
           </Card>
         </Col>

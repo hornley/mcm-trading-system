@@ -18,7 +18,6 @@ def create_app():
     app.config.from_object(Config)
     CORS(app)
     db.init_app(app)
-    app.register_blueprint(dashboard_bp)
     app.register_blueprint(account_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(inventory_bp)
@@ -26,7 +25,7 @@ def create_app():
     app.register_blueprint(locations_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(admin_bp)
-    app.register_blueprint(reports_bp)
+    app.register_blueprint(dashboard_bp)
 
     with app.app_context():
         from models import (
