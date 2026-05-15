@@ -36,9 +36,16 @@ const UserAccess = () => {
 
   useEffect(() => {
     if (!user) return;
+    setLoading(true);
     fetch(`/api/account/users?usertype=${user.usertype}`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          return res.json().then((data) => Promise.reject(new Error(data.error || 'Failed to load users')));
+        }
+        return res.json();
+      })
       .then(setUsers)
+      .catch((err) => message.error(err.message))
       .finally(() => setLoading(false));
   }, [user]);
 
