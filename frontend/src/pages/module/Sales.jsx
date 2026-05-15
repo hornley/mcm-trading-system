@@ -347,13 +347,14 @@ const Sales = () => {
         open={saleModalVisible}
         onCancel={() => { setSaleModalVisible(false); form.resetFields(); }}
         width={800}
+        styles={{ body: { maxHeight: '60vh', overflowY: 'auto', overflowX: 'hidden' } }}
         footer={[
           <Button key="cancel" onClick={() => { setSaleModalVisible(false); form.resetFields(); }}>Cancel</Button>,
           <Button key="save" type="primary" onClick={handleSaveSale} disabled={!confirmed && !selectedRecord}>Save</Button>,
         ]}
       >
         <Row gutter={24}>
-          <Col span={14}>
+          <Col xs={24} md={14}>
             <Form form={form} layout="vertical">
               <Form.Item name="product" label="Product" rules={[{ required: true, message: 'Please select a product' }]}>
                 {!lockedProduct ? (
@@ -418,7 +419,7 @@ const Sales = () => {
               </Form.Item>
             </Form>
           </Col>
-          <Col span={10}>
+          <Col xs={24} md={10}>
             <Card title="Order Summary">
               <Descriptions bordered column={1} size="small">
                 <Descriptions.Item label="Product">{selectedProduct?.name || '—'}</Descriptions.Item>
