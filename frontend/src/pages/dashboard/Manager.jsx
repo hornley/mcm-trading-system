@@ -38,10 +38,10 @@ const stockByCategory = [
 ];
 
 const recentSalesColumns = [
-  { title: 'Product', dataIndex: 'product', key: 'product', sorter: (a, b) => a.product.localeCompare(b.product) },
-  { title: 'Quantity', dataIndex: 'quantity', key: 'quantity', sorter: (a, b) => a.quantity - b.quantity },
-  { title: 'Amount', dataIndex: 'amount', key: 'amount', sorter: (a, b) => a.amount.localeCompare(b.amount) },
-  { title: 'Date', dataIndex: 'date', key: 'date', sorter: (a, b) => a.date.localeCompare(b.date) },
+  { title: 'Product', dataIndex: 'product', key: 'product' },
+  { title: 'Quantity', dataIndex: 'quantity', key: 'quantity' },
+  { title: 'Amount', dataIndex: 'amount', key: 'amount' },
+  { title: 'Date', dataIndex: 'date', key: 'date' },
 ];
 
 const recentSalesData = [
@@ -53,10 +53,14 @@ const recentSalesData = [
 ];
 
 const lowStockColumns = [
-  { title: 'Product Name', dataIndex: 'name', key: 'name', sorter: (a, b) => a.name.localeCompare(b.name) },
-  { title: 'Category', dataIndex: 'category', key: 'category', sorter: (a, b) => a.category.localeCompare(b.category) },
-  { title: 'Current Stock', dataIndex: 'currentStock', key: 'currentStock', sorter: (a, b) => a.currentStock - b.currentStock },
-  { title: 'Status', key: 'status', render: () => <Tag color="orange">Low Stock</Tag> },
+  { title: 'Product Name', dataIndex: 'name', key: 'name' },
+  { title: 'Category', dataIndex: 'category', key: 'category' },
+  { title: 'Current Stock', dataIndex: 'currentStock', key: 'currentStock' },
+  {
+    title: 'Status',
+    key: 'status',
+    render: () => <Tag color="orange">Low Stock</Tag>,
+  },
 ];
 
 const lowStockData = [
