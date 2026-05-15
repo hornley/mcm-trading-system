@@ -11,6 +11,8 @@ from routes.categories import categories_bp
 from routes.locations import locations_bp
 from routes.admin import admin_bp
 from routes.reports import reports_bp
+from routes.dashboard import dashboard_bp
+app.register_blueprint(dashboard_bp)
 
 def create_app():
     app = Flask(__name__, static_folder=FRONTEND_DIST, static_url_path="")
