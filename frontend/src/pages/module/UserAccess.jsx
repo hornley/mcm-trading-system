@@ -106,6 +106,7 @@ const UserAccess = () => {
         loading={loading}
         pagination={{ pageSize: 10 }}
       />
+      </Card>
     </div>
   );
 };

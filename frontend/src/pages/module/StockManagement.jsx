@@ -385,6 +385,7 @@ const StockManagement = () => {
           </Form.Item>
         </Form>
       </Modal>
+      </Card>
     </div>
   );
 };
