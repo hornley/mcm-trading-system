@@ -61,7 +61,49 @@ Use the `todowrite` tool to track all steps for the current task. Break the work
 - Register routes in `AppRouter.jsx` with `ProtectedRoute` + `allowedRoles`
 - Add navigation items in `Sidebar.jsx`
 
-### 6. Update THESIS-REQUIREMENTS.md
+### 6. Error Handling Patterns
+
+**Backend:**
+- Every endpoint must be wrapped in try/except with `return jsonify(...), 500` fallback
+- Use `db.session.rollback()` in except blocks for mutations
+- Input validation: use `validate_required(data, fields)` before any DB operations
+- Return consistent shape: `{"success": false, "error": "message"}` on failure
+- Check `_authorized(usertype)` first — return 403 immediately if denied
+
+```python
+try:
+    if not _authorized(usertype):
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    # ... logic ...
+    return jsonify({"success": True, "data": ...})
+except Exception as e:
+    db.session.rollback()
+    return jsonify({"success": False, "error": str(e)}), 500
+```
+
+**Frontend:**
+- Every `fetch()` must use try/catch with `message.error()` fallback
+- Always check `data.success` before using response data
+- Show backend error message when available: `message.error(data.message || data.error)`
+- Use `finally` block to reset loading state
+
+```jsx
+try {
+  const res = await fetch('/api/...');
+  const data = await res.json();
+  if (data.success) {
+    message.success('Operation completed');
+  } else {
+    message.error(data.message || data.error);
+  }
+} catch {
+  message.error('Failed to load data');
+} finally {
+  setLoading(false);
+}
+```
+
+### 7. Update THESIS-REQUIREMENTS.md
 
 After completing a feature, update the thesis progress tracker to reflect the new status.
 
@@ -114,10 +156,29 @@ gh pr create --title "type: description" --body "## Summary\n- bullet points of 
 
 ## Recommended Additions for Agent Awareness
 
+### Roles & Permissions
+
+| Value | Role | Backend Access | Frontend Access | Branch Scope |
+|-------|------|---------------|-----------------|-------------|
+| 1 | **Owner** | Full CRUD (`_can_create/update/delete` = True) | All modules + Maintenance + Settings | All branches |
+| 2 | **Manager** | Read + Update only (no create/delete) | Limited modules, no Maintenance | Assigned branch only |
+| 3 | **Admin** | Full CRUD (same as Owner) | Dashboard + Maintenance + Report + Settings | All branches |
+| 4 | **Staff** | No access (register default) | Login-only | — |
+
+**Backend enforcement:**
+- `_can_create(usertype)` → `usertype in [1, 3]`
+- `_can_update(usertype)` → `usertype in [1, 2, 3]`
+- `_can_delete(usertype)` → `usertype in [1, 3]`
+- `_resolve_location_id()` restricts managers to their `location_id`
+
+**Frontend enforcement:**
+- Route guard: `ProtectedRoute` with `allowedRoles={["owner", "manager"]}`
+- Action guard: `can('create')`, `can('update')`, `can('delete')` from `useAuth()`
+- Branch selector: Owner/Admin see all branches; Manager sees only their own (fixed)
+
 ### Project Architecture
 - **Frontend**: React 19 + Ant Design 6 + Vite + react-router-dom 7
 - **Backend**: Flask 3 + Flask-SQLAlchemy + SQLite
-- **Auth**: usertype-based (1=Owner, 2=Manager, 3=Admin, 4=Staff)
 - **State**: React Context (no Redux), persisted in localStorage
 - **API format**: `{ success: bool, data: ..., message: ..., error: ... }`
 
