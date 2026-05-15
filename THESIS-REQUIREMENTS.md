@@ -6,13 +6,13 @@
 | Stock Transfers | ✅ Complete | `POST /api/stock/transfer` between locations with validation. Combined movement history via `GET /api/inventory/movements`. |
 | Sales Module | ❌ Missing | Page is a stub (`<div>Sales</div>`). No backend endpoints. |
 | Reports Module | ❌ Missing | Page is a stub. No backend endpoints. |
-| Maintenance Module | ❌ Missing | Page is a stub. (Filename has typo: `Maintentance.jsx`) |
-| Backup & Restore | ❌ Missing | Not started. |
-| Help Module | ❌ Missing | Not started. |
-| User Manual | ⏳ Partial | API usage docs exist (`PLAN-feature-full-inventory-crud.md`, `AGENT-guide-full-inventory-crud.md`). No user-facing manual. |
-| Search Module | ⏳ Partial | Products searchable via API (`?q=` on `GET /api/products`). No dedicated search page or global search. |
-| Analytics | ⏳ Partial | Owner Dashboard has charts (pie, bar) with hardcoded mock data. Not wired to API. |
+| Maintenance Module | ✅ Complete | Full tabbed page: System Info, Backup & Restore, Integrity Check, VACUUM/Reindex, Configurable Cleanup. |
+| Backup & Restore | ✅ Complete | Create, list, restore, delete backups from UI. Backups stored in `db/backups/`. |
 | Activity Logging | ⏳ Partial | Auto-logged on all backend CRUD operations. No frontend viewer page to browse/search logs. |
-| Settings Module | ❌ Missing | Backend has settings/ profile endpoints. No frontend page wired to them. |
+| Settings Module | ✅ Complete | Profile (email, phone) and Preferences (theme, font size) via frontend page. |
+| Help Module | ❌ Missing | Not started. |
+| User Manual | ⏳ Partial | API usage docs exist. No user-facing manual. |
+| Search Module | ⏳ Partial | Products searchable via API. No dedicated search page. |
+| Analytics | ⏳ Partial | Owner Dashboard has charts with hardcoded mock data. |
 | Supplier Notifications | ❌ Missing | Not started. |
 | Stock Scheduling | ❌ Missing | Not started. |

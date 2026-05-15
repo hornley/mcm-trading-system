@@ -15,7 +15,9 @@ const ownerModules = [
   { key: '3', label: 'Stock Management', path: '/dashboard/stock-management' },
   { key: '4', label: 'Manage Users', path: '/dashboard/users' },
   { key: '5', label: 'Sales', path: '/dashboard/sales' },
-  { key: '6', label: 'Report', path: '/dashboard/report' },
+  { key: '6', label: 'Maintenance', path: '/dashboard/maintenance' },
+  { key: '7', label: 'Settings', path: '/dashboard/settings' },
+  { key: '8', label: 'Report', path: '/dashboard/report' },
 ];
 
 const managerModules = [
@@ -24,13 +26,15 @@ const managerModules = [
   { key: '3', label: 'Sales', path: '/dashboard/sales' },
   { key: '4', label: 'Stock Management', path: '/dashboard/stock-management' },
   { key: '5', label: 'Manage Staff', path: '/dashboard/users' },
-  { key: '6', label: 'Report', path: '/dashboard/report' },
+  { key: '6', label: 'Settings', path: '/dashboard/settings' },
+  { key: '7', label: 'Report', path: '/dashboard/report' },
 ];
 
 const adminModules = [
   { key: '1', label: 'Dashboard', path: '/dashboard/admin' },
   { key: '2', label: 'Maintenance', path: '/dashboard/maintenance' },
-  { key: '3', label: 'Report', path: '/dashboard/report' },
+  { key: '3', label: 'Settings', path: '/dashboard/settings' },
+  { key: '4', label: 'Report', path: '/dashboard/report' },
 ];
 const Sidebar = () => {
     const { user } = useAuth();
