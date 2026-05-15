@@ -169,6 +169,7 @@ const StockManagement = () => {
   const columns = [
     {
       title: 'Product Name', dataIndex: 'product_name', key: 'product_name',
+      defaultSortOrder: 'ascend',
       sorter: (a, b) => a.product_name.localeCompare(b.product_name),
     },
     {

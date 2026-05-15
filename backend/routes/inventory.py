@@ -356,7 +356,7 @@ def list_inventory():
     if resolved_location_id and resolved_location_id != "all":
         query = query.filter(Inventory.location_id == resolved_location_id)
 
-    inventory = query.all()
+    inventory = query.order_by(Product.name.asc()).all()
 
     return success_response([
         {
@@ -395,7 +395,7 @@ def get_inventory_by_location(location_id):
     inventory = Inventory.query.join(Product).filter(
         Inventory.location_id == location_id,
         Product.is_active == True
-    ).all()
+    ).order_by(Product.name.asc()).all()
 
     return success_response([
         {

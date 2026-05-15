@@ -28,8 +28,19 @@ subprocess.run([npm_executable, "install"], cwd=os.path.join(BASE_DIR, "frontend
 print("Building frontend...")
 subprocess.run([npm_executable, "run", "build"], cwd=os.path.join(BASE_DIR, "frontend"), check=True)
 
-print("Seeding database...")
-subprocess.run(["python", "createDatabase.py"], cwd=os.path.join(BASE_DIR, "backend"), check=True)
+print("Checking database connection...")
+import sys
+sys.path.insert(0, os.path.join(BASE_DIR, "backend"))
+from app import create_app
+from models import db
+
+_temp_app = create_app()
+with _temp_app.app_context():
+    if "sqlite" in db.engine.url.drivername:
+        print("Seeding database...")
+        subprocess.run(["python", "createDatabase.py"], cwd=os.path.join(BASE_DIR, "backend"), check=True)
+    else:
+        print("Connected to cloud database — skipping seed (data already in Supabase).")
 
 print("Starting Vite dev server (hot reload)...")
 vite_process = subprocess.Popen(
