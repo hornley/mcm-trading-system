@@ -164,3 +164,4 @@ Thumbs.dbcd
 
 # Agent skill files
 .agents/
+skills-lock.json
