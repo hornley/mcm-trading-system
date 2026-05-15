@@ -1,33 +1,31 @@
-import React, { useState, useEffect } from 'react'
-import { Typography, Row, Col, Button, Select, Space } from 'antd';
-import { LogoutOutlined } from '@ant-design/icons';
-import { colors } from '../theme.js';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext.jsx';
-const { Title } = Typography;
+import { useState, useEffect } from 'react'
+import { Typography, Button, Select, Space } from 'antd'
+import { LogoutOutlined } from '@ant-design/icons'
+import { useAuth } from '../context/AuthContext.jsx'
+
+const { Title } = Typography
 
 const Topbar = () => {
-  const navigate = useNavigate();
-  const { user, selectedLocationId, setSelectedLocationId, logout } = useAuth();
-  const [locations, setLocations] = useState([]);
+  const { user, selectedLocationId, setSelectedLocationId, logout } = useAuth()
+  const [locations, setLocations] = useState([])
 
   useEffect(() => {
     if (user && (user.usertype === 1 || user.usertype === 3)) {
       fetch(`/api/locations?usertype=${user.usertype}`)
         .then((res) => res.json())
         .then((data) => {
-          if (data.success) setLocations(data.data.filter((l) => l.is_active));
+          if (data.success) setLocations(data.data.filter((l) => l.is_active))
         })
-        .catch(() => {});
+        .catch(() => {})
     }
-  }, [user]);
+  }, [user])
 
   return (
-    <Row align='middle' style={{ width: '100%', height: '100%' }} justify="space-between">
-      <Col>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+      <div style={{ width: 240 }}>
         {user && (user.usertype === 1 || user.usertype === 3) && (
           <Space>
-            <span style={{ color: colors.secondaryText, fontSize: 14 }}>Branch:</span>
+            <span style={{ color: '#8c8c8c', fontSize: 13 }}>Branch:</span>
             <Select
               value={selectedLocationId}
               onChange={setSelectedLocationId}
@@ -42,22 +40,20 @@ const Topbar = () => {
           </Space>
         )}
         {user && user.usertype === 2 && (
-          <span style={{ color: colors.secondaryText, fontSize: 14 }}>
+          <span style={{ color: '#8c8c8c', fontSize: 13 }}>
             Branch: {user.location_name || `Location #${user.location_id}`}
           </span>
         )}
-      </Col>
-      <Col>
-        <Title level={3} style={{ color: colors.secondaryText, margin: 0, textAlign: 'center' }}>
-          Manco (MCM) Trading Shop Management System
-        </Title>
-      </Col>
-      <Col style={{ textAlign: 'right', paddingRight: '24px' }}>
-        <Button icon={<LogoutOutlined />} onClick={logout} style={{ backgroundColor: '#ffffff', color: '#ff4d4f', border: '1px solid #ff4d4f' }}>
+      </div>
+      <Title level={4} style={{ margin: 0, color: '#262626', textAlign: 'center', flex: 1 }}>
+        Manco (MCM) Trading
+      </Title>
+      <div style={{ width: 240, textAlign: 'right' }}>
+        <Button icon={<LogoutOutlined />} onClick={logout} type="text" style={{ color: '#ff4d4f' }}>
           Logout
         </Button>
-      </Col>
-    </Row>
+      </div>
+    </div>
   )
 }
 

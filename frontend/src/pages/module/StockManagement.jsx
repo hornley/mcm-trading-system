@@ -242,15 +242,15 @@ const StockManagement = () => {
     },
   ];
 
-  if (loading) return <Card style={{ margin: 24, textAlign: 'center' }}><Spin size="large" /></Card>;
+  if (loading) return <Card style={{ textAlign: 'center' }}><Spin size="large" /></Card>;
 
   return (
-    <Card style={{ margin: 24 }}>
-      <Title level={2}>Stock Management</Title>
-
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={8}>
-          <Card><Statistic title="Total Stock Items" value={totalItems} /></Card>
+    <div>
+      <Title level={4} style={{ marginBottom: 16 }}>Stock Management</Title>
+      <Card styles={{ body: { padding: '16px 24px' } }}>
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col xs={24} sm={8}>
+            <Card styles={{ body: { padding: '20px 24px' } }}><Statistic title="Total Stock Items" value={totalItems} /></Card>
         </Col>
         <Col xs={24} sm={8}>
           <Card>
@@ -385,7 +385,7 @@ const StockManagement = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </Card>
+    </div>
   );
 };
 

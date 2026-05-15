@@ -1,6 +1,8 @@
-import { Table, Card, Select, Tag, message, Space } from 'antd';
+import { Table, Card, Select, Tag, message, Space, Typography } from 'antd';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
+
+const { Title } = Typography;
 
 const USERTYPE_MAP = {
   1: { label: 'Owner', color: 'gold' },
@@ -94,15 +96,17 @@ const UserAccess = () => {
   };
 
   return (
-    <Card title="Users" style={{ margin: 24 }}>
-      <Table
+    <div>
+      <Title level={4} style={{ marginBottom: 16 }}>User Access</Title>
+      <Card styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}>
+        <Table
         dataSource={users}
         columns={[...columns, actionColumn]}
         rowKey="user_id"
         loading={loading}
         pagination={{ pageSize: 10 }}
       />
-    </Card>
+    </div>
   );
 };
 

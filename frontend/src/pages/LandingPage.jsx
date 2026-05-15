@@ -1,27 +1,61 @@
-import { Card, Col, Row, Button, Divider } from 'antd';
-import { useNavigate } from 'react-router-dom';
-import {colors} from '../theme.js';
+import { Card, Row, Col, Button, Typography, Space } from 'antd'
+import { useNavigate } from 'react-router-dom'
+import { ShoppingCartOutlined, TeamOutlined, SafetyOutlined } from '@ant-design/icons'
 
+const { Title, Text, Paragraph } = Typography
 
 const LandingPage = () => {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
 
   return (
-    <Row justify="center" align="middle" style={{ minHeight: '80vh' }}>
-      <Col span={8}>
-        <Card title={<span style={{ color: colors.primaryText, textAlign:'center'}}>Welcome User!</span>}>
-          <Row justify="center" align="middle">
-            <Button onClick={() => navigate('/login')} type="primary">
-              Login
-            </Button>
-            <Divider orientation="vertical"></Divider>
-            <Button onClick={() => navigate('/register')}>
-              Sign Up
-            </Button>
-          </Row>
-        </Card>
-      </Col>
-    </Row>
+    <div style={{ textAlign: 'center', padding: '40px 0', maxWidth: 600, width: '100%' }}>
+      <Card
+        style={{ borderRadius: 16, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
+        styles={{ body: { padding: '48px 32px' } }}
+      >
+        <Title level={2} style={{ marginBottom: 8 }}>Manco (MCM) Trading</Title>
+        <Text type="secondary" style={{ fontSize: 16, display: 'block', marginBottom: 32 }}>
+          Shop Management System
+        </Text>
+
+        <Paragraph style={{ color: '#595959', marginBottom: 40, fontSize: 14 }}>
+          Manage inventory, track sales, monitor stock levels, and oversee business operations — all in one place.
+        </Paragraph>
+
+        <Row gutter={[16, 16]} style={{ marginBottom: 40 }}>
+          <Col span={8}>
+            <div style={{ textAlign: 'center' }}>
+              <ShoppingCartOutlined style={{ fontSize: 28, color: '#5b7ff0', marginBottom: 8 }} />
+              <br />
+              <Text type="secondary" style={{ fontSize: 12 }}>Inventory</Text>
+            </div>
+          </Col>
+          <Col span={8}>
+            <div style={{ textAlign: 'center' }}>
+              <TeamOutlined style={{ fontSize: 28, color: '#5b7ff0', marginBottom: 8 }} />
+              <br />
+              <Text type="secondary" style={{ fontSize: 12 }}>Staff</Text>
+            </div>
+          </Col>
+          <Col span={8}>
+            <div style={{ textAlign: 'center' }}>
+              <SafetyOutlined style={{ fontSize: 28, color: '#5b7ff0', marginBottom: 8 }} />
+              <br />
+              <Text type="secondary" style={{ fontSize: 12 }}>Reports</Text>
+            </div>
+          </Col>
+        </Row>
+
+        <Space size={16}>
+          <Button type="primary" size="large" onClick={() => navigate('/login')} style={{ borderRadius: 8, paddingInline: 32 }}>
+            Login
+          </Button>
+          <Button size="large" onClick={() => navigate('/register')} style={{ borderRadius: 8, paddingInline: 32 }}>
+            Sign Up
+          </Button>
+        </Space>
+      </Card>
+    </div>
   )
 }
 

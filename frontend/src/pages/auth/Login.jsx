@@ -1,78 +1,67 @@
-import { Card, Col, Row, Button, Divider, Input, Space, message } from 'antd';
-import { useNavigate } from 'react-router-dom';
-import {colors} from '../../theme.js';
-import { useState } from 'react';
-import { useAuth } from '../../context/AuthContext.jsx';
+import { Card, Button, Input, Space, message, Typography, Form } from 'antd'
+import { UserOutlined, LockOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useAuth } from '../../context/AuthContext.jsx'
+
+const { Title } = Typography
 
 const Login = () => {
-    const {login} = useAuth();
+  const { login } = useAuth()
+  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-
-    const navigate = useNavigate();
-
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-
-        try {
-            const res = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password }),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                message.error(data.error);
-                return;
-            }
-
-            login(data);
-            navigate(`/dashboard/${data.role}`);
-        } catch {
-            message.error('Connection error. Is the server running?');
-        } finally {
-            setLoading(false);
-        }
+  const handleLogin = async (values) => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        message.error(data.error)
+        return
+      }
+      login(data)
+      navigate(`/dashboard/${data.role}`)
+    } catch {
+      message.error('Connection error. Is the server running?')
+    } finally {
+      setLoading(false)
     }
+  }
 
-    return (
-        <Row justify="center" align="middle" style={{ minHeight: '80vh' }}>
-        <Col span={8}>
-            <Card title={<span style={{ color: colors.primaryText, textAlign:'center'}}>Enter your Login Details!</span>}>
-            <Row justify="center" align="middle">
-                <Space.Compact>
-                    <form onSubmit={handleLogin}>
-                        <Input 
-                            placeholder='Username' 
-                            value={username} 
-                            onChange={(e)=> setUsername(e.target.value)}
-                        />
-                        <Input.Password 
-                            placeholder='Password'
-                            value={password}
-                            onChange={(e)=> setPassword(e.target.value)}
-                        />
-                        <Divider></Divider> 
-                        <Button type="primary" htmlType="submit" loading={loading}>
-                            Login
-                        </Button>
-                        <Divider orientation="vertical"></Divider>                       
-                        <Button onClick={() => navigate('/')}>
-                            Back
-                        </Button>
-                    </form>
-                    
-                </Space.Compact>
-            </Row>
-            </Card>
-        </Col>
-        </Row>
-    )
+  return (
+    <Card
+      style={{ width: 400, borderRadius: 16, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
+      styles={{ body: { padding: '40px 32px' } }}
+    >
+      <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <Title level={3} style={{ margin: 0 }}>Welcome Back</Title>
+        <Typography.Text type="secondary">Sign in to your account</Typography.Text>
+      </div>
+      <Form layout="vertical" onFinish={handleLogin} autoComplete="off">
+        <Form.Item name="username" rules={[{ required: true, message: 'Please enter your username' }]}>
+          <Input prefix={<UserOutlined />} placeholder="Username" size="large" />
+        </Form.Item>
+        <Form.Item name="password" rules={[{ required: true, message: 'Please enter your password' }]}>
+          <Input.Password prefix={<LockOutlined />} placeholder="Password" size="large" />
+        </Form.Item>
+        <Form.Item style={{ marginBottom: 12 }}>
+          <Button type="primary" htmlType="submit" loading={loading} block size="large" style={{ borderRadius: 8 }}>
+            Login
+          </Button>
+        </Form.Item>
+      </Form>
+      <Space style={{ width: '100%', justifyContent: 'center' }}>
+        <Button type="link" icon={<ArrowLeftOutlined />} onClick={() => navigate('/')}>
+          Back to Home
+        </Button>
+      </Space>
+    </Card>
+  )
 }
 
 export default Login

@@ -501,9 +501,11 @@ const Maintenance = () => {
   ];
 
   return (
-    <Card style={{ margin: 24 }}>
-      <Title level={2}>Maintenance</Title>
-      <Tabs defaultActiveKey="info" items={tabItems} />
+    <div>
+      <Title level={4} style={{ marginBottom: 16 }}>Maintenance</Title>
+      <Card styles={{ body: { padding: '16px 24px' } }}>
+        <Tabs defaultActiveKey="info" items={tabItems} />
+      </Card>
       <Modal
         title={confirmModal?.title}
         open={!!confirmModal}
@@ -514,7 +516,7 @@ const Maintenance = () => {
       >
         <Text>{confirmModal?.content}</Text>
       </Modal>
-    </Card>
+    </div>
   );
 };
 
