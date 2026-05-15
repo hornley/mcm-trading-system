@@ -25,6 +25,7 @@ def create_app():
     app.register_blueprint(locations_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(reports_bp)
     app.register_blueprint(dashboard_bp)
 
     with app.app_context():
