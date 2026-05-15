@@ -485,10 +485,12 @@ const Reports = () => {
   }
 
   return (
-    <Card style={{ margin: 24 }}>
-      <Title level={2}>Reports</Title>
-      <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabs} />
-    </Card>
+    <div>
+      <Title level={4} style={{ marginBottom: 16 }}>Reports</Title>
+      <Card styles={{ body: { padding: '16px 24px' } }}>
+        <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabs} />
+      </Card>
+    </div>
   );
 };
 

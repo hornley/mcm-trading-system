@@ -294,7 +294,7 @@ const Inventory = () => {
     </Row>
   );
 
-  if (loading) return <Card style={{ margin: 24, textAlign: 'center' }}><Spin size="large" /></Card>;
+  if (loading) return <Card style={{ textAlign: 'center' }}><Spin size="large" /></Card>;
 
   const items = [
     {
@@ -316,9 +316,11 @@ const Inventory = () => {
   ];
 
   return (
-    <Card style={{ margin: 24 }}>
-      <Title level={2}>Inventory</Title>
-      <Tabs items={items} />
+    <div>
+      <Title level={4} style={{ marginBottom: 16 }}>Inventory</Title>
+      <Card styles={{ body: { padding: '16px 24px' } }}>
+        <Tabs items={items} />
+      </Card>
 
       <Modal
         title={selectedRecord ? 'Edit Product' : 'Add Product'}
@@ -387,7 +389,7 @@ const Inventory = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </Card>
+    </div>
   );
 };
 

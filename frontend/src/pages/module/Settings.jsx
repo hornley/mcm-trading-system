@@ -94,11 +94,11 @@ const Settings = () => {
     }
   };
 
-  if (loading) return <Card style={{ margin: 24, textAlign: 'center' }}><Spin size="large" /></Card>;
+  if (loading) return <Card style={{ textAlign: 'center' }}><Spin size="large" /></Card>;
 
   return (
-    <Card style={{ margin: 24 }}>
-      <Title level={2}>
+    <div>
+      <Title level={4} style={{ marginBottom: 16 }}>
         <SettingOutlined /> Settings
       </Title>
 
@@ -151,7 +151,7 @@ const Settings = () => {
           </Form.Item>
         </Form>
       </Card>
-    </Card>
+    </div>
   );
 };
 

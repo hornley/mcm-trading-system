@@ -1,15 +1,31 @@
-import { Menu, Layout, Col, Row, Typography} from "antd"
-import { Avatar } from 'antd';
-import { Space } from 'antd';
-import { useAuth } from "../context/AuthContext";
-import {UserOutlined} from '@ant-design/icons'
-import { useNavigate, useLocation } from "react-router-dom";
+import { Menu, Layout, Typography, Avatar, Space } from 'antd'
+import {
+  DashboardOutlined, AppstoreOutlined, AuditOutlined, TeamOutlined,
+  ShoppingCartOutlined, ToolOutlined, SettingOutlined, BarChartOutlined,
+  UserOutlined,
+} from '@ant-design/icons'
+import { useAuth } from '../context/AuthContext'
+import { useNavigate, useLocation } from 'react-router-dom'
 
-const { Sider } = Layout;
-const { Text } = Typography;
+const { Sider } = Layout
+const { Text } = Typography
 
+const iconMap = {
+  Dashboard: <DashboardOutlined />,
+  Inventory: <AppstoreOutlined />,
+  'Stock Management': <AuditOutlined />,
+  'Manage Users': <TeamOutlined />,
+  Sales: <ShoppingCartOutlined />,
+  Maintenance: <ToolOutlined />,
+  Settings: <SettingOutlined />,
+  Report: <BarChartOutlined />,
+  'Manage Staff': <TeamOutlined />,
+}
 
-const ownerModules = [
+const mapModules = (modules) =>
+  modules.map((m) => ({ ...m, icon: iconMap[m.label] }))
+
+const ownerModules = mapModules([
   { key: '1', label: 'Dashboard', path: '/dashboard/owner' },
   { key: '2', label: 'Inventory', path: '/dashboard/inventory' },
   { key: '3', label: 'Stock Management', path: '/dashboard/stock-management' },
@@ -18,65 +34,64 @@ const ownerModules = [
   { key: '6', label: 'Maintenance', path: '/dashboard/maintenance' },
   { key: '7', label: 'Settings', path: '/dashboard/settings' },
   { key: '8', label: 'Report', path: '/dashboard/report' },
-];
+])
 
-const managerModules = [
+const managerModules = mapModules([
   { key: '1', label: 'Dashboard', path: '/dashboard/manager' },
   { key: '2', label: 'Inventory', path: '/dashboard/inventory' },
   { key: '3', label: 'Sales', path: '/dashboard/sales' },
   { key: '4', label: 'Stock Management', path: '/dashboard/stock-management' },
   { key: '5', label: 'Settings', path: '/dashboard/settings' },
   { key: '6', label: 'Report', path: '/dashboard/report' },
-];
+])
 
-const adminModules = [
+const adminModules = mapModules([
   { key: '1', label: 'Dashboard', path: '/dashboard/admin' },
   { key: '2', label: 'Maintenance', path: '/dashboard/maintenance' },
   { key: '3', label: 'Settings', path: '/dashboard/settings' },
   { key: '4', label: 'Report', path: '/dashboard/report' },
-];
+])
+
 const Sidebar = () => {
-    const { user } = useAuth();
-    const navigate = useNavigate();
-    const location = useLocation();
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
 
-    const modules = 
-        user?.role === 'owner' ? ownerModules :
-        user?.role === 'admin' ? adminModules :
-        user?.role === 'manager' ? managerModules :
-    [];
+  const modules =
+    user?.role === 'owner' ? ownerModules :
+    user?.role === 'admin' ? adminModules :
+    user?.role === 'manager' ? managerModules :
+    []
 
-    const selectedKey = modules.find(m => m.path === location.pathname)?.key || '1';
+  const selectedKey = modules.find((m) => m.path === location.pathname)?.key || '1'
 
   return (
-    <Sider style={{padding: '16px 16px'}}>
-        <Row justify='center'>
-            <Space orientation="vertical" size='medium'>
-                <Row justify='center'>
-                <Col>
-                    <Space>
-                        <Avatar src={user?.avatar || null} icon={!user?.avatar && <UserOutlined /> }/>
-                        <Text style={{color: '#ffffff' }}>
-                            {user?.username}
-                        </Text>
-                    </Space>
-                </Col>
-            </Row>
-            <Menu
-                selectedKeys={[selectedKey]}
-                mode='inline'
-                theme='dark'
-                items={modules}
-                onSelect={({ key }) => {
-                    const selected = modules.find(m => m.key === key);
-                    if (selected) navigate(selected.path);
-                }}
-            />
-            </Space>
-        </Row>
+    <Sider width={220} style={{ background: '#001529' }}>
+      <div style={{ padding: '20px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <Space>
+          <Avatar size={36} src={user?.avatar || null} icon={!user?.avatar && <UserOutlined />} style={{ backgroundColor: '#5b7ff0' }} />
+          <div style={{ lineHeight: 1.3 }}>
+            <Text style={{ color: '#ffffff', fontWeight: 600, fontSize: 14, display: 'block' }}>
+              {user?.username}
+            </Text>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
+              {user?.role}
+            </Text>
+          </div>
+        </Space>
+      </div>
+      <Menu
+        selectedKeys={[selectedKey]}
+        mode="inline"
+        theme="dark"
+        items={modules}
+        onSelect={({ key }) => {
+          const selected = modules.find((m) => m.key === key)
+          if (selected) navigate(selected.path)
+        }}
+        style={{ borderInlineEnd: 'none', marginTop: 4 }}
+      />
     </Sider>
-        
-
   )
 }
 

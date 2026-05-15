@@ -340,8 +340,8 @@ const Sales = () => {
   ];
 
   return (
-    <div style={{ padding: 24 }}>
-      <Title level={4} style={{ marginBottom: 4 }}>Sales</Title>
+    <div>
+      <Title level={4} style={{ marginBottom: 16 }}>Sales</Title>
       <Text type="secondary" style={{ marginBottom: 24, display: 'block' }}>Branch: {branch}</Text>
 
       <Row gutter={[16, 16]}>
