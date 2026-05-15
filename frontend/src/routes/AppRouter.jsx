@@ -57,6 +57,10 @@ const router = createBrowserRouter (
             <Route path="sales" element={<Sales />} />
             <Route path="stock-management" element={<StockManagement />} />
             <Route path="report" element={<Report />} />
+          </Route>
+
+          {/* owner only */}
+          <Route element={<ProtectedRoute allowedRoles={["owner"]} />}>
             <Route path="users" element={<UserAccess />} />
           </Route>
 
