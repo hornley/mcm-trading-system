@@ -1,3 +1,4 @@
+import random
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Location
@@ -63,6 +64,7 @@ def register():
         email=email,
         password=generate_password_hash(password),
         usertype=data.get("usertype", 4),
+        employee_code=str(random.randint(100000000, 999999999)),
     )
     db.session.add(user)
     db.session.commit()
