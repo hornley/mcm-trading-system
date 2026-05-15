@@ -46,16 +46,10 @@ const stockMovement = [
 ];
 
 const recentSalesColumns = [
-  { title: 'Product', dataIndex: 'product', key: 'product' },
-  { title: 'Qty', dataIndex: 'quantity', key: 'quantity' },
-  { title: 'Amount', dataIndex: 'amount', key: 'amount' },
-  { title: 'Branch', dataIndex: 'branch', key: 'branch' },
-  {
-    title: 'Status', dataIndex: 'status', key: 'status',
-    render: (status) => (
-      <Tag color={status === 'Completed' ? 'green' : 'orange'}>{status}</Tag>
-    ),
-  },
+  { title: 'Product', dataIndex: 'product', key: 'product', sorter: (a, b) => a.product.localeCompare(b.product) },
+  { title: 'Qty', dataIndex: 'quantity', key: 'quantity', sorter: (a, b) => a.quantity - b.quantity },
+  { title: 'Amount', dataIndex: 'amount', key: 'amount', sorter: (a, b) => a.amount.localeCompare(b.amount) },
+  { title: 'Date', dataIndex: 'date', key: 'date', sorter: (a, b) => a.date.localeCompare(b.date) },
 ];
 
 const recentSalesData = [
