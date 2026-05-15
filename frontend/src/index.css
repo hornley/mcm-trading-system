@@ -6,3 +6,8 @@
   box-sizing: border-box;
   font-family: 'Roboto', sans-serif;
 }
+
+.voided-row {
+  opacity: 0.6;
+  background-color: #fff1f0;
+}
