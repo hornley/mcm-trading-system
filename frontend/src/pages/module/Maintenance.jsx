@@ -12,6 +12,16 @@ import { useAuth } from '../../context/AuthContext.jsx';
 
 const { Title, Text } = Typography;
 
+const _formatSize = (bytes) => {
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let size = bytes;
+  for (const unit of units) {
+    if (size < 1024) return `${size.toFixed(1)} ${unit}`;
+    size /= 1024;
+  }
+  return `${size.toFixed(1)} TB`;
+};
+
 const Maintenance = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -233,10 +243,19 @@ const Maintenance = () => {
   };
 
   const backupColumns = [
-    { title: 'Filename', dataIndex: 'filename', key: 'filename' },
-    { title: 'Size', dataIndex: 'size_formatted', key: 'size' },
-    { title: 'Created', dataIndex: 'created_at', key: 'created_at',
+    {
+      title: 'Filename', dataIndex: 'filename', key: 'filename',
+      sorter: (a, b) => a.filename.localeCompare(b.filename),
+    },
+    {
+      title: 'Size', dataIndex: 'size', key: 'size',
+      render: (v) => _formatSize(v),
+      sorter: (a, b) => a.size - b.size,
+    },
+    {
+      title: 'Created', dataIndex: 'created_at', key: 'created_at',
       render: (v) => new Date(v).toLocaleString(),
+      sorter: (a, b) => new Date(a.created_at) - new Date(b.created_at),
     },
     {
       title: 'Actions', key: 'actions',
@@ -285,15 +304,23 @@ const Maintenance = () => {
                 <Descriptions.Item label="Version">{systemInfo.version}</Descriptions.Item>
               </Descriptions>
               <Title level={5}>Table Records</Title>
-              <Row gutter={[8, 8]}>
-                {Object.entries(systemInfo.table_counts).map(([name, count]) => (
-                  <Col xs={12} sm={8} md={6} key={name}>
-                    <Card size="small">
-                      <Statistic title={name} value={count} />
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
+              <Table
+                dataSource={systemInfo.table_counts}
+                columns={[
+                  {
+                    title: 'Table Name', dataIndex: 'name', key: 'name',
+                    sorter: (a, b) => a.name.localeCompare(b.name),
+                  },
+                  {
+                    title: 'Record Count', dataIndex: 'count', key: 'count',
+                    sorter: (a, b) => a.count - b.count,
+                  },
+                ]}
+                rowKey="name"
+                pagination={false}
+                size="small"
+                bordered
+              />
             </>
           ) : (
             <Button type="primary" onClick={fetchSystemInfo} loading={loading}>Load System Info</Button>

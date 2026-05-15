@@ -190,14 +190,27 @@ const Inventory = () => {
   });
 
   const columns = [
-    { title: 'Product Name', dataIndex: 'name', key: 'name' },
-    { title: 'Category', dataIndex: 'category', key: 'category' },
+    {
+      title: 'Product Name', dataIndex: 'name', key: 'name',
+      sorter: (a, b) => a.name.localeCompare(b.name),
+    },
+    {
+      title: 'Category', dataIndex: 'category', key: 'category',
+      sorter: (a, b) => (a.category || '').localeCompare(b.category || ''),
+    },
     {
       title: 'Stock Quantity', key: 'stockQuantity',
       render: (_, record) => record.quantity ?? 0,
+      sorter: (a, b) => (a.quantity ?? 0) - (b.quantity ?? 0),
     },
-    { title: 'Base Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}` },
-    { title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level' },
+    {
+      title: 'Base Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}`,
+      sorter: (a, b) => a.price - b.price,
+    },
+    {
+      title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level',
+      sorter: (a, b) => (parseInt(a.reorder_level) || 0) - (parseInt(b.reorder_level) || 0),
+    },
     {
       title: 'Status',
       dataIndex: 'is_active',
@@ -205,6 +218,7 @@ const Inventory = () => {
       render: (active) => (
         <Tag color={active ? 'green' : 'red'}>{active ? 'Active' : 'Voided'}</Tag>
       ),
+      sorter: (a, b) => Number(b.is_active) - Number(a.is_active),
     },
     {
       title: 'Actions',

@@ -225,21 +225,52 @@ const Sales = () => {
   const isVoided = (record) => record.status === 'Voided';
 
   const columns = [
-    { title: 'Transaction ID', dataIndex: 'transactionId', key: 'transactionId' },
-    { title: 'Product Name', dataIndex: 'productName', key: 'productName' },
-    { title: 'Category', dataIndex: 'category', key: 'category' },
-    { title: 'Quantity', dataIndex: 'quantity', key: 'quantity' },
-    { title: 'Unit Price', dataIndex: 'unitPrice', key: 'unitPrice', render: (v) => `₱${v}` },
-    { title: 'Total Amount', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => `₱${v}` },
-    { title: 'Amount Paid', dataIndex: 'amountPaid', key: 'amountPaid', render: (v) => `₱${v}` },
-    { title: 'Change', dataIndex: 'change', key: 'change', render: (v) => `₱${v}` },
-    { title: 'Branch', dataIndex: 'branch', key: 'branch' },
-    { title: 'Date', dataIndex: 'date', key: 'date' },
+    {
+      title: 'Transaction ID', dataIndex: 'transactionId', key: 'transactionId',
+      sorter: (a, b) => a.transactionId.localeCompare(b.transactionId),
+    },
+    {
+      title: 'Product Name', dataIndex: 'productName', key: 'productName',
+      sorter: (a, b) => a.productName.localeCompare(b.productName),
+    },
+    {
+      title: 'Category', dataIndex: 'category', key: 'category',
+      sorter: (a, b) => a.category.localeCompare(b.category),
+    },
+    {
+      title: 'Quantity', dataIndex: 'quantity', key: 'quantity',
+      sorter: (a, b) => a.quantity - b.quantity,
+    },
+    {
+      title: 'Unit Price', dataIndex: 'unitPrice', key: 'unitPrice', render: (v) => `₱${v}`,
+      sorter: (a, b) => a.unitPrice - b.unitPrice,
+    },
+    {
+      title: 'Total Amount', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => `₱${v}`,
+      sorter: (a, b) => a.totalAmount - b.totalAmount,
+    },
+    {
+      title: 'Amount Paid', dataIndex: 'amountPaid', key: 'amountPaid', render: (v) => `₱${v}`,
+      sorter: (a, b) => a.amountPaid - b.amountPaid,
+    },
+    {
+      title: 'Change', dataIndex: 'change', key: 'change', render: (v) => `₱${v}`,
+      sorter: (a, b) => a.change - b.change,
+    },
+    {
+      title: 'Branch', dataIndex: 'branch', key: 'branch',
+      sorter: (a, b) => a.branch.localeCompare(b.branch),
+    },
+    {
+      title: 'Date', dataIndex: 'date', key: 'date',
+      sorter: (a, b) => a.date.localeCompare(b.date),
+    },
     {
       title: 'Status', dataIndex: 'status', key: 'status',
       render: (status) => (
         <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag>
       ),
+      sorter: (a, b) => a.status.localeCompare(b.status),
     },
     {
       title: 'Actions', key: 'actions',
@@ -260,23 +291,51 @@ const Sales = () => {
   ];
 
   const totalSalesColumns = [
-    { title: 'Product Name', dataIndex: 'productName', key: 'productName' },
-    { title: 'Category', dataIndex: 'category', key: 'category' },
-    { title: 'Total Quantity Sold', dataIndex: 'totalQty', key: 'totalQty' },
-    { title: 'Total Amount', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => `₱${v.toLocaleString()}` },
+    {
+      title: 'Product Name', dataIndex: 'productName', key: 'productName',
+      sorter: (a, b) => a.productName.localeCompare(b.productName),
+    },
+    {
+      title: 'Category', dataIndex: 'category', key: 'category',
+      sorter: (a, b) => a.category.localeCompare(b.category),
+    },
+    {
+      title: 'Total Quantity Sold', dataIndex: 'totalQty', key: 'totalQty',
+      sorter: (a, b) => a.totalQty - b.totalQty,
+    },
+    {
+      title: 'Total Amount', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => `₱${v.toLocaleString()}`,
+      sorter: (a, b) => a.totalAmount - b.totalAmount,
+    },
   ];
 
   const historyColumns = [
-    { title: 'Transaction ID', dataIndex: 'transactionId', key: 'transactionId' },
-    { title: 'Date', dataIndex: 'date', key: 'date' },
-    { title: 'Quantity', dataIndex: 'quantity', key: 'quantity' },
-    { title: 'Unit Price', dataIndex: 'unitPrice', key: 'unitPrice', render: (v) => `₱${v}` },
-    { title: 'Total Amount', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => `₱${v}` },
+    {
+      title: 'Transaction ID', dataIndex: 'transactionId', key: 'transactionId',
+      sorter: (a, b) => a.transactionId.localeCompare(b.transactionId),
+    },
+    {
+      title: 'Date', dataIndex: 'date', key: 'date',
+      sorter: (a, b) => a.date.localeCompare(b.date),
+    },
+    {
+      title: 'Quantity', dataIndex: 'quantity', key: 'quantity',
+      sorter: (a, b) => a.quantity - b.quantity,
+    },
+    {
+      title: 'Unit Price', dataIndex: 'unitPrice', key: 'unitPrice', render: (v) => `₱${v}`,
+      sorter: (a, b) => a.unitPrice - b.unitPrice,
+    },
+    {
+      title: 'Total Amount', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => `₱${v}`,
+      sorter: (a, b) => a.totalAmount - b.totalAmount,
+    },
     {
       title: 'Status', dataIndex: 'status', key: 'status',
       render: (status) => (
         <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag>
       ),
+      sorter: (a, b) => a.status.localeCompare(b.status),
     },
   ];
 
