@@ -1,5 +1,5 @@
 import os
-from flask import Flask, send_from_directory
+from flask import Flask, app, send_from_directory
 from flask_cors import CORS
 from config import Config, FRONTEND_DIST
 from models import db
@@ -12,13 +12,13 @@ from routes.locations import locations_bp
 from routes.admin import admin_bp
 from routes.reports import reports_bp
 from routes.dashboard import dashboard_bp
-app.register_blueprint(dashboard_bp)
 
 def create_app():
     app = Flask(__name__, static_folder=FRONTEND_DIST, static_url_path="")
     app.config.from_object(Config)
     CORS(app)
     db.init_app(app)
+    app.register_blueprint(dashboard_bp)
     app.register_blueprint(account_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(inventory_bp)
