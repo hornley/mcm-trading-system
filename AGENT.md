@@ -163,7 +163,6 @@ gh pr create --title "type: description" --body "## Summary\n- bullet points of 
 | 1 | **Owner** | Full CRUD (`_can_create/update/delete` = True) | All modules + Maintenance + Settings | All branches |
 | 2 | **Manager** | Read + Update only (no create/delete) | Limited modules, no Maintenance | Assigned branch only |
 | 3 | **Admin** | Full CRUD (same as Owner) | Dashboard + Maintenance + Report + Settings | All branches |
-| 4 | **Staff** | No access (register default) | Login-only | — |
 
 **Backend enforcement:**
 - `_can_create(usertype)` → `usertype in [1, 3]`
