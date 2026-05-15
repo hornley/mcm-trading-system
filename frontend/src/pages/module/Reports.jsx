@@ -70,9 +70,12 @@ const Reports = () => {
         const data = summary.data;
         setInventorySummary({
           stats: data.stats || {},
-          by_branch: data.by_branch || [],
-          low_stock: lowStock.success ? (lowStock.data || []) : [],
-          distribution: data.distribution || [],
+          by_branch: data.rows || [],
+          low_stock: lowStock.success ? (lowStock.data?.rows || []) : [],
+          distribution: (data.rows || []).map((r) => ({
+            location_name: r.location_name,
+            total_quantity: r.total_quantity,
+          })),
         });
       }
     } catch {
@@ -178,45 +181,45 @@ const Reports = () => {
   const isAdmin = user?.role === 'admin';
 
   const inventoryColsBranch = [
-    { title: 'Branch', dataIndex: 'branch', key: 'branch', sorter: (a, b) => (a.branch || '').localeCompare(b.branch || '') },
-    { title: 'Total Items', dataIndex: 'total_items', key: 'total_items', sorter: (a, b) => (a.total_items || 0) - (b.total_items || 0) },
+    { title: 'Branch', dataIndex: 'location_name', key: 'location_name', sorter: (a, b) => (a.location_name || '').localeCompare(b.location_name || '') },
+    { title: 'Total Items', dataIndex: 'product_count', key: 'product_count', sorter: (a, b) => (a.product_count || 0) - (b.product_count || 0) },
     { title: 'Total Quantity', dataIndex: 'total_quantity', key: 'total_quantity', sorter: (a, b) => (a.total_quantity || 0) - (b.total_quantity || 0) },
   ];
 
   const inventoryColsLowStock = [
-    { title: 'Product', dataIndex: 'product', key: 'product', sorter: (a, b) => (a.product || '').localeCompare(b.product || '') },
+    { title: 'Product', dataIndex: 'product_name', key: 'product_name', sorter: (a, b) => (a.product_name || '').localeCompare(b.product_name || '') },
     { title: 'SKU', dataIndex: 'sku', key: 'sku', sorter: (a, b) => (a.sku || '').localeCompare(b.sku || '') },
-    { title: 'Branch', dataIndex: 'branch', key: 'branch', sorter: (a, b) => (a.branch || '').localeCompare(b.branch || '') },
-    { title: 'Stock', dataIndex: 'stock', key: 'stock', sorter: (a, b) => (a.stock || 0) - (b.stock || 0) },
+    { title: 'Branch', dataIndex: 'location_name', key: 'location_name', sorter: (a, b) => (a.location_name || '').localeCompare(b.location_name || '') },
+    { title: 'Stock', dataIndex: 'quantity', key: 'quantity', sorter: (a, b) => (a.quantity || 0) - (b.quantity || 0) },
     { title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level', sorter: (a, b) => (a.reorder_level || 0) - (b.reorder_level || 0) },
   ];
 
   const salesColsTop = [
-    { title: 'Product', dataIndex: 'product', key: 'product', sorter: (a, b) => (a.product || '').localeCompare(b.product || '') },
-    { title: 'Qty Sold', dataIndex: 'qty_sold', key: 'qty_sold', sorter: (a, b) => (a.qty_sold || 0) - (b.qty_sold || 0) },
+    { title: 'Product', dataIndex: 'product_name', key: 'product_name', sorter: (a, b) => (a.product_name || '').localeCompare(b.product_name || '') },
+    { title: 'Qty Sold', dataIndex: 'total_quantity', key: 'total_quantity', sorter: (a, b) => (a.total_quantity || 0) - (b.total_quantity || 0) },
     { title: 'Total Revenue', dataIndex: 'total_revenue', key: 'total_revenue', render: (v) => formatCurrency(v), sorter: (a, b) => (a.total_revenue || 0) - (b.total_revenue || 0) },
   ];
 
   const financialColsRevenue = [
     { title: 'Date', dataIndex: 'date', key: 'date', sorter: (a, b) => (a.date || '').localeCompare(b.date || '') },
-    { title: 'Orders', dataIndex: 'orders', key: 'orders', sorter: (a, b) => (a.orders || 0) - (b.orders || 0) },
+    { title: 'Orders', dataIndex: 'order_count', key: 'order_count', sorter: (a, b) => (a.order_count || 0) - (b.order_count || 0) },
     { title: 'Revenue', dataIndex: 'revenue', key: 'revenue', render: (v) => formatCurrency(v), sorter: (a, b) => (a.revenue || 0) - (b.revenue || 0) },
   ];
 
   const financialColsPM = [
     { title: 'Payment Method', dataIndex: 'payment_method', key: 'payment_method', sorter: (a, b) => (a.payment_method || '').localeCompare(b.payment_method || '') },
-    { title: 'Transactions', dataIndex: 'transactions', key: 'transactions', sorter: (a, b) => (a.transactions || 0) - (b.transactions || 0) },
-    { title: 'Total Amount', dataIndex: 'total_amount', key: 'total_amount', render: (v) => formatCurrency(v), sorter: (a, b) => (a.total_amount || 0) - (b.total_amount || 0) },
+    { title: 'Transactions', dataIndex: 'count', key: 'count', sorter: (a, b) => (a.count || 0) - (b.count || 0) },
+    { title: 'Total Amount', dataIndex: 'total', key: 'total', render: (v) => formatCurrency(v), sorter: (a, b) => (a.total || 0) - (b.total || 0) },
   ];
 
   const activityColsUser = [
-    { title: 'User', dataIndex: 'user', key: 'user', sorter: (a, b) => (a.user || '').localeCompare(b.user || '') },
-    { title: 'Actions', dataIndex: 'actions', key: 'actions', sorter: (a, b) => (a.actions || 0) - (b.actions || 0) },
+    { title: 'User', dataIndex: 'username', key: 'username', sorter: (a, b) => (a.username || '').localeCompare(b.username || '') },
+    { title: 'Actions', dataIndex: 'count', key: 'count', sorter: (a, b) => (a.count || 0) - (b.count || 0) },
   ];
 
   const activityColsModule = [
     { title: 'Module', dataIndex: 'module', key: 'module', sorter: (a, b) => (a.module || '').localeCompare(b.module || '') },
-    { title: 'Actions', dataIndex: 'actions', key: 'actions', sorter: (a, b) => (a.actions || 0) - (b.actions || 0) },
+    { title: 'Actions', dataIndex: 'count', key: 'count', sorter: (a, b) => (a.count || 0) - (b.count || 0) },
   ];
 
   const systemColsBackup = [
@@ -285,7 +288,7 @@ const Reports = () => {
             <Table
               dataSource={inventorySummary.low_stock}
               columns={inventoryColsLowStock}
-              rowKey={(r) => `${r.product || ''}-${r.branch || ''}`}
+              rowKey={(r) => `${r.product_name || ''}-${r.location_name || ''}`}
               pagination={{ pageSize: 10 }}
               size="small"
             />
@@ -328,7 +331,7 @@ const Reports = () => {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="total_amount" fill="#1677ff" name="Revenue" />
+                    <Bar dataKey="revenue" fill="#1677ff" name="Revenue" />
                   </BarChart>
                 </ResponsiveContainer>
               </Card>
@@ -338,7 +341,7 @@ const Reports = () => {
                 <Table
                   dataSource={salesData.topProducts}
                   columns={salesColsTop}
-                  rowKey="product"
+                  rowKey="product_name"
                   pagination={false}
                   size="small"
                 />
@@ -458,13 +461,13 @@ const Reports = () => {
         <Spin spinning={loading.system}>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={8}>
-              <Card><Statistic title="Backups" value={systemData.stats.backups ?? 0} /></Card>
+              <Card><Statistic title="Backups" value={systemData.stats.backup_count ?? 0} /></Card>
             </Col>
             <Col xs={24} sm={8}>
-              <Card><Statistic title="Actions (7d)" value={systemData.stats.actions_7d ?? 0} /></Card>
+              <Card><Statistic title="Actions (7d)" value={systemData.stats.activity_7d ?? 0} /></Card>
             </Col>
             <Col xs={24} sm={8}>
-              <Card><Statistic title="Actions (30d)" value={systemData.stats.actions_30d ?? 0} /></Card>
+              <Card><Statistic title="Actions (30d)" value={systemData.stats.activity_30d ?? 0} /></Card>
             </Col>
           </Row>
           <Card title="Backup History" style={{ marginTop: 16 }}>
