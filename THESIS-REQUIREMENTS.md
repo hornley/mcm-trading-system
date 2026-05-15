@@ -4,7 +4,7 @@
 |---|---|---|
 | Inventory CRUD | ✅ Complete | Full CRUD for Categories, Products, Locations, Inventory. Search, sort, filter, SKU auto-generation, role-based access. |
 | Stock Transfers | ✅ Complete | `POST /api/stock/transfer` between locations with validation. Combined movement history via `GET /api/inventory/movements`. |
-| Sales Module | ❌ Missing | Page is a stub (`<div>Sales</div>`). No backend endpoints. |
+| Sales Module | ✅ Complete | Add/edit sales modal, total sales view by branch/date, void support, sortable columns (mock data). |
 | Reports Module | ❌ Missing | Page is a stub. No backend endpoints. |
 | Maintenance Module | ✅ Complete | Full tabbed page: System Info, Backup & Restore, Integrity Check, VACUUM/Reindex, Configurable Cleanup. |
 | Backup & Restore | ✅ Complete | Create, list, restore, delete backups from UI. Backups stored in `db/backups/`. |
