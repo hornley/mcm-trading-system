@@ -28,6 +28,7 @@ const Owner = () => {
     stock_by_category: [],
     stock_movement: [],
     recent_transactions: [],
+    low_stock_items: [],
   })
 
   const fetchData = () => {
@@ -42,7 +43,7 @@ const Owner = () => {
 
   useEffect(() => { if (user) fetchData() }, [user, selectedLocationId])
 
-  const { stats, stock_by_category, stock_movement, recent_transactions } = data
+  const { stats, stock_by_category, stock_movement, recent_transactions, low_stock_items } = data
 
   const netChange = stock_movement.reduce((sum, d) => sum + (d.in || 0) - (d.out || 0), 0)
   const totalOut = stock_movement.reduce((sum, d) => sum + (d.out || 0), 0)
@@ -203,7 +204,7 @@ const Owner = () => {
       </Row>
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col span={24}>
+        <Col xs={24} lg={12}>
           <Card
             title="Recent Transactions"
             extra={<Button type="link" onClick={() => navigate('/dashboard/sales')}>View All Sales</Button>}
@@ -227,6 +228,29 @@ const Owner = () => {
               size="small"
               loading={loading}
               onRow={() => ({ style: { cursor: 'pointer' }, onClick: () => navigate('/dashboard/sales') })}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} lg={12}>
+          <Card
+            title={`Low Stock Items${low_stock_items.length > 0 ? ` (${low_stock_items.length})` : ''}`}
+            extra={<Button type="link" onClick={() => navigate('/dashboard/stock-management')}>View All</Button>}
+            styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}
+          >
+            <Table
+              dataSource={low_stock_items}
+              columns={[
+                { title: 'Product Name', dataIndex: 'product_name', key: 'product_name' },
+                { title: 'Category', dataIndex: 'category', key: 'category' },
+                { title: 'Current Stock', dataIndex: 'quantity', key: 'quantity' },
+                { title: 'Status', key: 'status', render: (_, record) => (
+                  <Tag color={record.quantity === 0 ? 'red' : 'orange'}>{record.quantity === 0 ? 'Out of Stock' : 'Low Stock'}</Tag>
+                )},
+              ]}
+              pagination={false}
+              size="small"
+              loading={loading}
+              rowClassName={(record) => record.quantity === 0 ? 'voided-row' : record.quantity <= 5 ? 'low-stock-warn' : ''}
             />
           </Card>
         </Col>
