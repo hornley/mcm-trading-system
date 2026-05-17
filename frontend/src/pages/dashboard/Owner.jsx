@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card, Row, Col, Statistic, Table, Tag, Typography, Button, Space } from 'antd'
 import { ArrowUpOutlined, ArrowDownOutlined, RightCircleOutlined } from '@ant-design/icons'
 import {
-  PieChart, Pie, Cell, BarChart, Bar,
+  PieChart, Pie, Cell, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { useAuth } from '../../context/AuthContext.jsx'
@@ -46,6 +46,7 @@ const Owner = () => {
 
   const netChange = stock_movement.reduce((sum, d) => sum + (d.in || 0) - (d.out || 0), 0)
   const totalAcrossCategories = stock_by_category.reduce((sum, c) => sum + c.value, 0)
+  const sparkData = stock_movement.map((d) => ({ day: d.day, net: (d.in || 0) - (d.out || 0) }))
 
   const statCards = [
     {
@@ -91,6 +92,15 @@ const Owner = () => {
             >
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <Statistic title={stat.title} value={stat.value} valueStyle={stat.valueStyle} loading={loading} />
+                {sparkData.length > 0 && stat.trend && (
+                  <div style={{ marginTop: 8, height: 24 }}>
+                    <ResponsiveContainer width="100%" height={24}>
+                      <LineChart data={sparkData}>
+                        <Line type="monotone" dataKey="net" stroke="#5b7ff0" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
                 <div style={{ flex: 1 }} />
                 {stat.trend && (
                   <Space>
