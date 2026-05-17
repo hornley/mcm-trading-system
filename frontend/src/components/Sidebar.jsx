@@ -74,7 +74,7 @@ const Sidebar = () => {
   }
 
   return (
-    <Sider width={220} collapsedWidth={60} collapsible collapsed={collapsed} onCollapse={handleCollapse} style={{ background: isDark ? '#001529' : '#ffffff' }}>
+    <Sider width={220} collapsedWidth={60} collapsible collapsed={collapsed} onCollapse={handleCollapse} className={isDark ? 'sider-dark' : 'sider-light'} style={{ background: isDark ? '#001529' : '#ffffff' }}>
       <div style={{ padding: collapsed ? '16px 10px' : '20px 16px', borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0'}`, textAlign: collapsed ? 'center' : 'left' }}>
         {collapsed ? (
           <Avatar size={36} src={user?.avatar || null} icon={!user?.avatar && <UserOutlined />} style={{ backgroundColor: '#5b7ff0' }} />

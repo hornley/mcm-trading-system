@@ -7,6 +7,17 @@
   font-family: 'Roboto', sans-serif;
 }
 
+.sider-light .ant-layout-sider-trigger {
+  background: #ffffff !important;
+  color: #262626 !important;
+  border-right: 1px solid #f0f0f0;
+}
+
+.sider-dark .ant-layout-sider-trigger {
+  background: #001529 !important;
+  color: #ffffff !important;
+}
+
 .voided-row {
   opacity: 0.6;
   background-color: #fff1f0;
