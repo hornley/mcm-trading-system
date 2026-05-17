@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Table, Card, Typography, Row, Col, Input, Select, Button,
   Tag, Modal, Statistic, Space, Descriptions, Form, InputNumber,
-  DatePicker, message, Spin,
+  DatePicker, message, Spin, Segmented,
 } from 'antd';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -40,18 +40,26 @@ const StockManagement = () => {
   const [pageSize] = useState(20);
   const [movementsCache, setMovementsCache] = useState({});
   const [stats, setStats] = useState({ total_items: 0, low_stock_count: 0, out_of_stock_count: 0 });
+  const [sortBy, setSortBy] = useState('product_name');
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [statusFilter, setStatusFilter] = useState('');
+  const searchTimer = useRef(null);
 
-  const fetchData = async (page) => {
+  const fetchData = async (page, sortOverrides) => {
     if (!user) return;
     const p = page || currentPage;
+    const sb = sortOverrides?.sortBy || sortBy;
+    const so = sortOverrides?.sortOrder || sortOrder;
     setLoading(true);
     try {
       const locationParam = selectedLocationId !== "all" ? `&location_id=${selectedLocationId}` : '';
       const userIdParam = `&user_id=${user.user_id}`;
       const searchParam = searchText ? `&q=${encodeURIComponent(searchText)}` : '';
+      const sortParam = `&sort_by=${sb}&sort_order=${so}`;
+      const statusParam = statusFilter ? `&status=${statusFilter}` : '';
 
       const [invRes, locRes, countRes] = await Promise.all([
-        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=${p}&limit=${pageSize}${searchParam}`),
+        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=${p}&limit=${pageSize}${searchParam}${sortParam}${statusParam}`),
         fetch(`/api/locations?usertype=${user.usertype}`),
         fetch(`/api/inventory/counts?usertype=${user.usertype}${locationParam}${userIdParam}`),
       ]);
@@ -83,7 +91,7 @@ const StockManagement = () => {
     setCurrentPage(1);
     setMovementsCache({});
     fetchData(1);
-  }, [user, selectedLocationId]);
+  }, [user, selectedLocationId, statusFilter]);
 
   const handleViewDetails = async (record) => {
     setSelectedRecord(record);
@@ -221,6 +229,15 @@ const StockManagement = () => {
     }
   };
 
+  const handleSearchChange = (e) => {
+    setSearchText(e.target.value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setCurrentPage(1);
+      fetchData(1);
+    }, 300);
+  };
+
   const handleBulkRestock = async () => {
     if (!storehouse) {
       message.warning('No storehouse configured. Mark a location as storehouse first.');
@@ -264,28 +281,28 @@ const StockManagement = () => {
   const columns = [
     {
       title: 'Product Name', dataIndex: 'product_name', key: 'product_name',
-      defaultSortOrder: 'ascend',
-      sorter: (a, b) => a.product_name.localeCompare(b.product_name),
+      sorter: true,
+      defaultSortOrder: sortBy === 'product_name' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
     },
     {
       title: 'Branch', dataIndex: 'location_name', key: 'location_name',
-      sorter: (a, b) => a.location_name.localeCompare(b.location_name),
+      sorter: true,
     },
     {
       title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
-      sorter: (a, b) => a.quantity - b.quantity,
+      sorter: true,
     },
     {
       title: 'Stock Status',
       dataIndex: 'quantity',
       key: 'stockStatus',
       render: (qty) => getStockStatus(qty).tag,
-      sorter: (a, b) => a.quantity - b.quantity,
+      sorter: true,
     },
     {
       title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level',
       render: (val) => (val ? parseInt(val) : '-'),
-      sorter: (a, b) => (parseInt(a.reorder_level) || 0) - (parseInt(b.reorder_level) || 0),
+      sorter: true,
     },
     {
       title: 'Auto-Restock',
@@ -395,10 +412,9 @@ const StockManagement = () => {
             <Search
               placeholder="Search by product name"
               value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              onSearch={() => fetchData(1)}
-              onPressEnter={() => fetchData(1)}
-              enterButton
+              onChange={handleSearchChange}
+              onSearch={() => { if (searchTimer.current) clearTimeout(searchTimer.current); setCurrentPage(1); fetchData(1); }}
+              allowClear
               style={{ width: 220 }}
             />
             {can('update') && storehouse && (
@@ -410,11 +426,38 @@ const StockManagement = () => {
         </Col>
       </Row>
 
+      <Space style={{ marginBottom: 12 }}>
+        <Segmented
+          value={statusFilter || 'all'}
+          options={[
+            { label: 'All', value: 'all' },
+            { label: `In Stock (${stats.total_items - stats.low_stock_count - stats.out_of_stock_count})`, value: 'in_stock' },
+            { label: `Low Stock (${stats.low_stock_count})`, value: 'low_stock' },
+            { label: `Out of Stock (${stats.out_of_stock_count})`, value: 'out_of_stock' },
+          ]}
+          onChange={(val) => setStatusFilter(val === 'all' ? '' : val)}
+        />
+      </Space>
+
       <Table
         dataSource={inventory}
         columns={columns}
         rowKey="inventory_id"
         loading={loading}
+        rowClassName={(record) => {
+          if (record.quantity === 0) return 'row-out-of-stock';
+          if (record.quantity <= 10) return 'row-low-stock';
+          return '';
+        }}
+        onChange={(pagination, filters, sorter) => {
+          if (sorter.field) {
+            const newSortBy = sorter.field;
+            const newSortOrder = sorter.order === 'descend' ? 'desc' : 'asc';
+            setSortBy(newSortBy);
+            setSortOrder(newSortOrder);
+            fetchData(1, { sortBy: newSortBy, sortOrder: newSortOrder });
+          }
+        }}
         pagination={{ current: currentPage, pageSize, total: totalCount, showSizeChanger: false, onChange: (p) => fetchData(p) }}
       />
 

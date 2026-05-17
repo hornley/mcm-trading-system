@@ -391,14 +391,36 @@ def list_inventory():
     if search:
         query = query.filter(Product.name.ilike(f"%{search}%"))
 
-    query = query.order_by(Product.name.asc())
+    status_filter = request.args.get("status", "").strip()
+    sort_by = request.args.get("sort_by", "product_name")
+    sort_order = request.args.get("sort_order", "asc")
+
+    sort_map = {
+        "product_name": Product.name,
+        "location_name": Location.name,
+        "quantity": Inventory.quantity,
+        "reorder_level": Product.reorder_level,
+    }
+    sort_col = sort_map.get(sort_by, Product.name)
+    if sort_order == "desc":
+        query = query.order_by(sort_col.desc())
+    else:
+        query = query.order_by(sort_col.asc())
 
     page = request.args.get("page", 1, type=int)
     limit = request.args.get("limit", 20, type=int)
     page = max(1, page)
     limit = max(1, min(100, limit))
 
+    if status_filter == "out_of_stock":
+        query = query.filter(Inventory.quantity == 0)
+    elif status_filter == "low_stock":
+        query = query.filter(Inventory.quantity > 0, Inventory.quantity <= 10)
+    elif status_filter == "in_stock":
+        query = query.filter(Inventory.quantity > 10)
+
     total_count = query.count()
+
     inventory = query.offset((page - 1) * limit).limit(limit).all()
 
     return success_response({
