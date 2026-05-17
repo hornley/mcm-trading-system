@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 const { Title } = Typography;
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, setTheme, setFontSize } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profileForm] = Form.useForm();
@@ -30,6 +30,8 @@ const Settings = () => {
             theme: data.theme || 'light',
             fontsize: data.fontsize || 'medium',
           });
+          setTheme(data.theme || 'light');
+          setFontSize(data.fontsize || 'medium');
         }
       } catch {
         message.error('Failed to load settings');
@@ -82,6 +84,8 @@ const Settings = () => {
       });
       const data = await res.json();
       if (data.message) {
+        setTheme(values.theme);
+        setFontSize(values.fontsize);
         message.success('Preferences updated');
       } else {
         message.error(data.error || 'Failed to update preferences');

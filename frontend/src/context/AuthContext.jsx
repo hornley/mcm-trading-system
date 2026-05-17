@@ -15,6 +15,8 @@ export const AuthProvider = ({children}) => {
       return stored ? JSON.parse(stored) : null;
     });
     const [selectedLocationId, setSelectedLocationId] = useState("all");
+    const [theme, setThemeState] = useState(() => localStorage.getItem('mcm_theme') || 'light');
+    const [fontSize, setFontSizeState] = useState(() => localStorage.getItem('mcm_fontsize') || 'medium');
 
     const login = (userData) => {
       localStorage.setItem('mcm_user', JSON.stringify(userData));
@@ -37,8 +39,18 @@ export const AuthProvider = ({children}) => {
       return PERMISSIONS[user.usertype]?.[action] ?? false;
     };
 
+    const setTheme = (t) => {
+      localStorage.setItem('mcm_theme', t);
+      setThemeState(t);
+    };
+
+    const setFontSize = (s) => {
+      localStorage.setItem('mcm_fontsize', s);
+      setFontSizeState(s);
+    };
+
   return (
-    <AuthContext.Provider value={{user, login, logout, can, selectedLocationId, setSelectedLocationId}}>
+    <AuthContext.Provider value={{user, login, logout, can, selectedLocationId, setSelectedLocationId, theme, fontSize, setTheme, setFontSize}}>
         {children}
     </AuthContext.Provider>
   )
