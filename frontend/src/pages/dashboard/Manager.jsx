@@ -111,21 +111,24 @@ const Manager = () => {
               styles={{ body: { padding: '20px 24px' } }}
               style={stat.title === 'Low Stock Alerts' && stats.low_stock_count > 0 ? { borderLeft: '3px solid #fa8c16' } : {}}
             >
-              <Statistic title={stat.title} value={stat.value} prefix={stat.icon} valueStyle={stat.valueStyle} loading={loading} />
-              {stat.trend && (
-                <Space style={{ marginTop: 4 }}>
-                  <Text style={{ fontSize: 13, color: stat.trend.direction === 'up' ? '#52c41a' : '#ff4d4f' }}>
-                    {stat.trend.direction === 'up' ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
-                    {' '}{stat.trend.percent}%
-                  </Text>
-                  <Text type="secondary" style={{ fontSize: 12 }}>vs yesterday</Text>
-                </Space>
-              )}
-              {stat.route && (
-                <Button type="link" size="small" icon={<RightCircleOutlined />} onClick={() => navigate(stat.route)} style={{ padding: 0, marginTop: 4 }}>
-                  View {stat.title.replace(/^(Total |Low )/, '')}
-                </Button>
-              )}
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Statistic title={stat.title} value={stat.value} prefix={stat.icon} valueStyle={stat.valueStyle} loading={loading} />
+                <div style={{ flex: 1 }} />
+                {stat.trend && (
+                  <Space>
+                    <Text style={{ fontSize: 13, color: stat.trend.direction === 'up' ? '#52c41a' : '#ff4d4f' }}>
+                      {stat.trend.direction === 'up' ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
+                      {' '}{stat.trend.percent}%
+                    </Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>vs yesterday</Text>
+                  </Space>
+                )}
+                {stat.route && (
+                  <Button type="link" size="small" icon={<RightCircleOutlined />} onClick={() => navigate(stat.route)} style={{ padding: 0, marginTop: 8 }}>
+                    View {stat.title.replace(/^(Total |Low )/, '')}
+                  </Button>
+                )}
+              </div>
             </Card>
           </Col>
         ))}
