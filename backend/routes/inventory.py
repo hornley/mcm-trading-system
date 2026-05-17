@@ -357,21 +357,38 @@ def list_inventory():
     if resolved_location_id and resolved_location_id != "all":
         query = query.filter(Inventory.location_id == resolved_location_id)
 
-    inventory = query.order_by(Product.name.asc()).all()
+    search = request.args.get("q", "").strip()
+    if search:
+        query = query.filter(Product.name.ilike(f"%{search}%"))
 
-    return success_response([
-        {
-            "inventory_id": inv.inventory_id,
-            "product_id": inv.product_id,
-            "product_name": inv.product.name,
-            "sku": inv.product.sku,
-            "location_id": inv.location_id,
-            "location_name": inv.location.name if inv.location else None,
-            "quantity": inv.quantity,
-            "reorder_level": inv.product.reorder_level,
-        }
-        for inv in inventory
-    ])
+    query = query.order_by(Product.name.asc())
+
+    page = request.args.get("page", 1, type=int)
+    limit = request.args.get("limit", 20, type=int)
+    page = max(1, page)
+    limit = max(1, min(100, limit))
+
+    total_count = query.count()
+    inventory = query.offset((page - 1) * limit).limit(limit).all()
+
+    return success_response({
+        "data": [
+            {
+                "inventory_id": inv.inventory_id,
+                "product_id": inv.product_id,
+                "product_name": inv.product.name,
+                "sku": inv.product.sku,
+                "location_id": inv.location_id,
+                "location_name": inv.location.name if inv.location else None,
+                "quantity": inv.quantity,
+                "reorder_level": inv.product.reorder_level,
+            }
+            for inv in inventory
+        ],
+        "total_count": total_count,
+        "page": page,
+        "limit": limit,
+    })
 
 
 @inventory_bp.route("/api/inventory/location/<int:location_id>", methods=["GET"])

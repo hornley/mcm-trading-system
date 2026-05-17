@@ -35,22 +35,32 @@ const StockManagement = () => {
   const [adjustForm] = Form.useForm();
   const [transferForm] = Form.useForm();
   const [restocking, setRestocking] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [pageSize] = useState(20);
+  const [movementsCache, setMovementsCache] = useState({});
 
-  const fetchData = async () => {
+  const fetchData = async (page) => {
     if (!user) return;
+    const p = page || currentPage;
     setLoading(true);
     try {
       const locationParam = selectedLocationId !== "all" ? `&location_id=${selectedLocationId}` : '';
       const userIdParam = `&user_id=${user.user_id}`;
+      const searchParam = searchText ? `&q=${encodeURIComponent(searchText)}` : '';
 
       const [invRes, locRes] = await Promise.all([
-        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}`),
+        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=${p}&limit=${pageSize}${searchParam}`),
         fetch(`/api/locations?usertype=${user.usertype}`),
       ]);
       const invData = await invRes.json();
       const locData = await locRes.json();
 
-      if (invData.success) setInventory(invData.data);
+      if (invData.success) {
+        setInventory(invData.data.data || []);
+        setTotalCount(invData.data.total_count || 0);
+        setCurrentPage(invData.data.page || p);
+      }
       if (locData.success) {
         const activeLocs = locData.data.filter((l) => l.is_active);
         setLocations(activeLocs);
@@ -64,18 +74,25 @@ const StockManagement = () => {
   };
 
   useEffect(() => {
-    fetchData();
+    setCurrentPage(1);
+    setMovementsCache({});
+    fetchData(1);
   }, [user, selectedLocationId]);
 
   const handleViewDetails = async (record) => {
     setSelectedRecord(record);
-    try {
-      const res = await fetch(`/api/inventory/movements?usertype=${user.usertype}&product_id=${record.product_id}`);
-      const data = await res.json();
-      if (data.success) setMovements(data.data);
-      else setMovements([]);
-    } catch {
-      setMovements([]);
+    if (movementsCache[record.product_id]) {
+      setMovements(movementsCache[record.product_id]);
+    } else {
+      try {
+        const res = await fetch(`/api/inventory/movements?usertype=${user.usertype}&product_id=${record.product_id}`);
+        const data = await res.json();
+        const result = data.success ? data.data : [];
+        setMovements(result);
+        setMovementsCache((prev) => ({ ...prev, [record.product_id]: result }));
+      } catch {
+        setMovements([]);
+      }
     }
     setDetailVisible(true);
   };
@@ -236,13 +253,9 @@ const StockManagement = () => {
     }
   };
 
-  const filteredData = inventory.filter((item) =>
-    item.product_name?.toLowerCase().includes(searchText.toLowerCase())
-  );
-
-  const totalItems = filteredData.length;
-  const lowStockCount = filteredData.filter((s) => s.quantity > 0 && s.quantity <= 10).length;
-  const outOfStockCount = filteredData.filter((s) => s.quantity === 0).length;
+  const totalItems = inventory.length;
+  const lowStockCount = inventory.filter((s) => s.quantity > 0 && s.quantity <= 10).length;
+  const outOfStockCount = inventory.filter((s) => s.quantity === 0).length;
 
   const columns = [
     {
@@ -341,7 +354,7 @@ const StockManagement = () => {
     },
   ];
 
-  if (loading) return <Card style={{ textAlign: 'center' }}><Spin size="large" /></Card>;
+  if (loading && inventory.length === 0) return <Card style={{ textAlign: 'center' }}><Spin size="large" /></Card>;
 
   return (
     <div>
@@ -377,8 +390,10 @@ const StockManagement = () => {
           <Space wrap>
             <Search
               placeholder="Search by product name"
-              onSearch={setSearchText}
+              value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
+              onSearch={() => fetchData(1)}
+              onPressEnter={() => fetchData(1)}
               enterButton
               style={{ width: 220 }}
             />
@@ -392,10 +407,11 @@ const StockManagement = () => {
       </Row>
 
       <Table
-        dataSource={filteredData}
+        dataSource={inventory}
         columns={columns}
         rowKey="inventory_id"
-        pagination={{ pageSize: 10 }}
+        loading={loading}
+        pagination={{ current: currentPage, pageSize, total: totalCount, showSizeChanger: false, onChange: (p) => fetchData(p) }}
       />
 
       <Modal
