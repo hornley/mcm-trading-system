@@ -1,3 +1,4 @@
+import math
 from flask import Blueprint, request
 from datetime import datetime
 from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer
@@ -338,6 +339,36 @@ def delete_product(product_id):
     return success_response(message="Product deleted successfully")
 
 
+@inventory_bp.route("/api/inventory/counts", methods=["GET"])
+def inventory_counts():
+    usertype = request.args.get("usertype", type=int)
+    if usertype is None:
+        return error_response("usertype query parameter is required", "MISSING_PARAM", 400)
+
+    user_id = request.args.get("user_id", type=int)
+    location_id = request.args.get("location_id")
+
+    resolved_location_id, error = _resolve_location_id(usertype, user_id, location_id)
+    if error:
+        return error
+
+    query = Inventory.query.join(Product).filter(Product.is_active == True)
+    if resolved_location_id and resolved_location_id != "all":
+        query = query.filter(Inventory.location_id == resolved_location_id)
+
+    all_inv = query.all()
+
+    total_items = len(all_inv)
+    low_stock_count = sum(1 for i in all_inv if i.quantity > 0 and i.quantity <= 10)
+    out_of_stock_count = sum(1 for i in all_inv if i.quantity == 0)
+
+    return success_response({
+        "total_items": total_items,
+        "low_stock_count": low_stock_count,
+        "out_of_stock_count": out_of_stock_count,
+    })
+
+
 @inventory_bp.route("/api/inventory", methods=["GET"])
 def list_inventory():
     usertype = request.args.get("usertype", type=int)
@@ -356,20 +387,60 @@ def list_inventory():
     if resolved_location_id and resolved_location_id != "all":
         query = query.filter(Inventory.location_id == resolved_location_id)
 
-    inventory = query.order_by(Product.name.asc()).all()
+    search = request.args.get("q", "").strip()
+    if search:
+        query = query.filter(Product.name.ilike(f"%{search}%"))
 
-    return success_response([
-        {
-            "inventory_id": inv.inventory_id,
-            "product_id": inv.product_id,
-            "product_name": inv.product.name,
-            "sku": inv.product.sku,
-            "location_id": inv.location_id,
-            "location_name": inv.location.name if inv.location else None,
-            "quantity": inv.quantity,
-        }
-        for inv in inventory
-    ])
+    status_filter = request.args.get("status", "").strip()
+    sort_by = request.args.get("sort_by", "product_name")
+    sort_order = request.args.get("sort_order", "asc")
+
+    sort_map = {
+        "product_name": Product.name,
+        "location_name": Location.name,
+        "quantity": Inventory.quantity,
+        "reorder_level": Product.reorder_level,
+    }
+    sort_col = sort_map.get(sort_by, Product.name)
+    if sort_order == "desc":
+        query = query.order_by(sort_col.desc())
+    else:
+        query = query.order_by(sort_col.asc())
+
+    page = request.args.get("page", 1, type=int)
+    limit = request.args.get("limit", 20, type=int)
+    page = max(1, page)
+    limit = max(1, min(100, limit))
+
+    if status_filter == "out_of_stock":
+        query = query.filter(Inventory.quantity == 0)
+    elif status_filter == "low_stock":
+        query = query.filter(Inventory.quantity > 0, Inventory.quantity <= 10)
+    elif status_filter == "in_stock":
+        query = query.filter(Inventory.quantity > 10)
+
+    total_count = query.count()
+
+    inventory = query.offset((page - 1) * limit).limit(limit).all()
+
+    return success_response({
+        "data": [
+            {
+                "inventory_id": inv.inventory_id,
+                "product_id": inv.product_id,
+                "product_name": inv.product.name,
+                "sku": inv.product.sku,
+                "location_id": inv.location_id,
+                "location_name": inv.location.name if inv.location else None,
+                "quantity": inv.quantity,
+                "reorder_level": inv.product.reorder_level,
+            }
+            for inv in inventory
+        ],
+        "total_count": total_count,
+        "page": page,
+        "limit": limit,
+    })
 
 
 @inventory_bp.route("/api/inventory/location/<int:location_id>", methods=["GET"])
@@ -532,6 +603,114 @@ def adjust_inventory():
     )
 
 
+@inventory_bp.route("/api/inventory/restock-below-reorder", methods=["POST"])
+def restock_below_reorder():
+    data = request.get_json()
+    if not data:
+        return error_response("Request body is required", "MISSING_BODY", 400)
+
+    usertype = data.get("usertype")
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+
+    if not _can_update(usertype):
+        return error_response("You don't have permission to restock", "FORBIDDEN", 403)
+
+    location_id = data.get("location_id")
+    user_id = data.get("user_id")
+
+    if usertype == 2:
+        manager = User.query.get(user_id)
+        if not manager:
+            return error_response("User not found", "NOT_FOUND", 404)
+        if manager.location_id != location_id:
+            return error_response("You can only restock your assigned location", "FORBIDDEN", 403)
+
+    storehouse = Location.query.filter_by(is_storehouse=True, is_active=True).first()
+    if not storehouse:
+        return error_response("No storehouse branch configured. Mark a location as storehouse first.", "NO_STOREHOUSE", 400)
+
+    location = Location.query.get(location_id)
+    if not location:
+        return error_response("Location not found", "NOT_FOUND", 404)
+
+    inventory_list = Inventory.query.filter_by(location_id=location_id).all()
+    restocked = []
+
+    for inv in inventory_list:
+        try:
+            level = int(inv.product.reorder_level) if inv.product and inv.product.reorder_level else 0
+        except (ValueError, TypeError):
+            level = 0
+
+        if level <= 0:
+            continue
+
+        target = level + math.ceil(level / 2)
+        if inv.quantity >= target:
+            continue
+
+        store_inv = Inventory.query.filter_by(
+            product_id=inv.product_id,
+            location_id=storehouse.location_id,
+        ).first()
+
+        if not store_inv or store_inv.quantity <= 0:
+            continue
+
+        deficit = target - inv.quantity
+        transfer_qty = min(deficit, store_inv.quantity)
+
+        if transfer_qty <= 0:
+            continue
+
+        store_inv.quantity -= transfer_qty
+        inv.quantity += transfer_qty
+
+        transfer = StockTransfer(
+            product_id=inv.product_id,
+            from_location_id=storehouse.location_id,
+            to_location_id=location_id,
+            user_id=user_id,
+            quantity=transfer_qty,
+            status="completed",
+            remarks="Bulk restock (below reorder level)",
+        )
+        db.session.add(transfer)
+
+        log_activity(
+            user_id=user_id,
+            module="inventory",
+            action_type="auto_restock",
+            action=f"Bulk restock: {transfer_qty} {inv.product.name} from {storehouse.name} to {location.name}",
+            details={
+                "product_id": inv.product_id,
+                "from_location_id": storehouse.location_id,
+                "to_location_id": location_id,
+                "quantity": transfer_qty,
+            },
+        )
+
+        restocked.append({
+            "product_id": inv.product_id,
+            "product_name": inv.product.name,
+            "previous_quantity": inv.quantity - transfer_qty,
+            "new_quantity": inv.quantity,
+            "reorder_level": level,
+            "target_level": target,
+            "quantity_added": transfer_qty,
+            "from_location": storehouse.name,
+        })
+
+    if restocked:
+        db.session.commit()
+        message = f"Restocked {len(restocked)} product(s)"
+    else:
+        message = "No products below reorder level"
+
+    return success_response({"restocked": restocked, "count": len(restocked)}, message)
+
+
 @inventory_bp.route("/api/inventory/low-stock", methods=["GET"])
 def get_low_stock():
     usertype = request.args.get("usertype", type=int)
@@ -655,6 +834,7 @@ def transfer_stock():
         to_location_id=data["to_location_id"],
         user_id=data.get("user_id"),
         quantity=quantity,
+        remarks=data.get("remarks"),
     )
     if data.get("transfer_date"):
         try:
@@ -734,7 +914,7 @@ def get_inventory_movements():
             "location_id": t.from_location_id,
             "location_name": t.from_location.name if t.from_location else None,
             "reason": "Transfer out",
-            "remarks": f"To: {t.to_location.name if t.to_location else 'Unknown'}",
+            "remarks": t.remarks or f"To: {t.to_location.name if t.to_location else 'Unknown'}",
         })
 
     for t in transfers_to.all():
@@ -745,7 +925,7 @@ def get_inventory_movements():
             "location_id": t.to_location_id,
             "location_name": t.to_location.name if t.to_location else None,
             "reason": "Transfer in",
-            "remarks": f"From: {t.from_location.name if t.from_location else 'Unknown'}",
+            "remarks": t.remarks or f"From: {t.from_location.name if t.from_location else 'Unknown'}",
         })
 
     movements.sort(key=lambda m: m["date"] or "", reverse=True)

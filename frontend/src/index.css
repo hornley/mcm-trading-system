@@ -27,6 +27,19 @@
   background-color: rgba(255, 77, 79, 0.06) !important;
 }
 
+.row-out-of-stock {
+  background-color: rgba(255, 77, 79, 0.08) !important;
+}
+.row-out-of-stock:hover td {
+  background-color: rgba(255, 77, 79, 0.12) !important;
+}
+.row-low-stock {
+  background-color: rgba(250, 140, 22, 0.08) !important;
+}
+.row-low-stock:hover td {
+  background-color: rgba(250, 140, 22, 0.12) !important;
+}
+
 .page-enter {
   animation: fadeInUp 0.35s ease-out both;
 }
