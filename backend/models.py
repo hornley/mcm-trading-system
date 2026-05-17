@@ -26,6 +26,7 @@ class Location(db.Model):
     name = db.Column(db.String, nullable=False)
     address = db.Column(db.String)
     is_active = db.Column(db.Boolean, default=True)
+    is_storehouse = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
 
@@ -108,6 +109,7 @@ class StockTransfer(db.Model):
     quantity = db.Column(db.Integer, nullable=False)
     transfer_date = db.Column(db.DateTime, nullable=False, default=datetime.now)
     status = db.Column(db.String, nullable=False, default="completed")
+    remarks = db.Column(db.String)
     product = db.relationship("Product")
     from_location = db.relationship("Location", foreign_keys=[from_location_id])
     to_location = db.relationship("Location", foreign_keys=[to_location_id])

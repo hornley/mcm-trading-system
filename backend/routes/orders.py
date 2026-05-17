@@ -1,6 +1,6 @@
 from flask import Blueprint, request
 from datetime import datetime
-from models import db, User, Order, OrderItem, Payment, Product, Inventory, Location
+from models import db, User, Order, OrderItem, Payment, Product, Inventory, Location, StockTransfer
 from utils.response import success_response, error_response
 from utils.validation import validate_required
 from utils.activity_logger import log_activity
@@ -213,6 +213,72 @@ def create_order():
 
     db.session.commit()
 
+    auto_restocks = []
+    storehouse = Location.query.filter_by(is_storehouse=True, is_active=True).first()
+    if storehouse:
+        for ri in resolved_items:
+            product = ri["product"]
+            try:
+                level = int(product.reorder_level) if product.reorder_level else 0
+            except (ValueError, TypeError):
+                level = 0
+            if level <= 0:
+                continue
+
+            inv = Inventory.query.filter_by(
+                product_id=product.product_id,
+                location_id=resolved_location_id,
+            ).first()
+
+            if inv and inv.quantity < level:
+                store_inv = Inventory.query.filter_by(
+                    product_id=product.product_id,
+                    location_id=storehouse.location_id,
+                ).first()
+
+                if store_inv and store_inv.quantity > 0:
+                    deficit = level - inv.quantity
+                    transfer_qty = min(deficit, store_inv.quantity)
+
+                    if transfer_qty > 0:
+                        store_inv.quantity -= transfer_qty
+                        inv.quantity += transfer_qty
+
+                        transfer = StockTransfer(
+                            product_id=product.product_id,
+                            from_location_id=storehouse.location_id,
+                            to_location_id=resolved_location_id,
+                            user_id=user_id,
+                            quantity=transfer_qty,
+                            status="completed",
+                            remarks=f"Auto-restock (Order #{order.order_id})",
+                        )
+                        db.session.add(transfer)
+
+                        log_activity(
+                            user_id=user_id,
+                            module="inventory",
+                            action_type="auto_restock",
+                            action=f"Auto-restock: {transfer_qty} {product.name} from {storehouse.name}",
+                            details={
+                                "product_id": product.product_id,
+                                "from_location_id": storehouse.location_id,
+                                "to_location_id": resolved_location_id,
+                                "quantity": transfer_qty,
+                                "triggered_by_order": order.order_id,
+                            },
+                        )
+
+                        auto_restocks.append({
+                            "product_id": product.product_id,
+                            "product_name": product.name,
+                            "quantity": transfer_qty,
+                            "from_location": storehouse.name,
+                        })
+
+        if auto_restocks:
+            db.session.commit()
+
     log_activity(
         user_id=user_id,
         module="orders",
@@ -226,8 +292,11 @@ def create_order():
         },
     )
 
+    response_data = _serialize_order_detail(order)
+    response_data["auto_restocks"] = auto_restocks
+
     return success_response(
-        _serialize_order_detail(order),
+        response_data,
         f"Order #{order.order_id} created successfully",
     )
 

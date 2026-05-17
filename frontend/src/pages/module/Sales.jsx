@@ -207,6 +207,10 @@ const Sales = () => {
       const json = await res.json();
       if (json.success) {
         message.success(`Order #${json.data.order_id} created`);
+        if (json.data.auto_restocks?.length > 0) {
+          const names = json.data.auto_restocks.map((r) => r.product_name).join(', ');
+          message.info(`Auto-restock triggered: ${names}`);
+        }
         setLastOrder(json.data);
         setSaleModalVisible(false);
         setReceiptModalVisible(true);
@@ -705,6 +709,17 @@ const Sales = () => {
                 </div>
               </div>
             ))}
+            {(lastOrder.auto_restocks || []).length > 0 && (
+              <>
+                <Divider style={{ margin: '8px 0' }} />
+                <div style={{ fontSize: 11, color: '#52c41a' }}>
+                  <Text type="secondary" style={{ fontSize: 11 }}>Auto-Restock Triggered:</Text>
+                  {lastOrder.auto_restocks.map((r, i) => (
+                    <div key={i}>{r.product_name}: +{r.quantity} from {r.from_location}</div>
+                  ))}
+                </div>
+              </>
+            )}
             <Divider style={{ margin: '8px 0' }} />
             <div style={{ textAlign: 'center', marginTop: 8 }}>
               <Text type="secondary" style={{ fontSize: 11 }}>Thank you for your purchase!</Text>

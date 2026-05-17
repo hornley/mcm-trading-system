@@ -29,6 +29,9 @@ const StockManagement = () => {
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [fromLocationId, setFromLocationId] = useState(null);
   const [searchText, setSearchText] = useState('');
+  const [storehouse, setStorehouse] = useState(null);
+  const [reorderVisible, setReorderVisible] = useState(false);
+  const [reorderForm] = Form.useForm();
   const [adjustForm] = Form.useForm();
   const [transferForm] = Form.useForm();
 
@@ -47,7 +50,11 @@ const StockManagement = () => {
       const locData = await locRes.json();
 
       if (invData.success) setInventory(invData.data);
-      if (locData.success) setLocations(locData.data.filter((l) => l.is_active));
+      if (locData.success) {
+        const activeLocs = locData.data.filter((l) => l.is_active);
+        setLocations(activeLocs);
+        setStorehouse(activeLocs.find((l) => l.is_storehouse) || null);
+      }
     } catch {
       message.error('Failed to load data');
     } finally {
@@ -88,6 +95,38 @@ const StockManagement = () => {
     transferForm.resetFields();
     transferForm.setFieldsValue({ from_location_id: record.location_id });
     setTransferVisible(true);
+  };
+
+  const handleSetReorder = (record) => {
+    setSelectedRecord(record);
+    reorderForm.resetFields();
+    reorderForm.setFieldsValue({ reorder_level: record.reorder_level ? parseInt(record.reorder_level) : 0 });
+    setReorderVisible(true);
+  };
+
+  const handleReorderSave = async () => {
+    try {
+      const values = await reorderForm.validateFields();
+      const res = await fetch(`/api/products/${selectedRecord.product_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          usertype: user.usertype,
+          user_id: user.user_id,
+          reorder_level: values.reorder_level ? String(values.reorder_level) : null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        message.success('Reorder level updated');
+        setReorderVisible(false);
+        fetchData();
+      } else {
+        message.error(data.message);
+      }
+    } catch {
+      message.error('Failed to update reorder level');
+    }
   };
 
   const handleAdjustSave = async () => {
@@ -188,10 +227,31 @@ const StockManagement = () => {
       sorter: (a, b) => a.quantity - b.quantity,
     },
     {
+      title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level',
+      render: (val) => (val ? parseInt(val) : '-'),
+      sorter: (a, b) => (parseInt(a.reorder_level) || 0) - (parseInt(b.reorder_level) || 0),
+    },
+    {
+      title: 'Auto-Restock',
+      key: 'autoRestock',
+      render: (_, record) => {
+        const level = parseInt(record.reorder_level) || 0;
+        const enabled = storehouse && level > 0;
+        return enabled
+          ? <Tag color="green">Active</Tag>
+          : <Tag>{storehouse ? 'Inactive' : 'No Storehouse'}</Tag>;
+      },
+    },
+    {
       title: 'Actions',
       key: 'actions',
       render: (_, record) => (
-        <Space>
+        <Space wrap>
+          {can('update') && (
+            <Button type="link" disabled={selectedLocationId === "all"} onClick={() => handleSetReorder(record)}>
+              Set Reorder Level
+            </Button>
+          )}
           {can('update') && (
             <Button type="link" disabled={selectedLocationId === "all"} onClick={() => handleAdjustStock(record)}>
               Adjust Stock
@@ -264,6 +324,15 @@ const StockManagement = () => {
         </Col>
       </Row>
 
+      {storehouse && (
+        <Card size="small" style={{ marginBottom: 16, background: '#f6ffed', borderColor: '#b7eb8f' }}>
+          <Space>
+            <Tag color="green">Storehouse</Tag>
+            <span><strong>{storehouse.name}</strong> — auto-restock source branch</span>
+          </Space>
+        </Card>
+      )}
+
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} md={14}>
           <Space wrap>
@@ -297,6 +366,7 @@ const StockManagement = () => {
           <Descriptions.Item label="SKU">{selectedRecord?.sku}</Descriptions.Item>
           <Descriptions.Item label="Branch">{selectedRecord?.location_name}</Descriptions.Item>
           <Descriptions.Item label="Current Stock Quantity">{selectedRecord?.quantity}</Descriptions.Item>
+          <Descriptions.Item label="Reorder Level">{parseInt(selectedRecord?.reorder_level) || 'Not set'}</Descriptions.Item>
         </Descriptions>
 
         <Typography.Text strong style={{ marginBottom: 8, display: 'block' }}>
@@ -310,6 +380,25 @@ const StockManagement = () => {
           pagination={false}
           bordered
         />
+      </Modal>
+
+      <Modal
+        title={`Set Reorder Level - ${selectedRecord?.product_name}`}
+        open={reorderVisible}
+        onCancel={() => setReorderVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setReorderVisible(false)}>Cancel</Button>,
+          <Button key="save" type="primary" onClick={handleReorderSave}>Save</Button>,
+        ]}
+      >
+        <Form form={reorderForm} layout="vertical">
+          <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+            Set the minimum stock threshold. When quantity drops below this level after a sale, an auto-restock transfer from the storehouse will be triggered.
+          </Typography.Text>
+          <Form.Item name="reorder_level" label="Reorder Level" rules={[{ required: true, message: 'Please enter reorder level' }]}>
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="Enter minimum stock level" />
+          </Form.Item>
+        </Form>
       </Modal>
 
       <Modal

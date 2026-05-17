@@ -22,6 +22,7 @@ def _serialize_location(location, include_inventory=False):
         "name": location.name,
         "address": location.address,
         "is_active": location.is_active,
+        "is_storehouse": location.is_storehouse,
         "created_at": location.created_at.isoformat() if location.created_at else None,
         "updated_at": location.updated_at.isoformat() if location.updated_at else None,
     }
@@ -93,6 +94,7 @@ def create_location():
     location = Location(
         name=data["name"],
         address=data.get("address"),
+        is_storehouse=data.get("is_storehouse", False),
     )
     db.session.add(location)
     db.session.flush()
@@ -140,6 +142,8 @@ def update_location(location_id):
         location.name = data["name"]
     if "address" in data:
         location.address = data["address"]
+    if "is_storehouse" in data:
+        location.is_storehouse = data["is_storehouse"]
 
     db.session.commit()
 

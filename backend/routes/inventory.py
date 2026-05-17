@@ -367,6 +367,7 @@ def list_inventory():
             "location_id": inv.location_id,
             "location_name": inv.location.name if inv.location else None,
             "quantity": inv.quantity,
+            "reorder_level": inv.product.reorder_level,
         }
         for inv in inventory
     ])
@@ -655,6 +656,7 @@ def transfer_stock():
         to_location_id=data["to_location_id"],
         user_id=data.get("user_id"),
         quantity=quantity,
+        remarks=data.get("remarks"),
     )
     if data.get("transfer_date"):
         try:
@@ -734,7 +736,7 @@ def get_inventory_movements():
             "location_id": t.from_location_id,
             "location_name": t.from_location.name if t.from_location else None,
             "reason": "Transfer out",
-            "remarks": f"To: {t.to_location.name if t.to_location else 'Unknown'}",
+            "remarks": t.remarks or f"To: {t.to_location.name if t.to_location else 'Unknown'}",
         })
 
     for t in transfers_to.all():
@@ -745,7 +747,7 @@ def get_inventory_movements():
             "location_id": t.to_location_id,
             "location_name": t.to_location.name if t.to_location else None,
             "reason": "Transfer in",
-            "remarks": f"From: {t.from_location.name if t.from_location else 'Unknown'}",
+            "remarks": t.remarks or f"From: {t.from_location.name if t.from_location else 'Unknown'}",
         })
 
     movements.sort(key=lambda m: m["date"] or "", reverse=True)
