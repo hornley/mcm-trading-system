@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card, Row, Col, Statistic, Table, Tag, Typography, Button, Space } from 'antd'
 import { ArrowUpOutlined, ArrowDownOutlined, RightCircleOutlined } from '@ant-design/icons'
 import {
-  PieChart, Pie, Cell, BarChart, Bar, LineChart, Line,
+  PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, ComposedChart,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { useAuth } from '../../context/AuthContext.jsx'
@@ -47,6 +47,10 @@ const Owner = () => {
   const netChange = stock_movement.reduce((sum, d) => sum + (d.in || 0) - (d.out || 0), 0)
   const totalAcrossCategories = stock_by_category.reduce((sum, c) => sum + c.value, 0)
   const sparkData = stock_movement.map((d) => ({ day: d.day, net: (d.in || 0) - (d.out || 0) }))
+  const chartData = stock_movement.map((d, i, arr) => ({
+    ...d,
+    ma3: i >= 2 ? Math.round((arr[i - 2].in + arr[i - 1].in + arr[i].in) / 3) : null,
+  }))
 
   const statCards = [
     {
@@ -152,7 +156,7 @@ const Owner = () => {
         <Col xs={24} lg={14}>
           <Card title="Stock Movement (Last 7 Days)" styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}>
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={stock_movement}>
+              <ComposedChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="day" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
@@ -160,7 +164,8 @@ const Owner = () => {
                 <Legend />
                 <Bar dataKey="in" fill="#52c41a" name="Stock In" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="out" fill="#ff4d4f" name="Stock Out" radius={[4, 4, 0, 0]} />
-              </BarChart>
+                <Line type="monotone" dataKey="ma3" stroke="#5b7ff0" strokeWidth={2} dot={false} name="3-day avg" />
+              </ComposedChart>
             </ResponsiveContainer>
             {stock_movement.length > 0 && (
               <Text style={{ display: 'block', textAlign: 'right', marginTop: 8, fontSize: 13 }}>
