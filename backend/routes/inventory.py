@@ -1,3 +1,4 @@
+import math
 from flask import Blueprint, request
 from datetime import datetime
 from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer
@@ -573,7 +574,11 @@ def restock_below_reorder():
         except (ValueError, TypeError):
             level = 0
 
-        if level <= 0 or inv.quantity >= level:
+        if level <= 0:
+            continue
+
+        target = level + math.ceil(level / 2)
+        if inv.quantity >= target:
             continue
 
         store_inv = Inventory.query.filter_by(
@@ -584,7 +589,7 @@ def restock_below_reorder():
         if not store_inv or store_inv.quantity <= 0:
             continue
 
-        deficit = level - inv.quantity
+        deficit = target - inv.quantity
         transfer_qty = min(deficit, store_inv.quantity)
 
         if transfer_qty <= 0:
@@ -623,6 +628,7 @@ def restock_below_reorder():
             "previous_quantity": inv.quantity - transfer_qty,
             "new_quantity": inv.quantity,
             "reorder_level": level,
+            "target_level": target,
             "quantity_added": transfer_qty,
             "from_location": storehouse.name,
         })
