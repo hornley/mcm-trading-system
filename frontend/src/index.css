@@ -18,6 +18,10 @@
   color: #ffffff !important;
 }
 
+.low-stock-warn {
+  background-color: #fff7e6;
+}
+
 .voided-row {
   opacity: 0.6;
   background-color: #fff1f0;
