@@ -240,6 +240,7 @@ const Manager = () => {
                 { title: 'Date', dataIndex: 'date', key: 'date' },
               ]}
               pagination={false} size="small" loading={loading}
+              scroll={{ y: 280 }}
               onRow={() => ({ style: { cursor: 'pointer' }, onClick: () => navigate('/dashboard/sales') })}
             />
           </Card>
@@ -254,6 +255,7 @@ const Manager = () => {
               dataSource={low_stock_items}
               columns={lowStockColumns}
               pagination={false} size="small" loading={loading}
+              scroll={{ y: 280 }}
               rowClassName={(record) => record.quantity === 0 ? 'voided-row' : record.quantity <= 5 ? 'low-stock-warn' : ''}
             />
           </Card>

@@ -227,6 +227,7 @@ const Owner = () => {
               pagination={false}
               size="small"
               loading={loading}
+              scroll={{ y: 280 }}
               onRow={() => ({ style: { cursor: 'pointer' }, onClick: () => navigate('/dashboard/sales') })}
             />
           </Card>
@@ -250,6 +251,7 @@ const Owner = () => {
               pagination={false}
               size="small"
               loading={loading}
+              scroll={{ y: 280 }}
               rowClassName={(record) => record.quantity === 0 ? 'voided-row' : record.quantity <= 5 ? 'low-stock-warn' : ''}
             />
           </Card>
