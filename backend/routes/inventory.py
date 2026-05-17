@@ -339,6 +339,36 @@ def delete_product(product_id):
     return success_response(message="Product deleted successfully")
 
 
+@inventory_bp.route("/api/inventory/counts", methods=["GET"])
+def inventory_counts():
+    usertype = request.args.get("usertype", type=int)
+    if usertype is None:
+        return error_response("usertype query parameter is required", "MISSING_PARAM", 400)
+
+    user_id = request.args.get("user_id", type=int)
+    location_id = request.args.get("location_id")
+
+    resolved_location_id, error = _resolve_location_id(usertype, user_id, location_id)
+    if error:
+        return error
+
+    query = Inventory.query.join(Product).filter(Product.is_active == True)
+    if resolved_location_id and resolved_location_id != "all":
+        query = query.filter(Inventory.location_id == resolved_location_id)
+
+    all_inv = query.all()
+
+    total_items = len(all_inv)
+    low_stock_count = sum(1 for i in all_inv if i.quantity > 0 and i.quantity <= 10)
+    out_of_stock_count = sum(1 for i in all_inv if i.quantity == 0)
+
+    return success_response({
+        "total_items": total_items,
+        "low_stock_count": low_stock_count,
+        "out_of_stock_count": out_of_stock_count,
+    })
+
+
 @inventory_bp.route("/api/inventory", methods=["GET"])
 def list_inventory():
     usertype = request.args.get("usertype", type=int)

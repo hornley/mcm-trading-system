@@ -39,6 +39,7 @@ const StockManagement = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [pageSize] = useState(20);
   const [movementsCache, setMovementsCache] = useState({});
+  const [stats, setStats] = useState({ total_items: 0, low_stock_count: 0, out_of_stock_count: 0 });
 
   const fetchData = async (page) => {
     if (!user) return;
@@ -49,17 +50,22 @@ const StockManagement = () => {
       const userIdParam = `&user_id=${user.user_id}`;
       const searchParam = searchText ? `&q=${encodeURIComponent(searchText)}` : '';
 
-      const [invRes, locRes] = await Promise.all([
+      const [invRes, locRes, countRes] = await Promise.all([
         fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=${p}&limit=${pageSize}${searchParam}`),
         fetch(`/api/locations?usertype=${user.usertype}`),
+        fetch(`/api/inventory/counts?usertype=${user.usertype}${locationParam}${userIdParam}`),
       ]);
       const invData = await invRes.json();
       const locData = await locRes.json();
+      const countData = await countRes.json();
 
       if (invData.success) {
         setInventory(invData.data.data || []);
         setTotalCount(invData.data.total_count || 0);
         setCurrentPage(invData.data.page || p);
+      }
+      if (countData.success) {
+        setStats(countData.data);
       }
       if (locData.success) {
         const activeLocs = locData.data.filter((l) => l.is_active);
@@ -253,9 +259,7 @@ const StockManagement = () => {
     }
   };
 
-  const totalItems = inventory.length;
-  const lowStockCount = inventory.filter((s) => s.quantity > 0 && s.quantity <= 10).length;
-  const outOfStockCount = inventory.filter((s) => s.quantity === 0).length;
+  const { total_items: totalItems, low_stock_count: lowStockCount, out_of_stock_count: outOfStockCount } = stats;
 
   const columns = [
     {
