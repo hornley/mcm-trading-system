@@ -86,8 +86,8 @@ const Owner = () => {
           <Col xs={24} sm={12} lg={6} key={i}>
             <Card
               hoverable
-              styles={{ body: { padding: '20px 24px' } }}
-              style={stat.title === 'Low Stock Alerts' && stats.low_stock_count > 0 ? { borderLeft: '3px solid #fa8c16' } : {}}
+              styles={{ body: { padding: '20px 24px', height: '100%' } }}
+              style={{ height: '100%', ...(stat.title === 'Low Stock Alerts' && stats.low_stock_count > 0 ? { borderLeft: '3px solid #fa8c16' } : {}) }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <Statistic title={stat.title} value={stat.value} valueStyle={stat.valueStyle} loading={loading} />
