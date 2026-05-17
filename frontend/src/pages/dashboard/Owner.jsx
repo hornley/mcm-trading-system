@@ -112,6 +112,32 @@ const Owner = () => {
         ))}
       </Row>
 
+      {stats.total_items > 0 && (
+        <Card size="small" style={{ marginTop: 16, marginBottom: 0 }} styles={{ body: { padding: '12px 16px' } }}>
+          <Row align="middle" gutter={16}>
+            <Col><Text type="secondary" style={{ fontSize: 12 }}>Stock Health</Text></Col>
+            <Col flex="auto">
+              <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', background: '#f0f0f0' }}>
+                <div style={{ width: `${Math.max(0, ((stats.total_items - stats.low_stock_count) / stats.total_items) * 100)}%`, background: '#52c41a', transition: 'width 0.3s' }} />
+                <div style={{ width: `${Math.max(0, (stats.low_stock_count / stats.total_items) * 100)}%`, background: '#fa8c16', transition: 'width 0.3s' }} />
+              </div>
+            </Col>
+            <Col>
+              <Space size={12}>
+                <Space size={4}>
+                  <div style={{ width: 8, height: 8, borderRadius: 4, background: '#52c41a' }} />
+                  <Text style={{ fontSize: 12 }}>{Math.max(0, stats.total_items - stats.low_stock_count)} healthy</Text>
+                </Space>
+                <Space size={4}>
+                  <div style={{ width: 8, height: 8, borderRadius: 4, background: '#fa8c16' }} />
+                  <Text style={{ fontSize: 12 }}>{stats.low_stock_count} low</Text>
+                </Space>
+              </Space>
+            </Col>
+          </Row>
+        </Card>
+      )}
+
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col xs={24} lg={14}>
           <Card title="Stock Movement (Last 7 Days)" styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}>
