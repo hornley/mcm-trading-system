@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Table, Card, Typography, Row, Col, Input, Select, Button,
   Tag, Modal, Statistic, Space, Descriptions, Form, InputNumber,
@@ -43,7 +43,6 @@ const StockManagement = () => {
   const [sortBy, setSortBy] = useState('product_name');
   const [sortOrder, setSortOrder] = useState('asc');
   const [statusFilter, setStatusFilter] = useState('');
-  const searchTimer = useRef(null);
 
   const fetchData = async (page, sortOverrides) => {
     if (!user) return;
@@ -229,15 +228,6 @@ const StockManagement = () => {
     }
   };
 
-  const handleSearchChange = (e) => {
-    setSearchText(e.target.value);
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => {
-      setCurrentPage(1);
-      fetchData(1);
-    }, 300);
-  };
-
   const handleBulkRestock = async () => {
     if (!storehouse) {
       message.warning('No storehouse configured. Mark a location as storehouse first.');
@@ -412,8 +402,9 @@ const StockManagement = () => {
             <Search
               placeholder="Search by product name"
               value={searchText}
-              onChange={handleSearchChange}
-              onSearch={() => { if (searchTimer.current) clearTimeout(searchTimer.current); setCurrentPage(1); fetchData(1); }}
+              onChange={(e) => setSearchText(e.target.value)}
+              onSearch={() => { setCurrentPage(1); fetchData(1); }}
+              enterButton
               allowClear
               style={{ width: 220 }}
             />
