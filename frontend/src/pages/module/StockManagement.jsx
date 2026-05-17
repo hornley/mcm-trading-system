@@ -31,6 +31,7 @@ const StockManagement = () => {
   const [searchText, setSearchText] = useState('');
   const [adjustForm] = Form.useForm();
   const [transferForm] = Form.useForm();
+  const [requestPreset, setRequestPreset] = useState(false);
 
   const fetchData = async () => {
     if (!user) return;
@@ -78,7 +79,20 @@ const StockManagement = () => {
       return;
     }
     setSelectedRecord(record);
+    setRequestPreset(false);
     adjustForm.resetFields();
+    setAdjustVisible(true);
+  };
+
+  const handleRequestStock = (record) => {
+    if (selectedLocationId === "all") {
+      message.warning('Select a specific branch from the top bar to adjust stock');
+      return;
+    }
+    setSelectedRecord(record);
+    setRequestPreset(true);
+    adjustForm.resetFields();
+    adjustForm.setFieldsValue({ adjustmentType: 'in', reason: 'Restock' });
     setAdjustVisible(true);
   };
 
@@ -93,7 +107,9 @@ const StockManagement = () => {
   const handleAdjustSave = async () => {
     try {
       const values = await adjustForm.validateFields();
-      const quantityChange = values.adjustmentType === 'in'
+      const adjType = values.adjustmentType || (requestPreset ? 'in' : null);
+      const reason = values.reason || (requestPreset ? 'Restock' : null);
+      const quantityChange = adjType === 'in'
         ? Math.abs(values.quantity)
         : -Math.abs(values.quantity);
 
@@ -106,7 +122,7 @@ const StockManagement = () => {
           product_id: selectedRecord.product_id,
           location_id: selectedLocationId,
           quantity_change: quantityChange,
-          reason: values.reason,
+          reason,
         }),
       });
       const data = await res.json();
@@ -178,6 +194,7 @@ const StockManagement = () => {
     },
     {
       title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
+      defaultSortOrder: 'ascend',
       sorter: (a, b) => a.quantity - b.quantity,
     },
     {
@@ -191,14 +208,19 @@ const StockManagement = () => {
       title: 'Actions',
       key: 'actions',
       render: (_, record) => (
-        <Space>
+        <Space wrap>
+          {can('update') && (
+            <Button type="link" disabled={selectedLocationId === "all"} onClick={() => handleRequestStock(record)}>
+              Request Stock
+            </Button>
+          )}
           {can('update') && (
             <Button type="link" disabled={selectedLocationId === "all"} onClick={() => handleAdjustStock(record)}>
               Adjust Stock
             </Button>
           )}
           {can('update') && (
-            <Button type="link" onClick={() => handleTransferStock(record)}>
+            <Button type="link" disabled={selectedLocationId === "all" || record.quantity === 0} onClick={() => handleTransferStock(record)}>
               Transfer
             </Button>
           )}
@@ -313,7 +335,7 @@ const StockManagement = () => {
       </Modal>
 
       <Modal
-        title={`Adjust Stock - ${selectedRecord?.product_name}`}
+        title={requestPreset ? `Request Stock - ${selectedRecord?.product_name}` : `Adjust Stock - ${selectedRecord?.product_name}`}
         open={adjustVisible}
         onCancel={() => setAdjustVisible(false)}
         footer={[
@@ -322,25 +344,32 @@ const StockManagement = () => {
         ]}
       >
         <Form form={adjustForm} layout="vertical">
-          <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+          <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
             Adjusting stock at selected branch
           </Typography.Text>
-          <Form.Item name="adjustmentType" label="Adjustment Type" rules={[{ required: true, message: 'Please select adjustment type' }]}>
-            <Select placeholder="Select type">
-              <Select.Option value="in">Stock In (+)</Select.Option>
-              <Select.Option value="out">Stock Out (-)</Select.Option>
-            </Select>
-          </Form.Item>
+          <Typography.Text style={{ display: 'block', marginBottom: 16 }}>
+            Current stock: <strong>{selectedRecord?.quantity ?? 0} units</strong>
+          </Typography.Text>
+          {!requestPreset && (
+            <Form.Item name="adjustmentType" label="Adjustment Type" rules={[{ required: true, message: 'Please select adjustment type' }]}>
+              <Select placeholder="Select type">
+                <Select.Option value="in">Stock In (+)</Select.Option>
+                <Select.Option value="out">Stock Out (-)</Select.Option>
+              </Select>
+            </Form.Item>
+          )}
           <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: 'Please enter quantity' }]}>
             <InputNumber min={1} style={{ width: '100%' }} placeholder="Enter quantity" />
           </Form.Item>
-          <Form.Item name="reason" label="Reason" rules={[{ required: true, message: 'Please select a reason' }]}>
-            <Select placeholder="Select reason">
-              {adjustmentReasons.map((r) => (
-                <Select.Option key={r} value={r}>{r}</Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+          {!requestPreset && (
+            <Form.Item name="reason" label="Reason" rules={[{ required: true, message: 'Please select a reason' }]}>
+              <Select placeholder="Select reason">
+                {adjustmentReasons.map((r) => (
+                  <Select.Option key={r} value={r}>{r}</Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+          )}
           <Form.Item name="remarks" label="Remarks (optional)">
             <TextArea rows={2} placeholder="Additional notes" />
           </Form.Item>
@@ -372,7 +401,7 @@ const StockManagement = () => {
             </Select>
           </Form.Item>
           <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: 'Please enter quantity' }]}>
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="Enter quantity" />
+            <InputNumber min={1} max={selectedRecord?.quantity || 1} style={{ width: '100%' }} placeholder="Enter quantity" />
           </Form.Item>
           <Typography.Text type="secondary" style={{ fontSize: 12, marginTop: -16, marginBottom: 16, display: 'block' }}>
             Available: {selectedRecord?.quantity ?? 0} units
