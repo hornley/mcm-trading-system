@@ -210,7 +210,7 @@ const StockManagement = () => {
       render: (_, record) => (
         <Space wrap>
           {can('update') && (
-            <Button type="link" disabled={selectedLocationId === "all" || record.quantity === 0} onClick={() => handleRequestStock(record)}>
+            <Button type="link" disabled={selectedLocationId === "all"} onClick={() => handleRequestStock(record)}>
               Request Stock
             </Button>
           )}
