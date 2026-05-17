@@ -170,32 +170,32 @@ const Manager = () => {
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col xs={24} lg={14}>
           <Card title="Stock Movement — Last 7 Days" styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}>
-            <div style={{ position: 'relative' }}>
-              <ResponsiveContainer width="100%" height={260}>
-                <ComposedChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="in" fill="#52c41a" name="Stock In" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="out" fill="#ff4d4f" name="Stock Out" radius={[4, 4, 0, 0]} />
-                  <Line type="monotone" dataKey="ma3" stroke="#5b7ff0" strokeWidth={2} dot={false} name="3-day avg" />
-                </ComposedChart>
-              </ResponsiveContainer>
-              {stock_movement.length > 0 && (
-                <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', textAlign: 'right', pointerEvents: 'none' }}>
-                  <Text style={{ fontSize: 13, display: 'block' }}>
-                    Net change: <Text style={{ color: netChange >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 600 }}>{netChange >= 0 ? '+' : ''}{netChange} units</Text> this week
-                  </Text>
-                  {stockRunway && (
-                    <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
-                      Stock runway: ~<Text strong>{stockRunway}</Text> days
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="in" fill="#52c41a" name="Stock In" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="out" fill="#ff4d4f" name="Stock Out" radius={[4, 4, 0, 0]} />
+                <Line type="monotone" dataKey="ma3" stroke="#5b7ff0" strokeWidth={2} dot={false} name="3-day avg" />
+              </ComposedChart>
+            </ResponsiveContainer>
+            {stock_movement.length > 0 && (
+              <div style={{ textAlign: 'right', marginTop: 8 }}>
+                <Text style={{ fontSize: 13 }}>
+                  Net change: <Text style={{ color: netChange >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 600 }}>{netChange >= 0 ? '+' : ''}{netChange} units</Text> this week
+                </Text>
+                {stockRunway && (
+                  <div>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Stock runway: ~<Text strong>{stockRunway}</Text> days at current outflow
                     </Text>
-                  )}
-                </div>
-              )}
-            </div>
+                  </div>
+                )}
+              </div>
+            )}
           </Card>
         </Col>
         <Col xs={24} lg={10}>
