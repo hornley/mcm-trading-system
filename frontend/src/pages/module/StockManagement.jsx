@@ -34,6 +34,7 @@ const StockManagement = () => {
   const [reorderForm] = Form.useForm();
   const [adjustForm] = Form.useForm();
   const [transferForm] = Form.useForm();
+  const [restocking, setRestocking] = useState(false);
 
   const fetchData = async () => {
     if (!user) return;
@@ -197,6 +198,44 @@ const StockManagement = () => {
     }
   };
 
+  const handleBulkRestock = async () => {
+    if (!storehouse) {
+      message.warning('No storehouse configured. Mark a location as storehouse first.');
+      return;
+    }
+    if (selectedLocationId === "all") {
+      message.warning('Select a specific branch from the top bar to restock');
+      return;
+    }
+    setRestocking(true);
+    try {
+      const res = await fetch('/api/inventory/restock-below-reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          usertype: user.usertype,
+          user_id: user.user_id,
+          location_id: selectedLocationId,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        if (json.data.count > 0) {
+          message.success(`Restocked ${json.data.count} product(s) from ${storehouse.name}`);
+          fetchData();
+        } else {
+          message.info('No products below reorder level');
+        }
+      } else {
+        message.error(json.message);
+      }
+    } catch {
+      message.error('Failed to restock');
+    } finally {
+      setRestocking(false);
+    }
+  };
+
   const filteredData = inventory.filter((item) =>
     item.product_name?.toLowerCase().includes(searchText.toLowerCase())
   );
@@ -343,6 +382,11 @@ const StockManagement = () => {
               enterButton
               style={{ width: 220 }}
             />
+            {can('update') && storehouse && (
+              <Button type="primary" onClick={handleBulkRestock} loading={restocking} disabled={selectedLocationId === "all"}>
+                Restock Below Reorder
+              </Button>
+            )}
           </Space>
         </Col>
       </Row>
