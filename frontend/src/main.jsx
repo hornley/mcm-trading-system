@@ -1,14 +1,20 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { ConfigProvider, App as AntApp } from 'antd'
-import { AuthProvider } from './context/AuthContext.jsx'
+import { ConfigProvider, theme, App as AntApp } from 'antd'
+import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import './index.css'
 import App from './App.jsx'
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
+const fontSizeMap = { small: 12, medium: 14, large: 16 }
+
+const ThemedApp = () => {
+  const { theme: appTheme, fontSize } = useAuth()
+  const isDark = appTheme === 'dark'
+
+  return (
     <ConfigProvider
       theme={{
+        algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
           colorPrimary: '#5b7ff0',
           colorSuccess: '#52c41a',
@@ -16,12 +22,13 @@ createRoot(document.getElementById('root')).render(
           colorError: '#ff4d4f',
           borderRadius: 8,
           fontFamily: "'Roboto', sans-serif",
+          fontSize: fontSizeMap[fontSize] || 14,
         },
         components: {
           Layout: {
-            headerBg: '#ffffff',
+            headerBg: isDark ? '#141414' : '#ffffff',
             siderBg: '#001529',
-            bodyBg: '#f0f2f5',
+            bodyBg: isDark ? '#000000' : '#f0f2f5',
           },
           Card: {
             borderRadiusLG: 12,
@@ -37,10 +44,16 @@ createRoot(document.getElementById('root')).render(
       }}
     >
       <AntApp>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
+        <App />
       </AntApp>
     </ConfigProvider>
+  )
+}
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <AuthProvider>
+      <ThemedApp />
+    </AuthProvider>
   </StrictMode>,
 )
