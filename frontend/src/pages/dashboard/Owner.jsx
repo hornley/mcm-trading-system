@@ -98,7 +98,7 @@ const Owner = () => {
                       {stat.trend.direction === 'up' ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
                       {' '}{stat.trend.percent}%
                     </Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>vs yesterday</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>since last week</Text>
                   </Space>
                 )}
                 {stat.route && (
