@@ -27,7 +27,7 @@ const ThemedApp = () => {
         components: {
           Layout: {
             headerBg: isDark ? '#141414' : '#ffffff',
-            siderBg: '#001529',
+            siderBg: isDark ? '#001529' : '#ffffff',
             bodyBg: isDark ? '#000000' : '#f0f2f5',
           },
           Card: {
