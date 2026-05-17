@@ -59,6 +59,23 @@ def dashboard_summary():
             sales_query = sales_query.filter(Order.location_id == location_id)
         sales_today = sales_query.scalar()
 
+        transactions_today_query = db.session.query(func.count(Order.order_id)).filter(
+            Order.status == "completed",
+            func.date(Order.order_date) == today
+        )
+        if location_id:
+            transactions_today_query = transactions_today_query.filter(Order.location_id == location_id)
+        transactions_today = transactions_today_query.scalar()
+
+        month_start = today.replace(day=1)
+        month_sales_query = db.session.query(func.coalesce(func.sum(Order.total_amount), 0)).filter(
+            Order.status == "completed",
+            Order.order_date >= datetime.combine(month_start, datetime.min.time()),
+        )
+        if location_id:
+            month_sales_query = month_sales_query.filter(Order.location_id == location_id)
+        month_sales = month_sales_query.scalar()
+
         active_users = User.query.count()
 
         # ── Stock by Category (pie chart) ──
@@ -164,6 +181,8 @@ def dashboard_summary():
             "stats": {
                 "total_items": total_items,
                 "sales_today": sales_today,
+                "month_sales": month_sales,
+                "transactions_today": transactions_today,
                 "low_stock_count": low_stock_count,
                 "active_users": active_users,
             },

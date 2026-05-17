@@ -22,6 +22,7 @@ from routes.locations import locations_bp
 from routes.admin import admin_bp
 from routes.reports import reports_bp
 from routes.dashboard import dashboard_bp
+from routes.orders import orders_bp
 
 def create_app():
     app = Flask(__name__, static_folder=FRONTEND_DIST, static_url_path="")
@@ -37,6 +38,7 @@ def create_app():
     app.register_blueprint(admin_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(dashboard_bp)
+    app.register_blueprint(orders_bp)
 
     with app.app_context():
         from models import (

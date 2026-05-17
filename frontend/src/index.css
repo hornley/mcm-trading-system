@@ -46,3 +46,23 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+@media print {
+  body * { visibility: hidden; }
+  #receipt-content, #receipt-content * { visibility: visible; }
+  #receipt-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    padding: 8px;
+    font-size: 12px;
+  }
+  #receipt-content table { width: 100%; border-collapse: collapse; }
+  #receipt-content th, #receipt-content td {
+    padding: 4px 2px;
+    border-bottom: 1px dashed #ccc;
+  }
+  .ant-modal { display: none !important; }
+  .ant-btn { display: none !important; }
+}
