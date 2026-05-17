@@ -50,6 +50,9 @@ const Manager = () => {
   const branchName = user?.location_name || `Branch #${user?.location_id}`
 
   const netChange = stock_movement.reduce((sum, d) => sum + (d.in || 0) - (d.out || 0), 0)
+  const totalOut = stock_movement.reduce((sum, d) => sum + (d.out || 0), 0)
+  const avgDailyOut = totalOut / 7
+  const stockRunway = avgDailyOut > 0 ? Math.round(stats.total_items / avgDailyOut) : null
   const totalAcrossCategories = stock_by_category.reduce((sum, c) => sum + c.value, 0)
   const sparkData = stock_movement.map((d) => ({ day: d.day, net: (d.in || 0) - (d.out || 0) }))
   const chartData = stock_movement.map((d, i, arr) => ({
@@ -190,9 +193,18 @@ const Manager = () => {
               </ComposedChart>
             </ResponsiveContainer>
             {stock_movement.length > 0 && (
-              <Text style={{ display: 'block', textAlign: 'right', marginTop: 8, fontSize: 13 }}>
-                Net change: <Text style={{ color: netChange >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 600 }}>{netChange >= 0 ? '+' : ''}{netChange} units</Text> this week
-              </Text>
+              <div style={{ textAlign: 'right', marginTop: 8 }}>
+                <Text style={{ fontSize: 13 }}>
+                  Net change: <Text style={{ color: netChange >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 600 }}>{netChange >= 0 ? '+' : ''}{netChange} units</Text> this week
+                </Text>
+                {stockRunway && (
+                  <div>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Stock runway: ~<Text strong>{stockRunway}</Text> days at current outflow
+                    </Text>
+                  </div>
+                )}
+              </div>
             )}
           </Card>
         </Col>
