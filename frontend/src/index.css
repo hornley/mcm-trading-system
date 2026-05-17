@@ -19,12 +19,12 @@
 }
 
 .low-stock-warn {
-  background-color: #fff7e6;
+  background-color: rgba(250, 140, 22, 0.08) !important;
 }
 
 .voided-row {
   opacity: 0.6;
-  background-color: #fff1f0;
+  background-color: rgba(255, 77, 79, 0.06) !important;
 }
 
 .page-enter {
