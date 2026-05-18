@@ -82,23 +82,23 @@ const Reports = () => {
   const fetchInventory = async () => {
     setLoading((prev) => ({ ...prev, inventory: true }));
     try {
-      const params = { location_id: selectedLocationId !== 'all' ? selectedLocationId : 'all' };
-      const [summaryRes, lowStockRes] = await Promise.all([
-        fetch(`/api/reports/inventory/summary?${mkParams(params)}`),
-        fetch(`/api/reports/inventory/low-stock?${mkParams({ location_id: params.location_id })}`),
+      const locationParam = selectedLocationId !== 'all' ? selectedLocationId : 'all';
+
+      const [statsRes, allBranchesRes, lowStockRes] = await Promise.all([
+        fetch(`/api/reports/inventory/summary?${mkParams({ location_id: locationParam })}`),
+        fetch(`/api/reports/inventory/summary?${mkParams({ location_id: 'all' })}`),
+        fetch(`/api/reports/inventory/low-stock?${mkParams({ location_id: locationParam })}`),
       ]);
-      const summary = await summaryRes.json();
+      const stats = await statsRes.json();
+      const allBranches = await allBranchesRes.json();
       const lowStock = await lowStockRes.json();
-      if (summary.success) {
-        const data = summary.data;
+
+      if (stats.success && allBranches.success) {
         setInventorySummary({
-          stats: data.stats || {},
-          by_branch: data.rows || [],
+          stats: stats.data?.stats || {},
+          by_branch: allBranches.data?.rows || [],
           low_stock: lowStock.success ? (lowStock.data?.rows || []) : [],
-          distribution: (data.rows || []).map((r) => ({
-            location_name: r.location_name,
-            total_quantity: Math.floor(r.total_quantity),
-          })),
+          distribution: allBranches.data?.rows || [],
         });
       }
     } catch {
