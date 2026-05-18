@@ -398,7 +398,7 @@ const Inventory = () => {
             </Radio.Group>
           </Form.Item>
           <Form.Item name="quantity" label={`Quantity (${adjustProduct?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} rules={[{ required: true, message: 'Please enter quantity' }]}>
-            <InputNumber min={0.01} step={adjustProduct?.category === FABRIC_CATEGORY ? 0.01 : 1} style={{ width: '100%' }} placeholder="Enter quantity" />
+            <InputNumber min={adjustProduct?.category === FABRIC_CATEGORY ? 0.125 : 1} step={adjustProduct?.category === FABRIC_CATEGORY ? 0.125 : 1} style={{ width: '100%' }} placeholder="Enter quantity" />
           </Form.Item>
           <Form.Item name="reason" label="Reason">
             <Input placeholder="e.g. New shipment, Damaged goods" />

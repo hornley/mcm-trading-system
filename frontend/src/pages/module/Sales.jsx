@@ -537,7 +537,11 @@ const Sales = () => {
                     placeholder="Search product"
                     optionFilterProp="children"
                     value={selectedProductId}
-                    onChange={setSelectedProductId}
+                    onChange={(id) => {
+                      setSelectedProductId(id);
+                      const p = products.find(p => p.product_id === id);
+                      if (p?.category !== FABRIC_CATEGORY) setCartQuantity(1);
+                    }}
                   >
                     {products
                       .filter((p) => p.is_active !== false)
@@ -553,13 +557,36 @@ const Sales = () => {
                   </Select>
                 </Col>
                 <Col>
-                  <InputNumber
-                    min={0.01}
-                    step={products.find(p => p.product_id === selectedProductId)?.category === FABRIC_CATEGORY ? 0.01 : 1}
-                    value={cartQuantity}
-                    onChange={setCartQuantity}
-                    style={{ width: 80 }}
-                  />
+                  {(() => {
+                    const sp = products.find(p => p.product_id === selectedProductId);
+                    const isFab = sp?.category === FABRIC_CATEGORY;
+                    return (
+                      <>
+                        <InputNumber
+                          min={isFab ? 0.125 : 1}
+                          step={isFab ? 0.125 : 1}
+                          value={cartQuantity}
+                          onChange={(v) => setCartQuantity(v)}
+                          style={{ width: 80 }}
+                        />
+                        {isFab && (
+                          <Space.Compact style={{ display: 'flex', marginTop: 4 }}>
+                            {[0.125, 0.25, 0.5, 0.75, 1].map((v) => (
+                              <Button
+                                key={v}
+                                size="small"
+                                type={cartQuantity === v ? 'primary' : 'default'}
+                                onClick={() => setCartQuantity(v)}
+                                style={{ flex: 1, fontSize: 11, padding: '0 2px' }}
+                              >
+                                {v === 0.125 ? '⅛' : v === 0.25 ? '¼' : v === 0.5 ? '½' : v === 0.75 ? '¾' : '1'}
+                              </Button>
+                            ))}
+                          </Space.Compact>
+                        )}
+                      </>
+                    );
+                  })()}
                 </Col>
                 <Col>
                   <Button type="primary" icon={<PlusOutlined />} disabled={!canAddToCart} onClick={handleAddToCart}>

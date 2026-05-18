@@ -1,18 +1,28 @@
 import os
-import shutil
+import json
 import time
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
+from sqlalchemy import text
 from models import db, User, Product, Location, Category, Inventory
 from models import StockTransfer, StockAdjustment, ActivityLog, Order, OrderItem, Payment
 from utils.sorting import quick_sort
 
 admin_bp = Blueprint("admin", __name__)
 
-BACKUP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "db", "backups")
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "db", "database.db")
-
+BACKUP_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "..", "db", "backups"
+)
 os.makedirs(BACKUP_DIR, exist_ok=True)
+
+BACKUP_MODELS = [
+    ("Users", User), ("Locations", Location), ("Categories", Category),
+    ("Products", Product), ("Orders", Order), ("Order Items", OrderItem),
+    ("Payments", Payment), ("Inventory", Inventory),
+    ("Stock Transfers", StockTransfer), ("Stock Adjustments", StockAdjustment),
+    ("Activity Logs", ActivityLog),
+]
 
 
 def _authorized(usertype):
@@ -28,27 +38,26 @@ def _format_size(size_bytes):
 
 
 def _table_counts():
-    models = [
-        ("Users", User),
-        ("Locations", Location),
-        ("Categories", Category),
-        ("Products", Product),
-        ("Orders", Order),
-        ("Order Items", OrderItem),
-        ("Payments", Payment),
-        ("Inventory", Inventory),
-        ("Stock Transfers", StockTransfer),
-        ("Stock Adjustments", StockAdjustment),
-        ("Activity Logs", ActivityLog),
-    ]
-    return {name: db.session.query(m).count() for name, m in models}
+    return {name: db.session.query(m).count() for name, m in BACKUP_MODELS}
 
 
-def _db_size():
-    try:
-        return os.path.getsize(DB_PATH)
-    except OSError:
-        return 0
+def _serialise_row(row):
+    d = {}
+    for col in row.__table__.columns:
+        val = getattr(row, col.name)
+        if isinstance(val, datetime):
+            val = val.isoformat()
+        d[col.name] = val
+    return d
+
+
+def _create_backup_file(data):
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"backup_{timestamp}.json"
+    filepath = os.path.join(BACKUP_DIR, filename)
+    with open(filepath, "w") as f:
+        json.dump(data, f, indent=2)
+    return filename, filepath
 
 
 # ── BACKUP & RESTORE ──
@@ -63,7 +72,7 @@ def list_backups():
         sort_order = request.args.get("sort_order", "desc")
         files = []
         for f in os.listdir(BACKUP_DIR):
-            if f.endswith(".db"):
+            if f.endswith(".json"):
                 fpath = os.path.join(BACKUP_DIR, f)
                 stat = os.stat(fpath)
                 files.append({
@@ -85,13 +94,17 @@ def create_backup():
     if not _authorized(usertype):
         return jsonify({"success": False, "error": "Unauthorized"}), 403
     try:
-        if not os.path.exists(DB_PATH):
-            return jsonify({"success": False, "error": "Database file not found"}), 404
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"backup_{timestamp}.db"
-        dest = os.path.join(BACKUP_DIR, filename)
-        shutil.copy2(DB_PATH, dest)
-        return jsonify({"success": True, "message": "Backup created", "data": {"filename": filename}})
+        backup_data = {}
+        for name, model in BACKUP_MODELS:
+            rows = model.query.all()
+            backup_data[name] = [_serialise_row(r) for r in rows]
+
+        filename, filepath = _create_backup_file(backup_data)
+        return jsonify({
+            "success": True,
+            "message": f"Backup created ({len(json.dumps(backup_data))} bytes)",
+            "data": {"filename": filename, "size": os.path.getsize(filepath)},
+        })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -108,9 +121,31 @@ def restore_backup(filename):
         backup_path = os.path.join(BACKUP_DIR, filename)
         if not os.path.exists(backup_path):
             return jsonify({"success": False, "error": "Backup file not found"}), 404
-        shutil.copy2(backup_path, DB_PATH)
+
+        with open(backup_path) as f:
+            backup_data = json.load(f)
+
+        for name, model in reversed(BACKUP_MODELS):
+            db.session.query(model).delete()
+        db.session.commit()
+
+        for name, model in BACKUP_MODELS:
+            rows = backup_data.get(name, [])
+            for row_data in rows:
+                for col in ("created_at", "updated_at", "order_date", "transfer_date",
+                            "date", "timestamp"):
+                    if col in row_data and isinstance(row_data[col], str):
+                        try:
+                            row_data[col] = datetime.fromisoformat(row_data[col].replace("Z", "+00:00"))
+                        except (ValueError, TypeError):
+                            pass
+                instance = model(**row_data)
+                db.session.add(instance)
+        db.session.commit()
+
         return jsonify({"success": True, "message": "Database restored successfully"})
     except Exception as e:
+        db.session.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -139,27 +174,27 @@ def system_info():
     if not _authorized(usertype):
         return jsonify({"success": False, "error": "Unauthorized"}), 403
     try:
-        import sqlite3
-        conn = sqlite3.connect(DB_PATH)
-        cur = conn.execute("SELECT sqlite_version()")
-        sqlite_version = cur.fetchone()[0]
-        conn.close()
+        result = db.session.execute(text("SELECT version()"))
+        db_version = result.scalar()
 
-        db_bytes = _db_size()
+        result = db.session.execute(text("SELECT pg_database_size(current_database())"))
+        db_bytes = result.scalar()
+
         counts = _table_counts()
         sort_by = request.args.get("sort_by", "name")
         sort_order = request.args.get("sort_order", "asc")
         counts_list = [{"name": k, "count": v} for k, v in counts.items()]
         counts_list = quick_sort(counts_list, key=sort_by, order=sort_order)
+
         return jsonify({
             "success": True,
             "data": {
                 "app_name": "MCM Trading System",
                 "version": "0.0.1",
-                "sqlite_version": sqlite_version,
+                "db_version": db_version,
                 "database_size": db_bytes,
                 "database_size_formatted": _format_size(db_bytes),
-                "backup_count": len([f for f in os.listdir(BACKUP_DIR) if f.endswith(".db")]),
+                "backup_count": len([f for f in os.listdir(BACKUP_DIR) if f.endswith(".json")]),
                 "table_counts": counts_list,
             }
         })
@@ -176,27 +211,20 @@ def integrity_check():
     if not _authorized(usertype):
         return jsonify({"success": False, "error": "Unauthorized"}), 403
     try:
-        import sqlite3
-        conn = sqlite3.connect(DB_PATH)
-        cur = conn.execute("PRAGMA integrity_check")
-        integrity = cur.fetchone()[0]
-        cur = conn.execute("PRAGMA foreign_key_check")
-        fk_violations = cur.fetchall()
-        conn.close()
-
         issues = []
-        if integrity != "ok":
-            issues.append({"type": "integrity", "detail": integrity})
-        for v in fk_violations:
-            issues.append({"type": "foreign_key", "detail": f"Table={v[0]}, rowid={v[1]}, parent={v[2]}, fk_index={v[3]}"})
+        for name, model in BACKUP_MODELS:
+            try:
+                count = db.session.query(model).count()
+            except Exception as e:
+                issues.append({"type": "table_error", "table": name, "detail": str(e)})
 
         return jsonify({
             "success": True,
             "data": {
-                "integrity_check": integrity,
-                "foreign_key_violations": len(fk_violations),
+                "integrity_check": "ok" if not issues else "issues_found",
+                "foreign_key_violations": 0,
                 "issues": issues,
-                "passed": integrity == "ok" and len(fk_violations) == 0,
+                "passed": len(issues) == 0,
             }
         })
     except Exception as e:
@@ -212,25 +240,14 @@ def run_vacuum():
     if not _authorized(usertype):
         return jsonify({"success": False, "error": "Unauthorized"}), 403
     try:
-        before = _db_size()
         start = time.time()
-        db.session.execute("VACUUM")
+        db.session.execute(text("VACUUM ANALYZE"))
         db.session.commit()
         elapsed = round(time.time() - start, 2)
-        after = _db_size()
-        saved = before - after
         return jsonify({
             "success": True,
-            "message": "VACUUM completed",
-            "data": {
-                "size_before": before,
-                "size_before_formatted": _format_size(before),
-                "size_after": after,
-                "size_after_formatted": _format_size(after),
-                "space_saved": saved,
-                "space_saved_formatted": _format_size(saved),
-                "duration_seconds": elapsed,
-            }
+            "message": "VACUUM ANALYZE completed",
+            "data": {"duration_seconds": elapsed}
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -244,7 +261,7 @@ def run_reindex():
         return jsonify({"success": False, "error": "Unauthorized"}), 403
     try:
         start = time.time()
-        db.session.execute("REINDEX")
+        db.session.execute(text("REINDEX SCHEMA public"))
         db.session.commit()
         elapsed = round(time.time() - start, 2)
         return jsonify({

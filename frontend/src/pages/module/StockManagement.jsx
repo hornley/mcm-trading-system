@@ -557,7 +557,7 @@ const StockManagement = () => {
             </Form.Item>
           )}
           <Form.Item name="quantity" label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} rules={[{ required: true, message: 'Please enter quantity' }]}>
-            <InputNumber min={0.01} step={selectedRecord?.category === FABRIC_CATEGORY ? 0.01 : 1} style={{ width: '100%' }} placeholder="Enter quantity" />
+            <InputNumber min={selectedRecord?.category === FABRIC_CATEGORY ? 0.125 : 1} step={selectedRecord?.category === FABRIC_CATEGORY ? 0.125 : 1} style={{ width: '100%' }} placeholder="Enter quantity" />
           </Form.Item>
           {!requestPreset && (
             <Form.Item name="reason" label="Reason" rules={[{ required: true, message: 'Please select a reason' }]}>
@@ -599,7 +599,7 @@ const StockManagement = () => {
             </Select>
           </Form.Item>
           <Form.Item name="quantity" label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} rules={[{ required: true, message: 'Please enter quantity' }]}>
-            <InputNumber min={0.01} max={selectedRecord?.quantity || 1} step={selectedRecord?.category === FABRIC_CATEGORY ? 0.01 : 1} style={{ width: '100%' }} placeholder="Enter quantity" />
+            <InputNumber min={selectedRecord?.category === FABRIC_CATEGORY ? 0.125 : 1} max={selectedRecord?.quantity || 1} step={selectedRecord?.category === FABRIC_CATEGORY ? 0.125 : 1} style={{ width: '100%' }} placeholder="Enter quantity" />
           </Form.Item>
           <Typography.Text type="secondary" style={{ fontSize: 12, marginTop: -16, marginBottom: 16, display: 'block' }}>
             Available: {fmtQty(selectedRecord?.quantity, selectedRecord?.category === FABRIC_CATEGORY)} {selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'}
