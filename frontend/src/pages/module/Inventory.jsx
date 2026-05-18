@@ -5,7 +5,6 @@ import {
 } from 'antd';
 import { useAuth } from '../../context/AuthContext.jsx';
 
-const { Title } = Typography;
 const { Search } = Input;
 const { TextArea } = Input;
 
@@ -317,7 +316,6 @@ const Inventory = () => {
 
   return (
     <div>
-      <Title level={4} style={{ marginBottom: 16 }}>Inventory</Title>
       <Card styles={{ body: { padding: '16px 24px' } }}>
         <Tabs items={items} />
       </Card>

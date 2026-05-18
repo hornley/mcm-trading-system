@@ -6,7 +6,6 @@ import {
 } from 'antd';
 import { useAuth } from '../../context/AuthContext.jsx';
 
-const { Title } = Typography;
 const { Search, TextArea } = Input;
 
 const getStockStatus = (qty) => {
@@ -38,7 +37,7 @@ const StockManagement = () => {
   const [restocking, setRestocking] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [pageSize] = useState(20);
+  const [pageSize] = useState(10);
   const [movementsCache, setMovementsCache] = useState({});
   const [stats, setStats] = useState({ total_items: 0, low_stock_count: 0, out_of_stock_count: 0 });
   const [sortBy, setSortBy] = useState('product_name');
@@ -390,7 +389,6 @@ const StockManagement = () => {
 
   return (
     <div>
-      <Title level={4} style={{ marginBottom: 16 }}>Stock Management</Title>
       <Card styles={{ body: { padding: '16px 24px' } }}>
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col xs={24} sm={8}>

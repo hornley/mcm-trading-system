@@ -11,7 +11,7 @@ import {
 import { useAuth } from '../../context/AuthContext.jsx';
 import dayjs from 'dayjs';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
 const PAYMENT_METHODS = ['Cash', 'Card', 'GCash', 'Bank Transfer'];
@@ -29,7 +29,7 @@ const Sales = () => {
   const [submitting, setSubmitting] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize] = useState(10);
   const [dashboardStats, setDashboardStats] = useState({ sales_today: 0, month_sales: 0, transactions_today: 0 });
   const [allSalesFull, setAllSalesFull] = useState([]);
 
@@ -427,9 +427,6 @@ const Sales = () => {
 
   return (
     <div>
-      <Title level={4} style={{ marginBottom: 16 }}>Sales</Title>
-      <Text type="secondary" style={{ marginBottom: 24, display: 'block' }}>Branch: {branchName}</Text>
-
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={8}>
           <Card>
@@ -501,7 +498,6 @@ const Sales = () => {
         }, showExpandColumn: false }}
         rowClassName={(record) => isVoided(record) ? 'voided-row' : ''}
         pagination={{ current: currentPage, pageSize, total: totalCount, showSizeChanger: false, onChange: (p) => fetchSales(p) }}
-        scroll={{ y: 400 }}
       />
 
       <Modal
