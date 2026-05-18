@@ -68,7 +68,7 @@ const Sales = () => {
   const userId = user?.user_id;
   const locationId = isManager ? user?.location_id : undefined;
 
-  const apiParams = `usertype=${usertype}&user_id=${userId}` + (locationId ? `&location_id=${locationId}` : '');
+  const apiParams = `usertype=${usertype}&user_id=${userId}` + (selectedLocationId && selectedLocationId !== 'all' ? `&location_id=${selectedLocationId}` : '');
 
   const fetchSales = async (page) => {
     setLoading(true);
@@ -79,7 +79,6 @@ const Sales = () => {
       if (dateRange && dateRange[0]) url += `&date_from=${dateRange[0].toISOString()}`;
       if (dateRange && dateRange[1]) url += `&date_to=${dateRange[1].toISOString()}`;
       if (searchText) url += `&q=${searchText}`;
-      if (selectedLocationId && selectedLocationId !== 'all') url += `&location_id=${selectedLocationId}`;
       const res = await fetch(url);
       const json = await res.json();
       if (json.success) {
@@ -421,7 +420,7 @@ const Sales = () => {
       (order.items || []).forEach((item) => {
         const key = item.product_name;
         if (!grouped[key]) grouped[key] = { product_name: item.product_name, total_qty: 0, total_amount: 0, is_fabric: item.category === FABRIC_CATEGORY };
-        grouped[key].total_qty += item.quantity;
+        grouped[key].total_qty += Math.floor(item.quantity);
         grouped[key].total_amount += item.line_total;
       });
     });
@@ -446,7 +445,7 @@ const Sales = () => {
     },
     {
       title: 'Total Quantity Sold', dataIndex: 'total_qty', key: 'total_qty',
-      render: (qty, r) => fmtQty(qty, r.is_fabric),
+      render: (qty) => Math.floor(qty).toLocaleString(),
       sorter: (a, b) => a.total_qty - b.total_qty,
     },
     {
@@ -711,7 +710,7 @@ const Sales = () => {
         title="Receipt"
         open={receiptModalVisible}
         onCancel={() => setReceiptModalVisible(false)}
-        width={420}
+        width={520}
         footer={[
           <Button key="print" type="primary" icon={<PrinterOutlined />}
             onClick={() => window.print()}>
@@ -724,16 +723,16 @@ const Sales = () => {
         {lastOrder && (
           <div id="receipt-content">
             <div style={{ textAlign: 'center', marginBottom: 16 }}>
-              <Text strong style={{ fontSize: 16 }}>MCM Trading System</Text>
+              <Text strong style={{ fontSize: 18 }}>MCM Trading System</Text>
               <br />
-              <Text>{lastOrder.location_name || branchName}</Text>
+              <Text style={{ fontSize: 14 }}>{lastOrder.location_name || branchName}</Text>
               <br />
-              <Text type="secondary">Transaction #{lastOrder.order_id}</Text>
+              <Text type="secondary" style={{ fontSize: 13 }}>Transaction #{lastOrder.order_id}</Text>
               <br />
-              <Text type="secondary">{dayjs(lastOrder.order_date).format('YYYY-MM-DD hh:mm A')}</Text>
+              <Text type="secondary" style={{ fontSize: 13 }}>{dayjs(lastOrder.order_date).format('YYYY-MM-DD hh:mm A')}</Text>
             </div>
             <Divider style={{ margin: '8px 0' }} />
-            <table style={{ width: '100%', fontSize: 13 }}>
+            <table style={{ width: '100%', fontSize: 15 }}>
               <thead>
                 <tr>
                   <th style={{ textAlign: 'left' }}>Item</th>
@@ -746,44 +745,44 @@ const Sales = () => {
                 {(lastOrder.items || []).map((item) => (
                   <tr key={item.order_item_id}>
                     <td>{item.product_name}</td>
-                    <td style={{ textAlign: 'center' }}>{Number(item.quantity).toFixed(item.category === FABRIC_CATEGORY ? 2 : 0)}</td>
+                    <td style={{ textAlign: 'center' }}>{fmtQty(item.quantity, item.category === FABRIC_CATEGORY)}</td>
                     <td style={{ textAlign: 'right' }}>₱{item.price}</td>
                     <td style={{ textAlign: 'right' }}>₱{(item.line_total || (item.quantity * item.price)).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <Divider style={{ margin: '8px 0' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Text strong>Total:</Text>
-              <Text strong>₱{lastOrder.total_amount?.toLocaleString() || 0}</Text>
+            <Divider style={{ margin: '12px 0' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16 }}>
+              <Text strong style={{ fontSize: 16 }}>Total:</Text>
+              <Text strong style={{ fontSize: 16 }}>₱{lastOrder.total_amount?.toLocaleString() || 0}</Text>
             </div>
             {(lastOrder.payments || []).map((pmt) => (
               <div key={pmt.payment_id}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Text>Payment ({pmt.payment_method}):</Text>
-                  <Text>₱{pmt.price?.toLocaleString() || 0}</Text>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginTop: 4 }}>
+                  <Text style={{ fontSize: 14 }}>Payment ({pmt.payment_method}):</Text>
+                  <Text style={{ fontSize: 14 }}>₱{pmt.price?.toLocaleString() || 0}</Text>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Text>Change:</Text>
-                  <Text style={{ color: '#52c41a' }}>₱{Math.max(0, (pmt.price || 0) - (lastOrder.total_amount || 0)).toLocaleString()}</Text>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                  <Text style={{ fontSize: 14 }}>Change:</Text>
+                  <Text style={{ color: '#52c41a', fontSize: 14 }}>₱{Math.max(0, (pmt.price || 0) - (lastOrder.total_amount || 0)).toLocaleString()}</Text>
                 </div>
               </div>
             ))}
             {(lastOrder.auto_restocks || []).length > 0 && (
               <>
-                <Divider style={{ margin: '8px 0' }} />
-                <div style={{ fontSize: 11, color: '#52c41a' }}>
-                  <Text type="secondary" style={{ fontSize: 11 }}>Auto-Restock Triggered:</Text>
+                <Divider style={{ margin: '12px 0' }} />
+                <div style={{ fontSize: 13, color: '#52c41a' }}>
+                  <Text type="secondary" style={{ fontSize: 13 }}>Auto-Restock Triggered:</Text>
                   {lastOrder.auto_restocks.map((r, i) => (
-                    <div key={i}>{r.product_name}: +{qtyLabel(r.quantity)} from {r.from_location}</div>
+                    <div key={i} style={{ fontSize: 13 }}>{r.product_name}: +{qtyLabel(r.quantity)} from {r.from_location}</div>
                   ))}
                 </div>
               </>
             )}
-            <Divider style={{ margin: '8px 0' }} />
+            <Divider style={{ margin: '12px 0' }} />
             <div style={{ textAlign: 'center', marginTop: 8 }}>
-              <Text type="secondary" style={{ fontSize: 11 }}>Thank you for your purchase!</Text>
+              <Text type="secondary" style={{ fontSize: 14 }}>Thank you for your purchase!</Text>
             </div>
           </div>
         )}

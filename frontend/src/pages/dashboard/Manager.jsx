@@ -10,7 +10,7 @@ import {
 } from 'recharts'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useNavigate } from 'react-router-dom'
-import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js'
+import { FABRIC_CATEGORY, fmtQty, qtyLabel } from '../../utils/format.js'
 
 const { Title, Text } = Typography
 const COLORS = ['#5b7ff0', '#fa8c16']
@@ -40,7 +40,17 @@ const Manager = () => {
     const params = new URLSearchParams({ usertype: user?.usertype, user_id: user?.user_id, location_id: selectedLocationId })
     fetch(`/api/dashboard/summary?${params}`)
       .then((res) => res.json())
-      .then((res) => { if (res.success) { setData(res.data); setLastUpdated(new Date().toLocaleTimeString()) } })
+      .then((res) => {
+        if (res.success) {
+          const d = res.data;
+          if (d.stock_by_category) {
+            d.stock_by_category = d.stock_by_category.map((c) => ({ ...c, value: Math.floor(c.value) }));
+          }
+          if (d.stats) d.stats.total_items = Math.floor(d.stats.total_items);
+          setData(d);
+          setLastUpdated(new Date().toLocaleTimeString());
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }
@@ -50,11 +60,11 @@ const Manager = () => {
   const { stats, stock_by_category, stock_movement, recent_transactions, low_stock_items } = data
   const branchName = user?.location_name || `Branch #${user?.location_id}`
 
-  const netChange = stock_movement.reduce((sum, d) => sum + (d.in || 0) - (d.out || 0), 0)
-  const totalOut = stock_movement.reduce((sum, d) => sum + (d.out || 0), 0)
+  const netChange = Math.floor(stock_movement.reduce((sum, d) => sum + (d.in || 0) - (d.out || 0), 0))
+  const totalOut = Math.floor(stock_movement.reduce((sum, d) => sum + (d.out || 0), 0))
   const avgDailyOut = totalOut / 7
   const stockRunway = avgDailyOut > 0 ? Math.round(stats.total_items / avgDailyOut) : null
-  const totalAcrossCategories = stock_by_category.reduce((sum, c) => sum + c.value, 0)
+  const totalAcrossCategories = Math.floor(stock_by_category.reduce((sum, c) => sum + c.value, 0))
   const chartData = stock_movement.map((d, i, arr) => ({
     ...d,
     ma3: i >= 2 ? Math.round((arr[i - 2].in + arr[i - 1].in + arr[i].in) / 3) : null,
@@ -237,7 +247,7 @@ const Manager = () => {
               dataSource={recent_transactions}
               columns={[
                 { title: 'Product', dataIndex: 'product', key: 'product' },
-                { title: 'Quantity', dataIndex: 'quantity', key: 'quantity' },
+                { title: 'Quantity', dataIndex: 'quantity', key: 'quantity', render: (qty) => qtyLabel(qty) },
                 { title: 'Amount', dataIndex: 'amount', key: 'amount' },
                 { title: 'Date', dataIndex: 'date', key: 'date' },
               ]}
