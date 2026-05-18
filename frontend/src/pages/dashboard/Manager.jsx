@@ -10,18 +10,9 @@ import {
 } from 'recharts'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useNavigate } from 'react-router-dom'
+import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js'
 
 const { Title, Text } = Typography
-const FABRIC_CATEGORY = 'Fabrics'
-
-const fmtQty = (qty, isFabric) => {
-  if (qty == null) return '0';
-  if (isFabric) {
-    const n = Number(qty);
-    return n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
-  }
-  return Number(qty).toLocaleString();
-};
 const COLORS = ['#5b7ff0', '#fa8c16']
 
 const computeTrend = (current) => {
