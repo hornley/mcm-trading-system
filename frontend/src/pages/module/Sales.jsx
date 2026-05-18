@@ -21,7 +21,7 @@ const STEP_QTY = 0.25;
 const MIN_QTY = 0.5;
 
 const Sales = () => {
-  const { user } = useAuth();
+  const { user, selectedLocationId } = useAuth();
   const branchName = user?.location_name || 'Main Store';
   const isOwner = user?.role === 'owner';
   const isManager = user?.role === 'manager';
@@ -77,6 +77,7 @@ const Sales = () => {
       if (dateRange && dateRange[0]) url += `&date_from=${dateRange[0].toISOString()}`;
       if (dateRange && dateRange[1]) url += `&date_to=${dateRange[1].toISOString()}`;
       if (searchText) url += `&q=${searchText}`;
+      if (selectedLocationId && selectedLocationId !== 'all') url += `&location_id=${selectedLocationId}`;
       const res = await fetch(url);
       const json = await res.json();
       if (json.success) {
@@ -136,7 +137,7 @@ const Sales = () => {
     } catch (e) { /* ignore */ }
   };
 
-  useEffect(() => { fetchSales(1); fetchDashboardStats(); }, [searchText, dateRange, statusFilter]);
+  useEffect(() => { fetchSales(1); fetchDashboardStats(); }, [searchText, dateRange, statusFilter, selectedLocationId]);
   useEffect(() => { fetchProducts(); fetchLocations(); }, []);
 
   const grandTotal = useMemo(() =>
