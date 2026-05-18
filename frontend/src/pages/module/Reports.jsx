@@ -51,6 +51,7 @@ const Reports = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productsList, setProductsList] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [distributionData, setDistributionData] = useState([]);
 
   const mkParams = (extra) => {
     const p = new URLSearchParams({ usertype: user?.usertype });
@@ -80,10 +81,8 @@ const Reports = () => {
   const fetchInventory = async () => {
     setLoading((prev) => ({ ...prev, inventory: true }));
     try {
-      const params = { location_id: 'all' };
-      if (selectedProduct) params.product_id = selectedProduct;
       const [summaryRes, lowStockRes] = await Promise.all([
-        fetch(`/api/reports/inventory/summary?${mkParams(params)}`),
+        fetch(`/api/reports/inventory/summary?${mkParams({ location_id: 'all' })}`),
         fetch(`/api/reports/inventory/low-stock?${mkParams()}`),
       ]);
       const summary = await summaryRes.json();
@@ -104,6 +103,23 @@ const Reports = () => {
       message.error('Failed to load inventory reports');
     } finally {
       setLoading((prev) => ({ ...prev, inventory: false }));
+    }
+  };
+
+  const fetchDistribution = async () => {
+    try {
+      const params = { location_id: 'all' };
+      if (selectedProduct) params.product_id = selectedProduct;
+      const res = await fetch(`/api/reports/inventory/summary?${mkParams(params)}`);
+      const data = await res.json();
+      if (data.success) {
+        setDistributionData((data.data.rows || []).map((r) => ({
+          location_name: r.location_name,
+          total_quantity: Math.floor(r.total_quantity),
+        })));
+      }
+    } catch {
+      message.error('Failed to load distribution data');
     }
   };
 
@@ -192,15 +208,20 @@ const Reports = () => {
 
   useEffect(() => {
     fetchProducts();
-    if (activeTab === 'inventory') fetchInventory();
+    if (activeTab === 'inventory') {
+      fetchInventory();
+      fetchDistribution();
+    }
     else if (activeTab === 'sales') fetchSales();
     else if (activeTab === 'financial') fetchFinancial();
     else if (activeTab === 'activity') fetchActivity();
     else if (activeTab === 'system') fetchSystem();
-  }, []);
+  }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab === 'inventory') fetchInventory();
+    if (activeTab === 'inventory') {
+      fetchDistribution();
+    }
   }, [selectedProduct]);
 
   const isOwner = user?.role === 'owner';
@@ -310,7 +331,7 @@ const Reports = () => {
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={inventorySummary.distribution}
+                      data={distributionData}
                       dataKey="total_quantity"
                       nameKey="location_name"
                       cx="50%"
@@ -318,7 +339,7 @@ const Reports = () => {
                       outerRadius={100}
                       label
                     >
-                      {inventorySummary.distribution.map((_, idx) => (
+                      {distributionData.map((_, idx) => (
                         <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
                       ))}
                     </Pie>
