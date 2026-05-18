@@ -26,6 +26,19 @@ export const AuthProvider = ({children}) => {
       } else {
         setSelectedLocationId("all");
       }
+        fetch(`/api/settings?user_id=${userData.user_id}&usertype=${userData.usertype}`)
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.theme) {
+        localStorage.setItem('mcm_theme', data.theme);
+        setThemeState(data.theme);
+      }
+      if (data.fontsize) {
+        localStorage.setItem('mcm_fontsize', data.fontsize);
+        setFontSizeState(data.fontsize);
+      }
+    })
+    .catch(() => {});
     };
 
     const logout = () => {
