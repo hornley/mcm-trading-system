@@ -549,7 +549,7 @@ const Sales = () => {
                     showSearch
                     style={{ width: '100%' }}
                     placeholder="Search product"
-                    optionFilterProp="children"
+                    optionFilterProp="label"
                     value={selectedProductId}
                     onChange={(id) => {
                       setSelectedProductId(id);
@@ -562,7 +562,7 @@ const Sales = () => {
                       .slice()
                       .sort((a, b) => (b.quantity || 0) - (a.quantity || 0))
                       .map((p) => (
-                      <Select.Option key={p.product_id} value={p.product_id} disabled={!p.quantity}>
+                      <Select.Option key={p.product_id} value={p.product_id} disabled={!p.quantity} label={p.name}>
                         <span style={{ opacity: p.quantity ? 1 : 0.45 }}>
                           {p.name} — ₱{p.price} (stock: {fmtQty(p.quantity, p.category === FABRIC_CATEGORY)})
                         </span>
@@ -741,7 +741,7 @@ const Sales = () => {
                 {(lastOrder.items || []).map((item) => (
                   <tr key={item.order_item_id}>
                     <td>{item.product_name}</td>
-                    <td style={{ textAlign: 'center' }}>{fmtQty(item.quantity, item.product?.category === FABRIC_CATEGORY)}</td>
+                    <td style={{ textAlign: 'center' }}>{fmtQty(item.quantity, item.category === FABRIC_CATEGORY)}</td>
                     <td style={{ textAlign: 'right' }}>₱{item.price}</td>
                     <td style={{ textAlign: 'right' }}>₱{(item.quantity * item.price).toLocaleString()}</td>
                   </tr>
