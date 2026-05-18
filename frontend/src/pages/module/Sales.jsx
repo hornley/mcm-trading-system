@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Row, Col, Card, Table, Tag, Typography, Input, Select, Button, Modal,
   Form, InputNumber, DatePicker, Descriptions, Popconfirm, Space, message,
@@ -25,6 +25,7 @@ const Sales = () => {
   const branchName = user?.location_name || 'Main Store';
   const isOwner = user?.role === 'owner';
   const isManager = user?.role === 'manager';
+  const defaultTotalBranch = isOwner || user?.role === 'admin' ? 'All' : branchName;
 
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
@@ -49,7 +50,8 @@ const Sales = () => {
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [totalSalesModalVisible, setTotalSalesModalVisible] = useState(false);
   const [totalSalesDateRange, setTotalSalesDateRange] = useState(null);
-  const [totalSalesBranch, setTotalSalesBranch] = useState(branchName);
+  const [totalSalesBranch, setTotalSalesBranch] = useState(defaultTotalBranch);
+  const [totalSalesLoading, setTotalSalesLoading] = useState(false);
 
   const [cart, setCart] = useState([]);
   const [selectedProductId, setSelectedProductId] = useState(null);
@@ -139,6 +141,28 @@ const Sales = () => {
 
   useEffect(() => { fetchSales(1); fetchDashboardStats(); }, [searchText, dateRange, statusFilter, selectedLocationId]);
   useEffect(() => { fetchProducts(); fetchLocations(); }, []);
+
+  const fetchTotalSalesData = useCallback(async (branch, dateFrom, dateTo) => {
+    setTotalSalesLoading(true);
+    try {
+      const loc = branch && branch !== 'All' ? locations.find((l) => l.name === branch)?.location_id : undefined;
+      const params = new URLSearchParams({ usertype, user_id: userId, include_items: 'true', limit: '999' });
+      if (loc) params.set('location_id', loc);
+      if (dateFrom) params.set('date_from', dateFrom.toISOString());
+      if (dateTo) params.set('date_to', dateTo.toISOString());
+      const res = await fetch(`/api/orders?${params}`);
+      const json = await res.json();
+      if (json.success) setAllSalesFull(json.data.orders || []);
+    } catch { /* ignore */ }
+    finally { setTotalSalesLoading(false); }
+  }, [usertype, userId, locations]);
+
+  useEffect(() => {
+    if (totalSalesModalVisible) {
+      const [from, to] = totalSalesDateRange || [];
+      fetchTotalSalesData(totalSalesBranch, from, to);
+    }
+  }, [totalSalesModalVisible, totalSalesBranch, totalSalesDateRange]);
 
   const grandTotal = useMemo(() =>
     cart.reduce((sum, item) => sum + item.quantity * item.price, 0),
@@ -478,14 +502,11 @@ const Sales = () => {
         <Col xs={24} sm={12} md={8} style={{ textAlign: 'right' }}>
           <Space>
             {isManager && <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} disabled={productsLoading} loading={productsLoading}>Add Sale</Button>}
-            <Button onClick={async () => {
-              setTotalSalesBranch(branchName);
+            <Button onClick={() => {
+              const defaultBranch = isOwner || user?.role === 'admin' ? 'All' : branchName;
+              setTotalSalesBranch(defaultBranch);
+              setTotalSalesDateRange(null);
               setTotalSalesModalVisible(true);
-              try {
-                const res = await fetch(`/api/orders?${apiParams}&include_items=true&limit=999`);
-                const json = await res.json();
-                if (json.success) setAllSalesFull(json.data.orders || []);
-              } catch (e) { /* ignore */ }
             }}>View Total Sales</Button>
           </Space>
         </Col>
@@ -799,7 +820,9 @@ const Sales = () => {
             rowKey="product_name"
             pagination={false}
             size="small"
+            loading={totalSalesLoading}
             summary={totalSalesSummary}
+            locale={{ emptyText: totalSalesLoading ? 'Loading...' : 'No sales data' }}
           />
         </Space>
       </Modal>
