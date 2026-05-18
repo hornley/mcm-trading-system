@@ -7,18 +7,9 @@ import {
 } from 'recharts'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useNavigate } from 'react-router-dom'
+import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js'
 
 const { Title, Text } = Typography
-const FABRIC_CATEGORY = 'Fabrics'
-
-const fmtQty = (qty, isFabric) => {
-  if (qty == null) return '0';
-  if (isFabric) {
-    const n = Number(qty);
-    return n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
-  }
-  return Number(qty).toLocaleString();
-};
 const COLORS = ['#5b7ff0', '#aac4f5']
 
 const computeTrend = (current) => {
@@ -224,7 +215,7 @@ const Owner = () => {
               dataSource={recent_transactions}
               columns={[
                 { title: 'Product', dataIndex: 'product', key: 'product' },
-                { title: 'Qty', dataIndex: 'quantity', key: 'quantity' },
+                { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty) => fmtQty(qty, false) },
                 { title: 'Amount', dataIndex: 'amount', key: 'amount' },
                 { title: 'Branch', dataIndex: 'branch', key: 'branch' },
                 {

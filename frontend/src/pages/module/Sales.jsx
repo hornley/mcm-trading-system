@@ -15,30 +15,10 @@ const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
 const PAYMENT_METHODS = ['Cash', 'Card', 'GCash', 'Bank Transfer'];
-const FABRIC_CATEGORY = 'Fabrics';
-
-const qtyLabel = (qty) => {
-  if (qty == null) return '';
-  const n = Number(qty);
-  const whole = Math.floor(n);
-  const frac = Math.round((n - whole) * 100) / 100;
-  let fracStr = '';
-  if (Math.abs(frac - 0.5) < 0.001) fracStr = '½';
-  else if (Math.abs(frac - 0.25) < 0.001) fracStr = '¼';
-  else if (Math.abs(frac - 0.75) < 0.001) fracStr = '¾';
-  else if (frac > 0) fracStr = frac.toFixed(2);
-  if (whole === 0) return fracStr || n.toString();
-  return fracStr ? `${whole} ${fracStr}` : whole.toString();
-};
+import { FABRIC_CATEGORY, qtyLabel, fmtQty } from '../../utils/format.js';
 
 const STEP_QTY = 0.25;
 const MIN_QTY = 0.5;
-
-const fmtQty = (qty, isFabric) => {
-  if (qty == null) return '0';
-  if (isFabric) return qtyLabel(qty);
-  return Number(qty).toLocaleString();
-};
 
 const Sales = () => {
   const { user } = useAuth();
@@ -774,7 +754,7 @@ const Sales = () => {
                 <div style={{ fontSize: 11, color: '#52c41a' }}>
                   <Text type="secondary" style={{ fontSize: 11 }}>Auto-Restock Triggered:</Text>
                   {lastOrder.auto_restocks.map((r, i) => (
-                    <div key={i}>{r.product_name}: +{r.quantity} from {r.from_location}</div>
+                    <div key={i}>{r.product_name}: +{qtyLabel(r.quantity)} from {r.from_location}</div>
                   ))}
                 </div>
               </>
