@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Card, Typography, Row, Col, Table, Tabs, Statistic,
-  Select, Spin, Space, message, Divider,
+  Select, Spin, Space, message, Divider, Button,
 } from 'antd';
 import {
   PieChart, Pie, Cell, BarChart, Bar,
@@ -52,6 +52,7 @@ const Reports = () => {
   const [productsList, setProductsList] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [distributionData, setDistributionData] = useState([]);
+  const [stockLevelsView, setStockLevelsView] = useState('table');
 
   const mkParams = (extra) => {
     const p = new URLSearchParams({ usertype: user?.usertype });
@@ -297,14 +298,40 @@ const Reports = () => {
           </Row>
           <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
             <Col xs={24} lg={14}>
-              <Card title="Stock Levels by Branch">
-                <Table
-                  dataSource={inventorySummary.by_branch}
-                  columns={inventoryColsBranch}
-                  rowKey="branch"
-                  pagination={false}
-                  size="small"
-                />
+              <Card
+                title={
+                  <Space>
+                    <span>Stock Levels by Branch</span>
+                    <Button
+                      type="text"
+                      size="small"
+                      onClick={() => setStockLevelsView(stockLevelsView === 'table' ? 'chart' : 'table')}
+                    >
+                      {stockLevelsView === 'table' ? 'Chart' : 'Table'}
+                    </Button>
+                  </Space>
+                }
+              >
+                {stockLevelsView === 'table' ? (
+                  <Table
+                    dataSource={inventorySummary.by_branch}
+                    columns={inventoryColsBranch}
+                    rowKey="branch"
+                    pagination={false}
+                    size="small"
+                  />
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={inventorySummary.by_branch}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="location_name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="total_quantity" name="Total Quantity" fill="#1677ff" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </Card>
             </Col>
             <Col xs={24} lg={10}>
