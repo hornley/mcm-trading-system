@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react';
 import {
-  Card, Typography, Form, Input, Select, Button, message, Spin, Descriptions,
+  Row, Col, Card, Typography, Form, Input, Select, Button, message,
+  Spin, Descriptions, Menu,
 } from 'antd';
-import { UserOutlined, SettingOutlined, SaveOutlined } from '@ant-design/icons';
+import {
+  UserOutlined, SettingOutlined, SaveOutlined, LockOutlined,
+  BellOutlined,   BgColorsOutlined,
+} from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 const Settings = () => {
   const { user, setTheme, setFontSize } = useAuth();
+  const [activeTab, setActiveTab] = useState('account');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profileForm] = Form.useForm();
@@ -100,61 +105,100 @@ const Settings = () => {
 
   if (loading) return <Card style={{ textAlign: 'center' }}><Spin size="large" /></Card>;
 
+  const menuItems = [
+    { key: 'account', icon: <UserOutlined />, label: 'Account Information' },
+    { key: 'password', icon: <LockOutlined />, label: 'Change Password' },
+    { key: 'notifications', icon: <BellOutlined />, label: 'Notifications' },
+    { key: 'personalization', icon: <BgColorsOutlined />, label: 'Personalization' },
+  ];
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'account':
+        return (
+          <>
+            <Descriptions column={2} size="small" style={{ marginBottom: 16 }}>
+              <Descriptions.Item label="Username">{user?.username}</Descriptions.Item>
+              <Descriptions.Item label="Role">{user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}</Descriptions.Item>
+            </Descriptions>
+            <Form form={profileForm} layout="vertical" style={{ maxWidth: 400 }}>
+              <Form.Item name="email" label="Email" rules={[{ type: 'email', message: 'Enter a valid email' }]}>
+                <Input placeholder="your@email.com" />
+              </Form.Item>
+              <Form.Item name="phone" label="Phone">
+                <Input placeholder="Phone number" />
+              </Form.Item>
+              <Form.Item>
+                <Button type="primary" icon={<SaveOutlined />} onClick={handleProfileSave} loading={saving}>
+                  Save Profile
+                </Button>
+              </Form.Item>
+            </Form>
+          </>
+        );
+      case 'password':
+        return (
+          <div style={{ padding: 24, textAlign: 'center' }}>
+            <Text type="secondary">Change password functionality coming soon.</Text>
+          </div>
+        );
+      case 'notifications':
+        return (
+          <div style={{ padding: 24, textAlign: 'center' }}>
+            <Text type="secondary">Notification settings coming soon.</Text>
+          </div>
+        );
+      case 'personalization':
+        return (
+          <Form form={prefForm} layout="vertical" style={{ maxWidth: 400 }}>
+            <Form.Item name="theme" label="Theme">
+              <Select>
+                <Select.Option value="light">Light</Select.Option>
+                <Select.Option value="dark">Dark</Select.Option>
+              </Select>
+            </Form.Item>
+            <Form.Item name="fontsize" label="Font Size">
+              <Select>
+                <Select.Option value="small">Small</Select.Option>
+                <Select.Option value="medium">Medium</Select.Option>
+                <Select.Option value="large">Large</Select.Option>
+              </Select>
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" icon={<SaveOutlined />} onClick={handlePrefSave} loading={saving}>
+                Save Preferences
+              </Button>
+            </Form.Item>
+          </Form>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div>
       <Title level={4} style={{ marginBottom: 16 }}>
         <SettingOutlined /> Settings
       </Title>
-
-      <Card
-        title={<span><UserOutlined /> Profile</span>}
-        style={{ marginBottom: 16 }}
-        size="small"
-      >
-        <Descriptions column={2} size="small" style={{ marginBottom: 16 }}>
-          <Descriptions.Item label="Username">{user?.username}</Descriptions.Item>
-          <Descriptions.Item label="Role">{user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}</Descriptions.Item>
-        </Descriptions>
-        <Form form={profileForm} layout="vertical" style={{ maxWidth: 400 }}>
-          <Form.Item name="email" label="Email" rules={[{ type: 'email', message: 'Enter a valid email' }]}>
-            <Input placeholder="your@email.com" />
-          </Form.Item>
-          <Form.Item name="phone" label="Phone">
-            <Input placeholder="Phone number" />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" icon={<SaveOutlined />} onClick={handleProfileSave} loading={saving}>
-              Save Profile
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
-
-      <Card
-        title={<span><SettingOutlined /> Preferences</span>}
-        size="small"
-      >
-        <Form form={prefForm} layout="vertical" style={{ maxWidth: 400 }}>
-          <Form.Item name="theme" label="Theme">
-            <Select>
-              <Select.Option value="light">Light</Select.Option>
-              <Select.Option value="dark">Dark</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name="fontsize" label="Font Size">
-            <Select>
-              <Select.Option value="small">Small</Select.Option>
-              <Select.Option value="medium">Medium</Select.Option>
-              <Select.Option value="large">Large</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" icon={<SaveOutlined />} onClick={handlePrefSave} loading={saving}>
-              Save Preferences
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
+      <Row gutter={24}>
+        <Col xs={24} sm={6}>
+          <Card size="small" styles={{ body: { padding: 0 } }}>
+            <Menu
+              mode="inline"
+              selectedKeys={[activeTab]}
+              onClick={({ key }) => setActiveTab(key)}
+              items={menuItems}
+              style={{ border: 'none' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={18}>
+          <Card size="small">
+            {renderContent()}
+          </Card>
+        </Col>
+      </Row>
     </div>
   );
 };
