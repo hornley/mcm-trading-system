@@ -63,6 +63,14 @@ def seed():
         db.session.add(cat2)
         db.session.flush()
 
+        cat3 = Category(name="Threads & Sewing", description="Threads, needles and sewing supplies", is_active=True)
+        db.session.add(cat3)
+        db.session.flush()
+
+        cat4 = Category(name="Tools & Equipment", description="Cutting tools, rulers and equipment", is_active=True)
+        db.session.add(cat4)
+        db.session.flush()
+
         # ── 4. PRODUCTS ──
         print("Seeding Products...")
         prods = [
@@ -85,33 +93,57 @@ def seed():
             Product(category_id=cat.category_id, name="SUEDE GAMOSA", price=200, reorder_level="8", sku="PROD-017", unit="piece", is_active=True),
             Product(category_id=cat.category_id, name="NEON WOVEN CLOTH", price=100, reorder_level="15", sku="PROD-018", unit="piece", is_active=True),
             Product(category_id=cat.category_id, name="FEATHERS", price=50, reorder_level="20", sku="PROD-019", unit="piece", is_active=True),
+            Product(category_id=cat.category_id, name="COTTON CANVAS", price=140, reorder_level="12", sku="PROD-020", unit="meter", is_active=True),
+            Product(category_id=cat.category_id, name="LINEN FABRIC", price=190, reorder_level="10", sku="PROD-021", unit="meter", is_active=True),
+            Product(category_id=cat.category_id, name="DENIM BLUE", price=210, reorder_level="8", sku="PROD-022", unit="meter", is_active=True),
+            Product(category_id=cat.category_id, name="SATIN SILK", price=320, reorder_level="5", sku="PROD-023", unit="meter", is_active=True),
+            Product(category_id=cat.category_id, name="POLYESTER MESH", price=85, reorder_level="20", sku="PROD-024", unit="meter", is_active=True),
+            Product(category_id=cat.category_id, name="LEATHERETTE", price=260, reorder_level="6", sku="PROD-025", unit="meter", is_active=True),
+            Product(category_id=cat.category_id, name="TWEED WOOL", price=340, reorder_level="4", sku="PROD-026", unit="meter", is_active=True),
+            Product(category_id=cat.category_id, name="CHIFFON", price=110, reorder_level="15", sku="PROD-027", unit="meter", is_active=True),
+            Product(category_id=cat.category_id, name="ORGANZA", price=130, reorder_level="12", sku="PROD-028", unit="meter", is_active=True),
+            Product(category_id=cat.category_id, name="BROCADE GOLD", price=450, reorder_level="3", sku="PROD-029", unit="meter", is_active=True),
         ]
         db.session.add_all(prods)
         db.session.flush()
 
-        # Add 4 new products under new category
         new_prods = [
-            Product(category_id=cat2.category_id, name="Metallic Zipper 20cm", price=15, reorder_level="50", sku="PROD-020", unit="piece", is_active=True),
-            Product(category_id=cat2.category_id, name="Plastic Buttons 20mm", price=5, reorder_level="100", sku="PROD-021", unit="piece", is_active=True),
-            Product(category_id=cat2.category_id, name="Elastic Band 2cm", price=8, reorder_level="80", sku="PROD-022", unit="meter", is_active=True),
-            Product(category_id=cat2.category_id, name="Satin Ribbon 1cm", price=12, reorder_level="60", sku="PROD-023", unit="meter", is_active=True),
+            Product(category_id=cat2.category_id, name="Metallic Zipper 20cm", price=15, reorder_level="50", sku="PROD-030", unit="piece", is_active=True),
+            Product(category_id=cat2.category_id, name="Plastic Buttons 20mm", price=5, reorder_level="100", sku="PROD-031", unit="piece", is_active=True),
+            Product(category_id=cat2.category_id, name="Elastic Band 2cm", price=8, reorder_level="80", sku="PROD-032", unit="meter", is_active=True),
+            Product(category_id=cat2.category_id, name="Satin Ribbon 1cm", price=12, reorder_level="60", sku="PROD-033", unit="meter", is_active=True),
+            Product(category_id=cat2.category_id, name="Velcro Tape 5cm", price=10, reorder_level="70", sku="PROD-034", unit="meter", is_active=True),
+            Product(category_id=cat2.category_id, name="Metal Buckle 3cm", price=18, reorder_level="40", sku="PROD-035", unit="piece", is_active=True),
+            Product(category_id=cat2.category_id, name="Lace Trim 2cm", price=14, reorder_level="50", sku="PROD-036", unit="meter", is_active=True),
+            Product(category_id=cat2.category_id, name="Snap Fastener Set", price=7, reorder_level="90", sku="PROD-037", unit="set", is_active=True),
+            Product(category_id=cat2.category_id, name="Hook & Eye Set", price=4, reorder_level="100", sku="PROD-038", unit="set", is_active=True),
+            Product(category_id=cat2.category_id, name="Bias Binding Tape", price=9, reorder_level="75", sku="PROD-039", unit="meter", is_active=True),
+            Product(category_id=cat3.category_id, name="Polyester Thread White", price=3, reorder_level="200", sku="PROD-040", unit="spool", is_active=True),
+            Product(category_id=cat3.category_id, name="Polyester Thread Black", price=3, reorder_level="200", sku="PROD-041", unit="spool", is_active=True),
+            Product(category_id=cat3.category_id, name="Nylon Thread Clear", price=5, reorder_level="150", sku="PROD-042", unit="spool", is_active=True),
+            Product(category_id=cat3.category_id, name="Sewing Needles Assorted", price=6, reorder_level="100", sku="PROD-043", unit="pack", is_active=True),
+            Product(category_id=cat3.category_id, name="Pins with Glass Heads", price=4, reorder_level="120", sku="PROD-044", unit="pack", is_active=True),
+            Product(category_id=cat3.category_id, name="Tailor's Chalk", price=2, reorder_level="150", sku="PROD-045", unit="piece", is_active=True),
+            Product(category_id=cat3.category_id, name="Thread Holder Box", price=25, reorder_level="30", sku="PROD-046", unit="piece", is_active=True),
+            Product(category_id=cat4.category_id, name="Fabric Scissors 10in", price=180, reorder_level="10", sku="PROD-047", unit="piece", is_active=True),
+            Product(category_id=cat4.category_id, name="Measuring Tape 150cm", price=15, reorder_level="40", sku="PROD-048", unit="piece", is_active=True),
+            Product(category_id=cat4.category_id, name="Rotary Cutter 45mm", price=220, reorder_level="8", sku="PROD-049", unit="piece", is_active=True),
+            Product(category_id=cat4.category_id, name="Cutting Mat A2", price=350, reorder_level="5", sku="PROD-050", unit="piece", is_active=True),
         ]
         db.session.add_all(new_prods)
         db.session.flush()
 
         # ── 5. INVENTORY ──
         print("Seeding Inventory...")
-        mock_stock = [25, 30, 15, 10, 20, 12, 8, 5, 7, 40, 6, 3, 18, 22, 4, 15, 10, 35, 50]
-        for idx, p in enumerate(prods):
-            qty = mock_stock[idx] if idx < len(mock_stock) else 0
-            db.session.add(Inventory(product_id=p.product_id, location_id=locs[0].location_id, quantity=qty))
+        all_products = prods + new_prods
+        stockhouse_floor = 3
+        branch_floor = 1
+        for p in all_products:
+            db.session.add(Inventory(product_id=p.product_id, location_id=locs[0].location_id,
+                                     quantity=random.randint(stockhouse_floor, 50)))
             for loc in locs[1:]:
-                db.session.add(Inventory(product_id=p.product_id, location_id=loc.location_id, quantity=0))
-
-        for p in new_prods:
-            db.session.add(Inventory(product_id=p.product_id, location_id=locs[0].location_id, quantity=random.randint(0, 20)))
-            for loc in locs[1:]:
-                db.session.add(Inventory(product_id=p.product_id, location_id=loc.location_id, quantity=0))
+                db.session.add(Inventory(product_id=p.product_id, location_id=loc.location_id,
+                                         quantity=random.randint(branch_floor, 15)))
         db.session.flush()
 
         # ── 6. ORDERS + ITEMS + PAYMENTS ──
@@ -120,13 +152,13 @@ def seed():
         methods = ["Cash", "Card", "Bank Transfer", "GCash"]
         now = datetime.now()
 
-        for _ in range(50):
+        for _ in range(300):
             loc = random.choice(locs)
-            odate = now - timedelta(days=random.randint(0, 180),
+            odate = now - timedelta(days=random.randint(0, 365),
                                     hours=random.randint(0, 23),
                                     minutes=random.randint(0, 59))
-            n = random.randint(1, 5)
-            chosen = random.sample(prods, min(n, len(prods)))
+            n = random.randint(1, 8)
+            chosen = random.sample(all_products, min(n, len(all_products)))
             items = [(p.product_id, random.randint(1, 20), p.price) for p in chosen]
             total = sum(q * pr for _, q, pr in items)
 
@@ -143,16 +175,15 @@ def seed():
 
         # ── 7. STOCK TRANSFERS ──
         print("Seeding Stock Transfers...")
-        all_products = prods + new_prods
         tstatus = ["pending", "approved", "completed", "cancelled"]
-        for _ in range(15):
+        for _ in range(50):
             fl, tl = random.sample(locs, 2)
             st = StockTransfer(
                 product_id=random.choice(all_products).product_id,
                 from_location_id=fl.location_id, to_location_id=tl.location_id,
                 user_id=random.choice(users).user_id,
-                quantity=random.randint(5, 30),
-                transfer_date=now - timedelta(days=random.randint(0, 90), hours=random.randint(0, 23)),
+                quantity=random.randint(5, 50),
+                transfer_date=now - timedelta(days=random.randint(0, 180), hours=random.randint(0, 23)),
                 status=random.choice(tstatus),
             )
             db.session.add(st)
@@ -161,15 +192,16 @@ def seed():
         # ── 8. STOCK ADJUSTMENTS ──
         print("Seeding Stock Adjustments...")
         reasons = ["Damaged goods", "Inventory count correction", "Sample material",
-                    "Quality check removal", "Supplier return"]
-        for _ in range(15):
+                    "Quality check removal", "Supplier return", "Damaged in transit",
+                    "Employee discount adjustment"]
+        for _ in range(50):
             sa = StockAdjustment(
                 product_id=random.choice(all_products).product_id,
                 location_id=random.choice(locs).location_id,
                 user_id=random.choice(users).user_id,
-                quantity_change=random.choice([-20, -10, -5, -3, 5, 10, 15]),
+                quantity_change=random.choice([-50, -20, -10, -5, -3, 5, 10, 15, 25]),
                 reason=random.choice(reasons),
-                date=now - timedelta(days=random.randint(0, 90), hours=random.randint(0, 23)),
+                date=now - timedelta(days=random.randint(0, 180), hours=random.randint(0, 23)),
             )
             db.session.add(sa)
         db.session.flush()
@@ -188,7 +220,7 @@ def seed():
             ("products", "update", "Updated product price"),
             ("inventory", "adjust", "Inventory count correction"),
         ]
-        for _ in range(100):
+        for _ in range(200):
             mod, typ, act = random.choice(activities)
             db.session.add(ActivityLog(
                 user_id=random.choice(users).user_id,
@@ -205,13 +237,13 @@ def seed():
         print("\n[OK] Database seeded successfully!")
         print(f"  Locations:       {len(locs)}")
         print(f"  Users:           {len(users_data)}")
-        print(f"  Categories:      2")
+        print(f"  Categories:      4")
         print(f"  Products:        {len(prods) + len(new_prods)}")
         print(f"  Inventory:       {(len(prods) + len(new_prods)) * len(locs)}")
-        print(f"  Orders:          50")
-        print(f"  Transfers:       15")
-        print(f"  Adjustments:     15")
-        print(f"  Activity Logs:   100")
+        print(f"  Orders:          300")
+        print(f"  Transfers:       50")
+        print(f"  Adjustments:     50")
+        print(f"  Activity Logs:   200")
 
 
 if __name__ == "__main__":
