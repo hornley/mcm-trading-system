@@ -145,7 +145,7 @@ def dashboard_summary():
                     "key": order.order_id,
                     "product": item.product.name if item.product else "Unknown",
                     "quantity": item.quantity,
-                    "amount": f"₱{item.quantity * item.price:,}",
+                    "amount": f"₱{item.quantity * item.price:,.2f}",
                     "branch": order.location.name if order.location else "Unknown",
                     "status": order.status,
                     "date": order.order_date.strftime("%Y-%m-%d") if order.order_date else "",

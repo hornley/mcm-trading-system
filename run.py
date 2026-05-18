@@ -28,11 +28,7 @@ from models import db
 
 _temp_app = create_app()
 with _temp_app.app_context():
-    if "sqlite" in db.engine.url.drivername:
-        print("Seeding database...")
-        subprocess.run(["python", "createDatabase.py"], cwd=os.path.join(BASE_DIR, "backend"), check=True)
-    else:
-        print("Connected to cloud database — skipping seed (data already in Supabase).")
+    print(f"Connected to {db.engine.url.drivername} — skipping seed (data already in cloud).")
 
 print("Starting Flask backend (serving built frontend)...")
 subprocess.run(["python", "app.py"], cwd=os.path.join(BASE_DIR, "backend"))

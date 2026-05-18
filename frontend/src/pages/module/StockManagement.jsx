@@ -8,9 +8,21 @@ import { useAuth } from '../../context/AuthContext.jsx';
 
 const { Search, TextArea } = Input;
 
+const FABRIC_CATEGORY = 'Fabrics';
+
+const fmtQty = (qty, isFabric) => {
+  if (qty == null) return '0';
+  if (isFabric) {
+    const n = Number(qty);
+    return n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
+  }
+  return Number(qty).toLocaleString();
+};
+
 const getStockStatus = (qty) => {
-  if (qty === 0) return { tag: <Tag color="red">Out of Stock</Tag>, label: 'out' };
-  if (qty <= 10) return { tag: <Tag color="orange">Low Stock</Tag>, label: 'low' };
+  const n = Number(qty);
+  if (n === 0) return { tag: <Tag color="red">Out of Stock</Tag>, label: 'out' };
+  if (n <= 10) return { tag: <Tag color="orange">Low Stock</Tag>, label: 'low' };
   return { tag: <Tag color="green">In Stock</Tag>, label: 'in' };
 };
 
@@ -144,7 +156,7 @@ const StockManagement = () => {
   const handleSetReorder = (record) => {
     setSelectedRecord(record);
     reorderForm.resetFields();
-    reorderForm.setFieldsValue({ reorder_level: record.reorder_level ? parseInt(record.reorder_level) : 0 });
+    reorderForm.setFieldsValue({ reorder_level: record.reorder_level ? Number(record.reorder_level) : 0 });
     setReorderVisible(true);
   };
 
@@ -295,6 +307,7 @@ const StockManagement = () => {
     },
     {
       title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
+      render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
       sorter: true,
     },
     {
@@ -306,14 +319,14 @@ const StockManagement = () => {
     },
     {
       title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level',
-      render: (val) => (val ? parseInt(val) : '-'),
+      render: (val) => (val ? Number(val).toLocaleString() : '-'),
       sorter: true,
     },
     {
       title: 'Auto-Restock',
       key: 'autoRestock',
       render: (_, record) => {
-        const level = parseInt(record.reorder_level) || 0;
+        const level = Number(record.reorder_level) || 0;
         const enabled = storehouse && level > 0;
         return enabled
           ? <Tag color="green">Active</Tag>
@@ -455,8 +468,9 @@ const StockManagement = () => {
         rowKey="inventory_id"
         loading={loading}
         rowClassName={(record) => {
-          if (record.quantity === 0) return 'row-out-of-stock';
-          if (record.quantity <= 10) return 'row-low-stock';
+          const q = Number(record.quantity);
+          if (q === 0) return 'row-out-of-stock';
+          if (q <= 10) return 'row-low-stock';
           return '';
         }}
         onChange={(pagination, filters, sorter) => {
@@ -482,8 +496,8 @@ const StockManagement = () => {
           <Descriptions.Item label="Product Name">{selectedRecord?.product_name}</Descriptions.Item>
           <Descriptions.Item label="SKU">{selectedRecord?.sku}</Descriptions.Item>
           <Descriptions.Item label="Branch">{selectedRecord?.location_name}</Descriptions.Item>
-          <Descriptions.Item label="Current Stock Quantity">{selectedRecord?.quantity}</Descriptions.Item>
-          <Descriptions.Item label="Reorder Level">{parseInt(selectedRecord?.reorder_level) || 'Not set'}</Descriptions.Item>
+          <Descriptions.Item label="Current Stock Quantity">{fmtQty(selectedRecord?.quantity, selectedRecord?.category === FABRIC_CATEGORY)}</Descriptions.Item>
+          <Descriptions.Item label="Reorder Level">{selectedRecord?.reorder_level ? Number(selectedRecord.reorder_level).toLocaleString() : 'Not set'}</Descriptions.Item>
         </Descriptions>
 
         <Typography.Text strong style={{ marginBottom: 8, display: 'block' }}>
@@ -532,7 +546,7 @@ const StockManagement = () => {
             Adjusting stock at selected branch
           </Typography.Text>
           <Typography.Text style={{ display: 'block', marginBottom: 16 }}>
-            Current stock: <strong>{selectedRecord?.quantity ?? 0} units</strong>
+            Current stock: <strong>{fmtQty(selectedRecord?.quantity, selectedRecord?.category === FABRIC_CATEGORY)} {selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'}</strong>
           </Typography.Text>
           {!requestPreset && (
             <Form.Item name="adjustmentType" label="Adjustment Type" rules={[{ required: true, message: 'Please select adjustment type' }]}>
@@ -542,8 +556,8 @@ const StockManagement = () => {
               </Select>
             </Form.Item>
           )}
-          <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: 'Please enter quantity' }]}>
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="Enter quantity" />
+          <Form.Item name="quantity" label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} rules={[{ required: true, message: 'Please enter quantity' }]}>
+            <InputNumber min={0.01} step={selectedRecord?.category === FABRIC_CATEGORY ? 0.01 : 1} style={{ width: '100%' }} placeholder="Enter quantity" />
           </Form.Item>
           {!requestPreset && (
             <Form.Item name="reason" label="Reason" rules={[{ required: true, message: 'Please select a reason' }]}>
@@ -584,11 +598,11 @@ const StockManagement = () => {
               ))}
             </Select>
           </Form.Item>
-          <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: 'Please enter quantity' }]}>
-            <InputNumber min={1} max={selectedRecord?.quantity || 1} style={{ width: '100%' }} placeholder="Enter quantity" />
+          <Form.Item name="quantity" label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} rules={[{ required: true, message: 'Please enter quantity' }]}>
+            <InputNumber min={0.01} max={selectedRecord?.quantity || 1} step={selectedRecord?.category === FABRIC_CATEGORY ? 0.01 : 1} style={{ width: '100%' }} placeholder="Enter quantity" />
           </Form.Item>
           <Typography.Text type="secondary" style={{ fontSize: 12, marginTop: -16, marginBottom: 16, display: 'block' }}>
-            Available: {selectedRecord?.quantity ?? 0} units
+            Available: {fmtQty(selectedRecord?.quantity, selectedRecord?.category === FABRIC_CATEGORY)} {selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'}
           </Typography.Text>
           <Form.Item name="date" label="Transfer Date" rules={[{ required: true, message: 'Please select date' }]}>
             <DatePicker style={{ width: '100%' }} />

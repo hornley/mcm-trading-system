@@ -8,6 +8,17 @@ import { useAuth } from '../../context/AuthContext.jsx';
 const { Search } = Input;
 const { TextArea } = Input;
 
+const FABRIC_CATEGORY = 'Fabrics';
+
+const fmtQty = (qty, isFabric) => {
+  if (qty == null) return '0';
+  if (isFabric) {
+    const n = Number(qty);
+    return n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
+  }
+  return Number(qty).toLocaleString();
+};
+
 const Inventory = () => {
   const { user, can, selectedLocationId } = useAuth();
   const [products, setProducts] = useState([]);
@@ -199,8 +210,15 @@ const Inventory = () => {
     },
     {
       title: 'Stock Quantity', key: 'stockQuantity',
-      render: (_, record) => record.quantity ?? 0,
+      render: (_, record) => {
+        const isFab = record.category === FABRIC_CATEGORY;
+        return fmtQty(record.quantity, isFab);
+      },
       sorter: (a, b) => (a.quantity ?? 0) - (b.quantity ?? 0),
+    },
+    {
+      title: 'Unit', dataIndex: 'unit', key: 'unit',
+      render: (v, record) => record.category === FABRIC_CATEGORY ? 'yards' : (v || '-'),
     },
     {
       title: 'Base Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}`,
@@ -379,8 +397,8 @@ const Inventory = () => {
               <Radio value="remove">Remove Stock</Radio>
             </Radio.Group>
           </Form.Item>
-          <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: 'Please enter quantity' }]}>
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="Enter quantity" />
+          <Form.Item name="quantity" label={`Quantity (${adjustProduct?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} rules={[{ required: true, message: 'Please enter quantity' }]}>
+            <InputNumber min={0.01} step={adjustProduct?.category === FABRIC_CATEGORY ? 0.01 : 1} style={{ width: '100%' }} placeholder="Enter quantity" />
           </Form.Item>
           <Form.Item name="reason" label="Reason">
             <Input placeholder="e.g. New shipment, Damaged goods" />

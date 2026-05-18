@@ -14,9 +14,10 @@ from werkzeug.security import generate_password_hash
 def seed():
     app = create_app()
     with app.app_context():
-        if "sqlite" not in db.engine.url.drivername:
-            print("ABORTED: This script drops all tables. It only works with SQLite.")
-            print(f"Detected engine: {db.engine.url.drivername}")
+        print(f"WARNING: This will DROP all tables and recreate them on {db.engine.url.drivername}")
+        confirm = input("Type 'yes' to continue: ")
+        if confirm.lower() != "yes":
+            print("Aborted.")
             return
         print("Dropping all tables and recreating...")
         db.drop_all()

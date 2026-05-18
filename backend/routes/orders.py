@@ -2,7 +2,7 @@ from flask import Blueprint, request
 from datetime import datetime
 from models import db, User, Order, OrderItem, Payment, Product, Inventory, Location, StockTransfer
 from utils.response import success_response, error_response
-from utils.validation import validate_required
+from utils.validation import validate_required, validate_quantity
 from utils.activity_logger import log_activity
 
 orders_bp = Blueprint("orders", __name__)
@@ -44,6 +44,7 @@ def _serialize_order_detail(order):
                 "order_item_id": item.order_item_id,
                 "product_id": item.product_id,
                 "product_name": item.product.name if item.product else "Unknown",
+                "category": item.product.category.name if item.product and item.product.category else None,
                 "quantity": item.quantity,
                 "price": item.price,
                 "line_total": item.quantity * item.price,
@@ -75,6 +76,7 @@ def _serialize_order_list(order):
         "total_amount": order.total_amount,
         "item_count": len(items),
         "product_names": [item.product.name for item in items if item.product],
+        "product_categories": {item.product_id: (item.product.category.name if item.product and item.product.category else None) for item in items},
         "payment_method": first_payment.payment_method if first_payment else None,
         "payment_price": first_payment.price if first_payment else None,
     }
@@ -138,21 +140,19 @@ def create_order():
 
         if not pid:
             return error_response(f"Item {idx}: product_id is required", "MISSING_FIELDS", 400)
-        try:
-            qty = int(qty) if qty is not None else 0
-        except (ValueError, TypeError):
-            return error_response(f"Item {idx}: quantity must be a valid integer", "INVALID_VALUE", 400)
-
-        if qty <= 0:
-            return error_response(f"Item {idx}: quantity must be a positive integer", "INVALID_VALUE", 400)
-
-        if pid in seen_product_ids:
-            return error_response(f"Duplicate product_id {pid} in items", "DUPLICATE_PRODUCT", 400)
-        seen_product_ids.add(pid)
 
         product = Product.query.get(pid)
         if not product or not product.is_active:
             return error_response(f"Product {pid} not found or inactive", "NOT_FOUND", 404)
+
+        qty_error = validate_quantity(qty, "quantity", product.category_id)
+        if qty_error:
+            return error_response(f"Item {idx}: {qty_error.get('message', 'Invalid quantity')}", "INVALID_VALUE", 400)
+        qty = float(qty)
+
+        if pid in seen_product_ids:
+            return error_response(f"Duplicate product_id {pid} in items", "DUPLICATE_PRODUCT", 400)
+        seen_product_ids.add(pid)
 
         inventory = Inventory.query.filter_by(
             product_id=pid, location_id=resolved_location_id

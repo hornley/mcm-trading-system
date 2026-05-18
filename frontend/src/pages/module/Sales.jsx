@@ -15,6 +15,16 @@ const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
 const PAYMENT_METHODS = ['Cash', 'Card', 'GCash', 'Bank Transfer'];
+const FABRIC_CATEGORY = 'Fabrics';
+
+const fmtQty = (qty, isFabric) => {
+  if (qty == null) return '0';
+  if (isFabric) {
+    const n = Number(qty);
+    return n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
+  }
+  return Number(qty).toLocaleString();
+};
 
 const Sales = () => {
   const { user } = useAuth();
@@ -162,6 +172,7 @@ const Sales = () => {
         product_name: product.name,
         quantity: cartQuantity,
         price: product.price,
+        is_fabric: product.category === FABRIC_CATEGORY,
       },
     ]);
     setSelectedProductId(null);
@@ -355,7 +366,7 @@ const Sales = () => {
           dataSource={items}
           columns={[
             { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
-            { title: 'Qty', dataIndex: 'quantity', key: 'quantity' },
+            { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty, r) => fmtQty(qty, r.category === FABRIC_CATEGORY) },
             { title: 'Unit Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}` },
             { title: 'Line Total', dataIndex: 'line_total', key: 'line_total', render: (v) => `₱${v?.toLocaleString() || 0}` },
           ]}
@@ -390,7 +401,7 @@ const Sales = () => {
     data.forEach((order) => {
       (order.items || []).forEach((item) => {
         const key = item.product_name;
-        if (!grouped[key]) grouped[key] = { product_name: item.product_name, total_qty: 0, total_amount: 0 };
+        if (!grouped[key]) grouped[key] = { product_name: item.product_name, total_qty: 0, total_amount: 0, is_fabric: item.category === FABRIC_CATEGORY };
         grouped[key].total_qty += item.quantity;
         grouped[key].total_amount += item.line_total;
       });
@@ -416,6 +427,7 @@ const Sales = () => {
     },
     {
       title: 'Total Quantity Sold', dataIndex: 'total_qty', key: 'total_qty',
+      render: (qty, r) => fmtQty(qty, r.is_fabric),
       sorter: (a, b) => a.total_qty - b.total_qty,
     },
     {
@@ -534,7 +546,7 @@ const Sales = () => {
                       .map((p) => (
                       <Select.Option key={p.product_id} value={p.product_id} disabled={!p.quantity}>
                         <span style={{ opacity: p.quantity ? 1 : 0.45 }}>
-                          {p.name} — ₱{p.price} (stock: {p.quantity || 0})
+                          {p.name} — ₱{p.price} (stock: {fmtQty(p.quantity, p.category === FABRIC_CATEGORY)})
                         </span>
                       </Select.Option>
                     ))}
@@ -542,10 +554,11 @@ const Sales = () => {
                 </Col>
                 <Col>
                   <InputNumber
-                    min={1}
+                    min={0.01}
+                    step={products.find(p => p.product_id === selectedProductId)?.category === FABRIC_CATEGORY ? 0.01 : 1}
                     value={cartQuantity}
                     onChange={setCartQuantity}
-                    style={{ width: 70 }}
+                    style={{ width: 80 }}
                   />
                 </Col>
                 <Col>
@@ -561,7 +574,7 @@ const Sales = () => {
                 dataSource={cart}
                 columns={[
                   { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
-                  { title: 'Qty', dataIndex: 'quantity', key: 'quantity' },
+                  { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty, r) => fmtQty(qty, r.is_fabric) },
                   { title: 'Unit Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}` },
                   {
                     title: 'Total', key: 'line_total',
@@ -604,7 +617,7 @@ const Sales = () => {
               <Descriptions bordered column={1} size="small">
                 {cart.map((item, idx) => (
                   <Descriptions.Item key={idx} label={item.product_name}>
-                    {item.quantity} × ₱{item.price} = ₱{(item.quantity * item.price).toLocaleString()}
+                    {fmtQty(item.quantity, item.is_fabric)} × ₱{item.price} = ₱{(item.quantity * item.price).toLocaleString()}
                   </Descriptions.Item>
                 ))}
                 {cart.length === 0 && (
@@ -681,7 +694,7 @@ const Sales = () => {
                 {(lastOrder.items || []).map((item) => (
                   <tr key={item.order_item_id}>
                     <td>{item.product_name}</td>
-                    <td style={{ textAlign: 'center' }}>{item.quantity}</td>
+                    <td style={{ textAlign: 'center' }}>{fmtQty(item.quantity, item.product?.category === FABRIC_CATEGORY)}</td>
                     <td style={{ textAlign: 'right' }}>₱{item.price}</td>
                     <td style={{ textAlign: 'right' }}>₱{(item.quantity * item.price).toLocaleString()}</td>
                   </tr>
