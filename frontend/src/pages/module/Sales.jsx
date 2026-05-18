@@ -17,12 +17,26 @@ const { RangePicker } = DatePicker;
 const PAYMENT_METHODS = ['Cash', 'Card', 'GCash', 'Bank Transfer'];
 const FABRIC_CATEGORY = 'Fabrics';
 
+const qtyLabel = (qty) => {
+  if (qty == null) return '';
+  const n = Number(qty);
+  const whole = Math.floor(n);
+  const frac = Math.round((n - whole) * 100) / 100;
+  let fracStr = '';
+  if (Math.abs(frac - 0.5) < 0.001) fracStr = '½';
+  else if (Math.abs(frac - 0.25) < 0.001) fracStr = '¼';
+  else if (Math.abs(frac - 0.75) < 0.001) fracStr = '¾';
+  else if (frac > 0) fracStr = frac.toFixed(2);
+  if (whole === 0) return fracStr || n.toString();
+  return fracStr ? `${whole} ${fracStr}` : whole.toString();
+};
+
+const STEP_QTY = 0.25;
+const MIN_QTY = 0.5;
+
 const fmtQty = (qty, isFabric) => {
   if (qty == null) return '0';
-  if (isFabric) {
-    const n = Number(qty);
-    return n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
-  }
+  if (isFabric) return qtyLabel(qty);
   return Number(qty).toLocaleString();
 };
 
@@ -560,31 +574,27 @@ const Sales = () => {
                   {(() => {
                     const sp = products.find(p => p.product_id === selectedProductId);
                     const isFab = sp?.category === FABRIC_CATEGORY;
+                    if (isFab) {
+                      return (
+                        <Space.Compact>
+                          <Button onClick={() => setCartQuantity(Math.max(MIN_QTY, cartQuantity - STEP_QTY))}>−</Button>
+                          <Input
+                            value={`${qtyLabel(cartQuantity)} yd`}
+                            readOnly
+                            style={{ width: 80, textAlign: 'center' }}
+                          />
+                          <Button onClick={() => setCartQuantity(cartQuantity + STEP_QTY)}>+</Button>
+                        </Space.Compact>
+                      );
+                    }
                     return (
-                      <>
-                        <InputNumber
-                          min={isFab ? 0.125 : 1}
-                          step={isFab ? 0.125 : 1}
-                          value={cartQuantity}
-                          onChange={(v) => setCartQuantity(v)}
-                          style={{ width: 80 }}
-                        />
-                        {isFab && (
-                          <Space.Compact style={{ display: 'flex', marginTop: 4 }}>
-                            {[0.125, 0.25, 0.5, 0.75, 1].map((v) => (
-                              <Button
-                                key={v}
-                                size="small"
-                                type={cartQuantity === v ? 'primary' : 'default'}
-                                onClick={() => setCartQuantity(v)}
-                                style={{ flex: 1, fontSize: 11, padding: '0 2px' }}
-                              >
-                                {v === 0.125 ? '⅛' : v === 0.25 ? '¼' : v === 0.5 ? '½' : v === 0.75 ? '¾' : '1'}
-                              </Button>
-                            ))}
-                          </Space.Compact>
-                        )}
-                      </>
+                      <InputNumber
+                        min={1}
+                        step={1}
+                        value={cartQuantity}
+                        onChange={(v) => setCartQuantity(v)}
+                        style={{ width: 80 }}
+                      />
                     );
                   })()}
                 </Col>
