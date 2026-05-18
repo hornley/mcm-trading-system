@@ -75,7 +75,7 @@ const Reports = () => {
           low_stock: lowStock.success ? (lowStock.data?.rows || []) : [],
           distribution: (data.rows || []).map((r) => ({
             location_name: r.location_name,
-            total_quantity: r.total_quantity,
+            total_quantity: Math.floor(r.total_quantity),
           })),
         });
       }
@@ -184,7 +184,7 @@ const Reports = () => {
   const inventoryColsBranch = [
     { title: 'Branch', dataIndex: 'location_name', key: 'location_name', sorter: (a, b) => (a.location_name || '').localeCompare(b.location_name || '') },
     { title: 'Total Items', dataIndex: 'product_count', key: 'product_count', sorter: (a, b) => (a.product_count || 0) - (b.product_count || 0) },
-    { title: 'Total Quantity', dataIndex: 'total_quantity', key: 'total_quantity', render: (v) => qtyLabel(v), sorter: (a, b) => (a.total_quantity || 0) - (b.total_quantity || 0) },
+    { title: 'Total Quantity', dataIndex: 'total_quantity', key: 'total_quantity', render: (v) => Math.floor(v).toLocaleString(), sorter: (a, b) => (a.total_quantity || 0) - (b.total_quantity || 0) },
   ];
 
   const inventoryColsLowStock = [
