@@ -4,20 +4,10 @@ import {
   Tag, Modal, Form, Space, Popconfirm, InputNumber, message, Spin, Radio,
 } from 'antd';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js';
 
 const { Search } = Input;
 const { TextArea } = Input;
-
-const FABRIC_CATEGORY = 'Fabrics';
-
-const fmtQty = (qty, isFabric) => {
-  if (qty == null) return '0';
-  if (isFabric) {
-    const n = Number(qty);
-    return n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
-  }
-  return Number(qty).toLocaleString();
-};
 
 const Inventory = () => {
   const { user, can, selectedLocationId } = useAuth();
