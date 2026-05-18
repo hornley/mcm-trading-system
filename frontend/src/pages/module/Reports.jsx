@@ -33,7 +33,7 @@ const formatFileSize = (bytes) => {
 };
 
 const Reports = () => {
-  const { user } = useAuth();
+  const { user, selectedLocationId } = useAuth();
   const [activeTab, setActiveTab] = useState('inventory');
   const [inventoryPeriod, setInventoryPeriod] = useState(30);
   const [salesPeriod, setSalesPeriod] = useState(7);
@@ -53,8 +53,6 @@ const Reports = () => {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [distributionData, setDistributionData] = useState([]);
   const [stockLevelsView, setStockLevelsView] = useState('table');
-  const [selectedBranch, setSelectedBranch] = useState(null);
-  const [branchList, setBranchList] = useState([]);
 
   const mkParams = (extra) => {
     const p = new URLSearchParams({ usertype: user?.usertype });
@@ -81,25 +79,13 @@ const Reports = () => {
     }
   };
 
-  const fetchBranches = async () => {
-    try {
-      const res = await fetch(`/api/reports/inventory/summary?${mkParams({ location_id: 'all' })}`);
-      const data = await res.json();
-      if (data.success) {
-        setBranchList((data.data.rows || []).map((r) => ({ label: r.location_name, value: r.location_id })));
-      }
-    } catch {
-      message.error('Failed to load branches');
-    }
-  };
-
   const fetchInventory = async () => {
     setLoading((prev) => ({ ...prev, inventory: true }));
     try {
-      const params = { location_id: selectedBranch || 'all' };
+      const params = { location_id: selectedLocationId !== 'all' ? selectedLocationId : 'all' };
       const [summaryRes, lowStockRes] = await Promise.all([
         fetch(`/api/reports/inventory/summary?${mkParams(params)}`),
-        fetch(`/api/reports/inventory/low-stock?${mkParams({ location_id: selectedBranch || 'all' })}`),
+        fetch(`/api/reports/inventory/low-stock?${mkParams({ location_id: params.location_id })}`),
       ]);
       const summary = await summaryRes.json();
       const lowStock = await lowStockRes.json();
@@ -224,7 +210,6 @@ const Reports = () => {
 
   useEffect(() => {
     fetchProducts();
-    fetchBranches();
     if (activeTab === 'inventory') {
       fetchInventory();
       fetchDistribution();
@@ -245,7 +230,7 @@ const Reports = () => {
     if (activeTab === 'inventory') {
       fetchInventory();
     }
-  }, [selectedBranch]);
+  }, [selectedLocationId]);
 
   const isOwner = user?.role === 'owner';
   const isManager = user?.role === 'manager';
@@ -307,21 +292,6 @@ const Reports = () => {
       label: <span><DatabaseOutlined /> Inventory</span>,
       children: (
         <Spin spinning={loading.inventory}>
-          <Space style={{ marginBottom: 16 }}>
-            <span>Branch:</span>
-            <Select
-              allowClear
-              showSearch
-              placeholder="All Branches"
-              value={selectedBranch}
-              onChange={(v) => setSelectedBranch(v)}
-              options={branchList}
-              style={{ width: 200 }}
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
-            />
-          </Space>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={8}>
               <Card><Statistic title="Total Products" value={inventorySummary.stats.total_products ?? 0} /></Card>

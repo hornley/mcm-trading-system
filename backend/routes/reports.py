@@ -121,7 +121,14 @@ def low_stock():
     if not _authorized(usertype):
         return jsonify({"success": False, "error": "Unauthorized"}), 403
     try:
-        all_inv = Inventory.query.all()
+        user_id = request.args.get("user_id", type=int)
+        location_id = _resolve_location_id(usertype, user_id, request.args.get("location_id", type=int))
+
+        inv_query = Inventory.query
+        if location_id:
+            inv_query = inv_query.filter(Inventory.location_id == location_id)
+
+        all_inv = inv_query.all()
         rows = []
         for inv in all_inv:
             try:
