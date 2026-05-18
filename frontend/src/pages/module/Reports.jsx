@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Card, Typography, Row, Col, Table, Tabs, Statistic,
-  Select, Spin, Space, message, Divider,
+  Select, Spin, Space, message, Divider, Button,
 } from 'antd';
 import {
   PieChart, Pie, Cell, BarChart, Bar,
@@ -33,7 +33,7 @@ const formatFileSize = (bytes) => {
 };
 
 const Reports = () => {
-  const { user } = useAuth();
+  const { user, selectedLocationId } = useAuth();
   const [activeTab, setActiveTab] = useState('inventory');
   const [inventoryPeriod, setInventoryPeriod] = useState(30);
   const [salesPeriod, setSalesPeriod] = useState(7);
@@ -48,6 +48,12 @@ const Reports = () => {
   const [activityData, setActivityData] = useState({ stats: {}, by_user: [], by_module: [] });
   const [systemData, setSystemData] = useState({ stats: {}, backups: [] });
 
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [productsList, setProductsList] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [distributionData, setDistributionData] = useState([]);
+  const [stockLevelsView, setStockLevelsView] = useState('table');
+
   const mkParams = (extra) => {
     const p = new URLSearchParams({ usertype: user?.usertype });
     if (user?.user_id) p.set('user_id', user.user_id);
@@ -58,31 +64,64 @@ const Reports = () => {
     return p.toString();
   };
 
+  const fetchProducts = async () => {
+    setLoadingProducts(true);
+    try {
+      const res = await fetch(`/api/products?${mkParams({ is_active: 'true' })}`);
+      const data = await res.json();
+      if (data.success) {
+        setProductsList(data.data.map((p) => ({ label: p.name, value: p.product_id })));
+      }
+    } catch {
+      message.error('Failed to load products');
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
   const fetchInventory = async () => {
     setLoading((prev) => ({ ...prev, inventory: true }));
     try {
-      const [summaryRes, lowStockRes] = await Promise.all([
+      const locationParam = selectedLocationId !== 'all' ? selectedLocationId : 'all';
+
+      const [statsRes, allBranchesRes, lowStockRes] = await Promise.all([
+        fetch(`/api/reports/inventory/summary?${mkParams({ location_id: locationParam })}`),
         fetch(`/api/reports/inventory/summary?${mkParams({ location_id: 'all' })}`),
-        fetch(`/api/reports/inventory/low-stock?${mkParams()}`),
+        fetch(`/api/reports/inventory/low-stock?${mkParams({ location_id: locationParam })}`),
       ]);
-      const summary = await summaryRes.json();
+      const stats = await statsRes.json();
+      const allBranches = await allBranchesRes.json();
       const lowStock = await lowStockRes.json();
-      if (summary.success) {
-        const data = summary.data;
+
+      if (stats.success && allBranches.success) {
         setInventorySummary({
-          stats: data.stats || {},
-          by_branch: data.rows || [],
+          stats: stats.data?.stats || {},
+          by_branch: allBranches.data?.rows || [],
           low_stock: lowStock.success ? (lowStock.data?.rows || []) : [],
-          distribution: (data.rows || []).map((r) => ({
-            location_name: r.location_name,
-            total_quantity: Math.floor(r.total_quantity),
-          })),
+          distribution: allBranches.data?.rows || [],
         });
       }
     } catch {
       message.error('Failed to load inventory reports');
     } finally {
       setLoading((prev) => ({ ...prev, inventory: false }));
+    }
+  };
+
+  const fetchDistribution = async () => {
+    try {
+      const params = { location_id: 'all' };
+      if (selectedProduct) params.product_id = selectedProduct;
+      const res = await fetch(`/api/reports/inventory/summary?${mkParams(params)}`);
+      const data = await res.json();
+      if (data.success) {
+        setDistributionData((data.data.rows || []).map((r) => ({
+          location_name: r.location_name,
+          total_quantity: Math.floor(r.total_quantity),
+        })));
+      }
+    } catch {
+      message.error('Failed to load distribution data');
     }
   };
 
@@ -170,12 +209,28 @@ const Reports = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'inventory') fetchInventory();
+    fetchProducts();
+    if (activeTab === 'inventory') {
+      fetchInventory();
+      fetchDistribution();
+    }
     else if (activeTab === 'sales') fetchSales();
     else if (activeTab === 'financial') fetchFinancial();
     else if (activeTab === 'activity') fetchActivity();
     else if (activeTab === 'system') fetchSystem();
-  }, [activeTab, salesPeriod, financialPeriod, activityPeriod]);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'inventory') {
+      fetchDistribution();
+    }
+  }, [selectedProduct]);
+
+  useEffect(() => {
+    if (activeTab === 'inventory') {
+      fetchInventory();
+    }
+  }, [selectedLocationId]);
 
   const isOwner = user?.role === 'owner';
   const isManager = user?.role === 'manager';
@@ -242,30 +297,79 @@ const Reports = () => {
               <Card><Statistic title="Total Products" value={inventorySummary.stats.total_products ?? 0} /></Card>
             </Col>
             <Col xs={24} sm={8}>
-              <Card><Statistic title="Low Stock Items" value={inventorySummary.stats.low_stock ?? 0} valueStyle={{ color: '#fa8c16' }} /></Card>
+              <Card><Statistic title="Low Stock Items" value={inventorySummary.stats.low_stock_count ?? 0} valueStyle={{ color: '#fa8c16' }} /></Card>
             </Col>
             <Col xs={24} sm={8}>
-              <Card><Statistic title="Out of Stock" value={inventorySummary.stats.out_of_stock ?? 0} valueStyle={{ color: '#ff4d4f' }} /></Card>
+              <Card><Statistic title="Out of Stock" value={inventorySummary.stats.out_of_stock_count ?? 0} valueStyle={{ color: '#ff4d4f' }} /></Card>
             </Col>
           </Row>
           <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
             <Col xs={24} lg={14}>
-              <Card title="Stock Levels by Branch">
-                <Table
-                  dataSource={inventorySummary.by_branch}
-                  columns={inventoryColsBranch}
-                  rowKey="branch"
-                  pagination={false}
-                  size="small"
-                />
+              <Card
+                title={
+                  <Space>
+                    <span>Stock Levels by Branch</span>
+                    <Button
+                      type="text"
+                      size="small"
+                      onClick={() => setStockLevelsView(stockLevelsView === 'table' ? 'chart' : 'table')}
+                    >
+                      {stockLevelsView === 'table' ? 'Chart' : 'Table'}
+                    </Button>
+                  </Space>
+                }
+              >
+                {stockLevelsView === 'table' ? (
+                  <Table
+                    dataSource={inventorySummary.by_branch}
+                    columns={inventoryColsBranch}
+                    rowKey="branch"
+                    pagination={false}
+                    size="small"
+                  />
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={inventorySummary.by_branch}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="location_name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="total_quantity" name="Total Quantity">
+                        {inventorySummary.by_branch.map((_, idx) => (
+                          <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </Card>
             </Col>
             <Col xs={24} lg={10}>
-              <Card title="Stock Distribution">
+              <Card
+                title={
+                  <Space>
+                    <span>Stock Distribution</span>
+                    <Select
+                      allowClear
+                      showSearch
+                      placeholder="Filter by product"
+                      value={selectedProduct}
+                      onChange={(v) => setSelectedProduct(v)}
+                      options={productsList}
+                      loading={loadingProducts}
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                      }
+                      style={{ width: 200 }}
+                    />
+                  </Space>
+                }
+              >
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={inventorySummary.distribution}
+                      data={distributionData}
                       dataKey="total_quantity"
                       nameKey="location_name"
                       cx="50%"
@@ -273,7 +377,7 @@ const Reports = () => {
                       outerRadius={100}
                       label
                     >
-                      {inventorySummary.distribution.map((_, idx) => (
+                      {distributionData.map((_, idx) => (
                         <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
                       ))}
                     </Pie>
