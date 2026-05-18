@@ -741,9 +741,9 @@ const Sales = () => {
                 {(lastOrder.items || []).map((item) => (
                   <tr key={item.order_item_id}>
                     <td>{item.product_name}</td>
-                    <td style={{ textAlign: 'center' }}>{fmtQty(item.quantity, item.category === FABRIC_CATEGORY)}</td>
+                    <td style={{ textAlign: 'center' }}>{Number(item.quantity).toFixed(item.category === FABRIC_CATEGORY ? 2 : 0)}</td>
                     <td style={{ textAlign: 'right' }}>₱{item.price}</td>
-                    <td style={{ textAlign: 'right' }}>₱{(item.quantity * item.price).toLocaleString()}</td>
+                    <td style={{ textAlign: 'right' }}>₱{(item.line_total || (item.quantity * item.price)).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
