@@ -12,6 +12,7 @@ import {
   UserOutlined, SettingOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { qtyLabel } from '../../utils/format.js';
 
 const { Title } = Typography;
 
@@ -183,20 +184,20 @@ const Reports = () => {
   const inventoryColsBranch = [
     { title: 'Branch', dataIndex: 'location_name', key: 'location_name', sorter: (a, b) => (a.location_name || '').localeCompare(b.location_name || '') },
     { title: 'Total Items', dataIndex: 'product_count', key: 'product_count', sorter: (a, b) => (a.product_count || 0) - (b.product_count || 0) },
-    { title: 'Total Quantity', dataIndex: 'total_quantity', key: 'total_quantity', sorter: (a, b) => (a.total_quantity || 0) - (b.total_quantity || 0) },
+    { title: 'Total Quantity', dataIndex: 'total_quantity', key: 'total_quantity', render: (v) => qtyLabel(v), sorter: (a, b) => (a.total_quantity || 0) - (b.total_quantity || 0) },
   ];
 
   const inventoryColsLowStock = [
     { title: 'Product', dataIndex: 'product_name', key: 'product_name', sorter: (a, b) => (a.product_name || '').localeCompare(b.product_name || '') },
     { title: 'SKU', dataIndex: 'sku', key: 'sku', sorter: (a, b) => (a.sku || '').localeCompare(b.sku || '') },
     { title: 'Branch', dataIndex: 'location_name', key: 'location_name', sorter: (a, b) => (a.location_name || '').localeCompare(b.location_name || '') },
-    { title: 'Stock', dataIndex: 'quantity', key: 'quantity', sorter: (a, b) => (a.quantity || 0) - (b.quantity || 0) },
+    { title: 'Stock', dataIndex: 'quantity', key: 'quantity', render: (v) => qtyLabel(v), sorter: (a, b) => (a.quantity || 0) - (b.quantity || 0) },
     { title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level', sorter: (a, b) => (a.reorder_level || 0) - (b.reorder_level || 0) },
   ];
 
   const salesColsTop = [
     { title: 'Product', dataIndex: 'product_name', key: 'product_name', sorter: (a, b) => (a.product_name || '').localeCompare(b.product_name || '') },
-    { title: 'Qty Sold', dataIndex: 'total_quantity', key: 'total_quantity', sorter: (a, b) => (a.total_quantity || 0) - (b.total_quantity || 0) },
+    { title: 'Qty Sold', dataIndex: 'total_quantity', key: 'total_quantity', render: (v) => qtyLabel(v), sorter: (a, b) => (a.total_quantity || 0) - (b.total_quantity || 0) },
     { title: 'Total Revenue', dataIndex: 'total_revenue', key: 'total_revenue', render: (v) => formatCurrency(v), sorter: (a, b) => (a.total_revenue || 0) - (b.total_revenue || 0) },
   ];
 
