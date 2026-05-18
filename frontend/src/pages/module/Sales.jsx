@@ -696,6 +696,9 @@ const Sales = () => {
                 <Text>Change: </Text>
                 <Text strong style={{ color: change > 0 ? '#52c41a' : undefined }}>₱{change.toLocaleString()}</Text>
               </div>
+              {paymentAmount > 0 && paymentAmount < grandTotal && (
+                <Text type="danger" style={{ display: 'block', marginBottom: 8 }}>Insufficient amount of money</Text>
+              )}
               <Text type="secondary">Branch: {branchName}</Text>
             </Card>
           </Col>
