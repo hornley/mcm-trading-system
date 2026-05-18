@@ -66,9 +66,8 @@ const Sales = () => {
 
   const usertype = user?.usertype;
   const userId = user?.user_id;
-  const locationId = isManager ? user?.location_id : undefined;
 
-  const apiParams = `usertype=${usertype}&user_id=${userId}` + (locationId ? `&location_id=${locationId}` : '');
+  const apiParams = `usertype=${usertype}&user_id=${userId}` + (selectedLocationId && selectedLocationId !== 'all' ? `&location_id=${selectedLocationId}` : '');
 
   const fetchSales = async (page) => {
     setLoading(true);
@@ -79,7 +78,6 @@ const Sales = () => {
       if (dateRange && dateRange[0]) url += `&date_from=${dateRange[0].toISOString()}`;
       if (dateRange && dateRange[1]) url += `&date_to=${dateRange[1].toISOString()}`;
       if (searchText) url += `&q=${searchText}`;
-      if (selectedLocationId && selectedLocationId !== 'all') url += `&location_id=${selectedLocationId}`;
       const res = await fetch(url);
       const json = await res.json();
       if (json.success) {
