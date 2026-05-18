@@ -65,8 +65,12 @@ def inventory_summary():
 
         rows = query.group_by(Location.location_id).order_by(Location.name).all()
 
-        total_products = db.session.query(func.count(Product.product_id)).scalar()
-        total_q = db.session.query(func.coalesce(func.sum(Inventory.quantity), 0)).scalar()
+        if location_id:
+            total_products = db.session.query(func.count(func.distinct(Inventory.product_id))).filter(Inventory.location_id == location_id).scalar()
+            total_q = db.session.query(func.coalesce(func.sum(Inventory.quantity), 0)).filter(Inventory.location_id == location_id).scalar()
+        else:
+            total_products = db.session.query(func.count(Product.product_id)).scalar()
+            total_q = db.session.query(func.coalesce(func.sum(Inventory.quantity), 0)).scalar()
 
         inv_query = Inventory.query
         if location_id:
