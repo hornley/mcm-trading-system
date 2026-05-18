@@ -576,15 +576,22 @@ const Sales = () => {
                     const isFab = sp?.category === FABRIC_CATEGORY;
                     if (isFab) {
                       return (
-                        <Space.Compact>
-                          <Button onClick={() => setCartQuantity(Math.max(MIN_QTY, cartQuantity - STEP_QTY))}>−</Button>
-                          <Input
-                            value={`${qtyLabel(cartQuantity)} yd`}
-                            readOnly
-                            style={{ width: 80, textAlign: 'center' }}
-                          />
-                          <Button onClick={() => setCartQuantity(cartQuantity + STEP_QTY)}>+</Button>
-                        </Space.Compact>
+                        <div>
+                          <Space.Compact>
+                            <Button onClick={() => setCartQuantity(Math.max(MIN_QTY, cartQuantity - STEP_QTY))}>−</Button>
+                            <InputNumber
+                              min={MIN_QTY}
+                              step={STEP_QTY}
+                              value={cartQuantity}
+                              onChange={(v) => setCartQuantity(v ?? MIN_QTY)}
+                              style={{ width: 70, textAlign: 'center' }}
+                            />
+                            <Button onClick={() => setCartQuantity(cartQuantity + STEP_QTY)}>+</Button>
+                          </Space.Compact>
+                          <div style={{ fontSize: 12, color: '#888', marginTop: 2, textAlign: 'center' }}>
+                            {qtyLabel(cartQuantity)} yd
+                          </div>
+                        </div>
                       );
                     }
                     return (
