@@ -574,6 +574,7 @@ const Sales = () => {
                   {(() => {
                     const sp = products.find(p => p.product_id === selectedProductId);
                     const isFab = sp?.category === FABRIC_CATEGORY;
+                    const maxQty = sp?.quantity ?? 1;
                     if (isFab) {
                       return (
                         <div>
@@ -581,12 +582,13 @@ const Sales = () => {
                             <Button onClick={() => setCartQuantity(Math.max(MIN_QTY, cartQuantity - STEP_QTY))}>−</Button>
                             <InputNumber
                               min={MIN_QTY}
+                              max={maxQty}
                               step={STEP_QTY}
                               value={cartQuantity}
                               onChange={(v) => setCartQuantity(v ?? MIN_QTY)}
                               style={{ width: 70, textAlign: 'center' }}
                             />
-                            <Button onClick={() => setCartQuantity(cartQuantity + STEP_QTY)}>+</Button>
+                            <Button onClick={() => setCartQuantity(Math.min(maxQty, cartQuantity + STEP_QTY))}>+</Button>
                           </Space.Compact>
                           <div style={{ fontSize: 12, color: '#888', marginTop: 2, textAlign: 'center' }}>
                             {qtyLabel(cartQuantity)} yd
@@ -597,6 +599,7 @@ const Sales = () => {
                     return (
                       <InputNumber
                         min={1}
+                        max={maxQty}
                         step={1}
                         value={cartQuantity}
                         onChange={(v) => setCartQuantity(v)}
