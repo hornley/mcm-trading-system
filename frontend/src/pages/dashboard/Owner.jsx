@@ -7,7 +7,7 @@ import {
 } from 'recharts'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useNavigate } from 'react-router-dom'
-import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js'
+import { FABRIC_CATEGORY, fmtQty, qtyLabel } from '../../utils/format.js'
 
 const { Title, Text } = Typography
 const COLORS = ['#5b7ff0', '#aac4f5']
@@ -43,6 +43,7 @@ const Owner = () => {
           if (d.stock_by_category) {
             d.stock_by_category = d.stock_by_category.map((c) => ({ ...c, value: Math.floor(c.value) }));
           }
+          if (d.stats) d.stats.total_items = Math.floor(d.stats.total_items);
           setData(d);
           setLastUpdated(new Date().toLocaleTimeString());
         }
@@ -224,7 +225,7 @@ const Owner = () => {
               dataSource={recent_transactions}
               columns={[
                 { title: 'Product', dataIndex: 'product', key: 'product' },
-                { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty) => fmtQty(qty, false) },
+                { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty) => qtyLabel(qty) },
                 { title: 'Amount', dataIndex: 'amount', key: 'amount' },
                 { title: 'Branch', dataIndex: 'branch', key: 'branch' },
                 {
