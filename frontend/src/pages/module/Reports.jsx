@@ -48,6 +48,10 @@ const Reports = () => {
   const [activityData, setActivityData] = useState({ stats: {}, by_user: [], by_module: [] });
   const [systemData, setSystemData] = useState({ stats: {}, backups: [] });
 
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [productsList, setProductsList] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
   const mkParams = (extra) => {
     const p = new URLSearchParams({ usertype: user?.usertype });
     if (user?.user_id) p.set('user_id', user.user_id);
@@ -58,11 +62,28 @@ const Reports = () => {
     return p.toString();
   };
 
+  const fetchProducts = async () => {
+    setLoadingProducts(true);
+    try {
+      const res = await fetch(`/api/products?${mkParams({ is_active: 'true' })}`);
+      const data = await res.json();
+      if (data.success) {
+        setProductsList(data.data.map((p) => ({ label: p.name, value: p.product_id })));
+      }
+    } catch {
+      message.error('Failed to load products');
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
   const fetchInventory = async () => {
     setLoading((prev) => ({ ...prev, inventory: true }));
     try {
+      const params = { location_id: 'all' };
+      if (selectedProduct) params.product_id = selectedProduct;
       const [summaryRes, lowStockRes] = await Promise.all([
-        fetch(`/api/reports/inventory/summary?${mkParams({ location_id: 'all' })}`),
+        fetch(`/api/reports/inventory/summary?${mkParams(params)}`),
         fetch(`/api/reports/inventory/low-stock?${mkParams()}`),
       ]);
       const summary = await summaryRes.json();
@@ -170,12 +191,17 @@ const Reports = () => {
   };
 
   useEffect(() => {
+    fetchProducts();
     if (activeTab === 'inventory') fetchInventory();
     else if (activeTab === 'sales') fetchSales();
     else if (activeTab === 'financial') fetchFinancial();
     else if (activeTab === 'activity') fetchActivity();
     else if (activeTab === 'system') fetchSystem();
-  }, [activeTab, salesPeriod, financialPeriod, activityPeriod]);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'inventory') fetchInventory();
+  }, [selectedProduct]);
 
   const isOwner = user?.role === 'owner';
   const isManager = user?.role === 'manager';
@@ -261,7 +287,26 @@ const Reports = () => {
               </Card>
             </Col>
             <Col xs={24} lg={10}>
-              <Card title="Stock Distribution">
+              <Card
+                title={
+                  <Space>
+                    <span>Stock Distribution</span>
+                    <Select
+                      allowClear
+                      showSearch
+                      placeholder="Filter by product"
+                      value={selectedProduct}
+                      onChange={(v) => setSelectedProduct(v)}
+                      options={productsList}
+                      loading={loadingProducts}
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                      }
+                      style={{ width: 200 }}
+                    />
+                  </Space>
+                }
+              >
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie

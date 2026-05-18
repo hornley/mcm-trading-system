@@ -48,6 +48,7 @@ def inventory_summary():
     try:
         user_id = request.args.get("user_id", type=int)
         location_id = _resolve_location_id(usertype, user_id, request.args.get("location_id", type=int))
+        product_id = request.args.get("product_id", type=int)
 
         query = db.session.query(
             Location.location_id,
@@ -59,6 +60,9 @@ def inventory_summary():
         if location_id:
             query = query.filter(Location.location_id == location_id)
 
+        if product_id:
+            query = query.filter(Inventory.product_id == product_id)
+
         rows = query.group_by(Location.location_id).order_by(Location.name).all()
 
         total_products = db.session.query(func.count(Product.product_id)).scalar()
@@ -67,6 +71,8 @@ def inventory_summary():
         inv_query = Inventory.query
         if location_id:
             inv_query = inv_query.filter(Inventory.location_id == location_id)
+        if product_id:
+            inv_query = inv_query.filter(Inventory.product_id == product_id)
 
         all_inv = inv_query.all()
         low_stock_count = 0
