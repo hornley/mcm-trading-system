@@ -3,7 +3,7 @@ from flask import Blueprint, request
 from datetime import datetime
 from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer
 from utils.response import success_response, error_response
-from utils.validation import validate_required
+from utils.validation import validate_required, validate_quantity, is_fabric_category
 from utils.activity_logger import log_activity
 from utils.sorting import quick_sort
 
@@ -430,6 +430,9 @@ def list_inventory():
                 "product_id": inv.product_id,
                 "product_name": inv.product.name,
                 "sku": inv.product.sku,
+                "category_id": inv.product.category_id,
+                "category": inv.product.category.name if inv.product.category else None,
+                "unit": inv.product.unit,
                 "location_id": inv.location_id,
                 "location_name": inv.location.name if inv.location else None,
                 "quantity": inv.quantity,
@@ -474,6 +477,9 @@ def get_inventory_by_location(location_id):
             "product_id": inv.product_id,
             "product_name": inv.product.name,
             "sku": inv.product.sku,
+            "category_id": inv.product.category_id,
+            "category": inv.product.category.name if inv.product.category else None,
+            "unit": inv.product.unit,
             "quantity": inv.quantity,
         }
         for inv in inventory
@@ -506,6 +512,11 @@ def get_inventory_by_product(product_id):
     return success_response([
         {
             "inventory_id": inv.inventory_id,
+            "product_id": product.product_id,
+            "product_name": product.name,
+            "category_id": product.category_id,
+            "category": product.category.name if product.category else None,
+            "unit": product.unit,
             "location_id": inv.location_id,
             "location_name": inv.location.name if inv.location else None,
             "quantity": inv.quantity,
@@ -538,14 +549,14 @@ def adjust_inventory():
     if error:
         return error
 
-    try:
-        quantity_change = int(data["quantity_change"])
-    except (ValueError, TypeError):
-        return error_response("quantity_change must be a valid integer", "INVALID_VALUE", 400)
-
     product = Product.query.get(data["product_id"])
     if not product:
         return error_response("Product not found", "NOT_FOUND", 404)
+
+    qty_error = validate_quantity(data["quantity_change"], "quantity_change", product.category_id)
+    if qty_error:
+        return qty_error
+    quantity_change = float(data["quantity_change"])
 
     location = Location.query.get(data["location_id"])
     if not location:
@@ -579,7 +590,7 @@ def adjust_inventory():
         user_id=data.get("user_id"),
         module="inventory",
         action_type="adjust",
-        action=f"Adjusted inventory for {product.name} at {location.name}: {quantity_change:+d}",
+        action=f"Adjusted inventory for {product.name} at {location.name}: {quantity_change:+g}",
         details={
             "product_id": product.product_id,
             "location_id": location.location_id,
@@ -748,6 +759,8 @@ def get_low_stock():
                     "product_id": product.product_id,
                     "product_name": product.name,
                     "sku": product.sku,
+                    "category_id": product.category_id,
+                    "category": product.category.name if product.category else None,
                     "location_id": inv.location_id,
                     "location_name": inv.location.name if inv.location else None,
                     "quantity": inv.quantity,
@@ -781,16 +794,14 @@ def transfer_stock():
         if manager.location_id != data.get("from_location_id"):
             return error_response("You can only transfer stock from your assigned location", "FORBIDDEN", 403)
 
-    try:
-        quantity = int(data["quantity"])
-        if quantity <= 0:
-            raise ValueError
-    except (ValueError, TypeError):
-        return error_response("quantity must be a positive integer", "INVALID_VALUE", 400)
-
     product = Product.query.get(data["product_id"])
     if not product:
         return error_response("Product not found", "NOT_FOUND", 404)
+
+    qty_error = validate_quantity(data["quantity"], "quantity", product.category_id)
+    if qty_error:
+        return qty_error
+    quantity = float(data["quantity"])
 
     from_location = Location.query.get(data["from_location_id"])
     if not from_location:

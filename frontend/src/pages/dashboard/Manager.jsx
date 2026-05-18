@@ -12,6 +12,16 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { useNavigate } from 'react-router-dom'
 
 const { Title, Text } = Typography
+const FABRIC_CATEGORY = 'Fabrics'
+
+const fmtQty = (qty, isFabric) => {
+  if (qty == null) return '0';
+  if (isFabric) {
+    const n = Number(qty);
+    return n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
+  }
+  return Number(qty).toLocaleString();
+};
 const COLORS = ['#5b7ff0', '#fa8c16']
 
 const computeTrend = (current) => {
@@ -58,7 +68,7 @@ const Manager = () => {
     ...d,
     ma3: i >= 2 ? Math.round((arr[i - 2].in + arr[i - 1].in + arr[i].in) / 3) : null,
   }))
-  const zeroStockCount = low_stock_items.filter((i) => i.quantity === 0).length
+  const zeroStockCount = low_stock_items.filter((i) => Number(i.quantity) === 0).length
 
   const statCards = [
     {
@@ -94,10 +104,11 @@ const Manager = () => {
   const lowStockColumns = [
     { title: 'Product Name', dataIndex: 'product_name', key: 'product_name' },
     { title: 'Category', dataIndex: 'category', key: 'category' },
-    { title: 'Current Stock', dataIndex: 'quantity', key: 'quantity' },
-    { title: 'Status', key: 'status', render: (_, record) => (
-      <Tag color={record.quantity === 0 ? 'red' : 'orange'}>{record.quantity === 0 ? 'Out of Stock' : 'Low Stock'}</Tag>
-    )},
+    { title: 'Current Stock', dataIndex: 'quantity', key: 'quantity', render: (qty, r) => fmtQty(qty, r.category === FABRIC_CATEGORY) },
+    { title: 'Status', key: 'status', render: (_, record) => {
+      const q = Number(record.quantity);
+      return <Tag color={q === 0 ? 'red' : 'orange'}>{q === 0 ? 'Out of Stock' : 'Low Stock'}</Tag>;
+    }},
   ]
 
   return (
@@ -256,7 +267,10 @@ const Manager = () => {
               columns={lowStockColumns}
               pagination={false} size="small" loading={loading}
               scroll={{ y: 280 }}
-              rowClassName={(record) => record.quantity === 0 ? 'voided-row' : record.quantity <= 5 ? 'low-stock-warn' : ''}
+              rowClassName={(record) => {
+                const q = Number(record.quantity);
+                return q === 0 ? 'voided-row' : q <= 5 ? 'low-stock-warn' : '';
+              }}
             />
           </Card>
         </Col>

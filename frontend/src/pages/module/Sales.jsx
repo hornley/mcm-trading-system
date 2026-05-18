@@ -15,6 +15,30 @@ const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
 const PAYMENT_METHODS = ['Cash', 'Card', 'GCash', 'Bank Transfer'];
+const FABRIC_CATEGORY = 'Fabrics';
+
+const qtyLabel = (qty) => {
+  if (qty == null) return '';
+  const n = Number(qty);
+  const whole = Math.floor(n);
+  const frac = Math.round((n - whole) * 100) / 100;
+  let fracStr = '';
+  if (Math.abs(frac - 0.5) < 0.001) fracStr = '½';
+  else if (Math.abs(frac - 0.25) < 0.001) fracStr = '¼';
+  else if (Math.abs(frac - 0.75) < 0.001) fracStr = '¾';
+  else if (frac > 0) fracStr = frac.toFixed(2);
+  if (whole === 0) return fracStr || n.toString();
+  return fracStr ? `${whole} ${fracStr}` : whole.toString();
+};
+
+const STEP_QTY = 0.25;
+const MIN_QTY = 0.5;
+
+const fmtQty = (qty, isFabric) => {
+  if (qty == null) return '0';
+  if (isFabric) return qtyLabel(qty);
+  return Number(qty).toLocaleString();
+};
 
 const Sales = () => {
   const { user } = useAuth();
@@ -162,6 +186,7 @@ const Sales = () => {
         product_name: product.name,
         quantity: cartQuantity,
         price: product.price,
+        is_fabric: product.category === FABRIC_CATEGORY,
       },
     ]);
     setSelectedProductId(null);
@@ -355,7 +380,7 @@ const Sales = () => {
           dataSource={items}
           columns={[
             { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
-            { title: 'Qty', dataIndex: 'quantity', key: 'quantity' },
+            { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty, r) => fmtQty(qty, r.category === FABRIC_CATEGORY) },
             { title: 'Unit Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}` },
             { title: 'Line Total', dataIndex: 'line_total', key: 'line_total', render: (v) => `₱${v?.toLocaleString() || 0}` },
           ]}
@@ -390,7 +415,7 @@ const Sales = () => {
     data.forEach((order) => {
       (order.items || []).forEach((item) => {
         const key = item.product_name;
-        if (!grouped[key]) grouped[key] = { product_name: item.product_name, total_qty: 0, total_amount: 0 };
+        if (!grouped[key]) grouped[key] = { product_name: item.product_name, total_qty: 0, total_amount: 0, is_fabric: item.category === FABRIC_CATEGORY };
         grouped[key].total_qty += item.quantity;
         grouped[key].total_amount += item.line_total;
       });
@@ -416,6 +441,7 @@ const Sales = () => {
     },
     {
       title: 'Total Quantity Sold', dataIndex: 'total_qty', key: 'total_qty',
+      render: (qty, r) => fmtQty(qty, r.is_fabric),
       sorter: (a, b) => a.total_qty - b.total_qty,
     },
     {
@@ -525,7 +551,11 @@ const Sales = () => {
                     placeholder="Search product"
                     optionFilterProp="children"
                     value={selectedProductId}
-                    onChange={setSelectedProductId}
+                    onChange={(id) => {
+                      setSelectedProductId(id);
+                      const p = products.find(p => p.product_id === id);
+                      if (p?.category !== FABRIC_CATEGORY) setCartQuantity(1);
+                    }}
                   >
                     {products
                       .filter((p) => p.is_active !== false)
@@ -534,19 +564,49 @@ const Sales = () => {
                       .map((p) => (
                       <Select.Option key={p.product_id} value={p.product_id} disabled={!p.quantity}>
                         <span style={{ opacity: p.quantity ? 1 : 0.45 }}>
-                          {p.name} — ₱{p.price} (stock: {p.quantity || 0})
+                          {p.name} — ₱{p.price} (stock: {fmtQty(p.quantity, p.category === FABRIC_CATEGORY)})
                         </span>
                       </Select.Option>
                     ))}
                   </Select>
                 </Col>
                 <Col>
-                  <InputNumber
-                    min={1}
-                    value={cartQuantity}
-                    onChange={setCartQuantity}
-                    style={{ width: 70 }}
-                  />
+                  {(() => {
+                    const sp = products.find(p => p.product_id === selectedProductId);
+                    const isFab = sp?.category === FABRIC_CATEGORY;
+                    const maxQty = sp?.quantity ?? 1;
+                    if (isFab) {
+                      return (
+                        <div>
+                          <Space.Compact>
+                            <Button onClick={() => setCartQuantity(Math.max(MIN_QTY, cartQuantity - STEP_QTY))}>−</Button>
+                            <InputNumber
+                              min={MIN_QTY}
+                              max={maxQty}
+                              step={STEP_QTY}
+                              value={cartQuantity}
+                              onChange={(v) => setCartQuantity(v ?? MIN_QTY)}
+                              style={{ width: 70, textAlign: 'center' }}
+                            />
+                            <Button onClick={() => setCartQuantity(Math.min(maxQty, cartQuantity + STEP_QTY))}>+</Button>
+                          </Space.Compact>
+                          <div style={{ fontSize: 12, color: '#888', marginTop: 2, textAlign: 'center' }}>
+                            {qtyLabel(cartQuantity)} yd
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <InputNumber
+                        min={1}
+                        max={maxQty}
+                        step={1}
+                        value={cartQuantity}
+                        onChange={(v) => setCartQuantity(v)}
+                        style={{ width: 80 }}
+                      />
+                    );
+                  })()}
                 </Col>
                 <Col>
                   <Button type="primary" icon={<PlusOutlined />} disabled={!canAddToCart} onClick={handleAddToCart}>
@@ -561,7 +621,7 @@ const Sales = () => {
                 dataSource={cart}
                 columns={[
                   { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
-                  { title: 'Qty', dataIndex: 'quantity', key: 'quantity' },
+                  { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty, r) => fmtQty(qty, r.is_fabric) },
                   { title: 'Unit Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}` },
                   {
                     title: 'Total', key: 'line_total',
@@ -604,7 +664,7 @@ const Sales = () => {
               <Descriptions bordered column={1} size="small">
                 {cart.map((item, idx) => (
                   <Descriptions.Item key={idx} label={item.product_name}>
-                    {item.quantity} × ₱{item.price} = ₱{(item.quantity * item.price).toLocaleString()}
+                    {fmtQty(item.quantity, item.is_fabric)} × ₱{item.price} = ₱{(item.quantity * item.price).toLocaleString()}
                   </Descriptions.Item>
                 ))}
                 {cart.length === 0 && (
@@ -681,7 +741,7 @@ const Sales = () => {
                 {(lastOrder.items || []).map((item) => (
                   <tr key={item.order_item_id}>
                     <td>{item.product_name}</td>
-                    <td style={{ textAlign: 'center' }}>{item.quantity}</td>
+                    <td style={{ textAlign: 'center' }}>{fmtQty(item.quantity, item.product?.category === FABRIC_CATEGORY)}</td>
                     <td style={{ textAlign: 'right' }}>₱{item.price}</td>
                     <td style={{ textAlign: 'right' }}>₱{(item.quantity * item.price).toLocaleString()}</td>
                   </tr>
