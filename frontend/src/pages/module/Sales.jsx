@@ -75,7 +75,7 @@ const Sales = () => {
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [cartQuantity, setCartQuantity] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
-  const [paymentAmount, setPaymentAmount] = useState(0);
+  const [paymentAmount, setPaymentAmount] = useState(null);
   const [orderDate, setOrderDate] = useState(dayjs());
   const [remarks, setRemarks] = useState('');
   const [expandedRowKeys, setExpandedRowKeys] = useState([]);
@@ -203,7 +203,7 @@ const Sales = () => {
     setSelectedProductId(null);
     setCartQuantity(1);
     setPaymentMethod('Cash');
-    setPaymentAmount(0);
+    setPaymentAmount(null);
     setOrderDate(dayjs());
     setRemarks('');
     form.resetFields();
@@ -690,7 +690,7 @@ const Sales = () => {
                 placeholder="Payment Amount"
                 prefix="₱"
                 value={paymentAmount}
-                onChange={(v) => setPaymentAmount(v || 0)}
+                onChange={(v) => setPaymentAmount(v)}
               />
               <div style={{ marginBottom: 8 }}>
                 <Text>Change: </Text>
