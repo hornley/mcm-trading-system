@@ -6,9 +6,9 @@ export const qtyLabel = (qty) => {
   const whole = Math.floor(n);
   const frac = Math.round((n - whole) * 100) / 100;
   let fracStr = '';
-  if (Math.abs(frac - 0.5) < 0.001) fracStr = '\u00BD';
-  else if (Math.abs(frac - 0.25) < 0.001) fracStr = '\u00BC';
-  else if (Math.abs(frac - 0.75) < 0.001) fracStr = '\u00BE';
+  if (Math.abs(frac - 0.5) < 0.001) fracStr = '½';
+  else if (Math.abs(frac - 0.25) < 0.001) fracStr = '¼';
+  else if (Math.abs(frac - 0.75) < 0.001) fracStr = '¾';
   else if (frac > 0) fracStr = n.toFixed(2);
   if (whole === 0) return fracStr || n.toString();
   return fracStr ? `${whole} ${fracStr}` : whole.toString();
