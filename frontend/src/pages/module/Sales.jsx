@@ -710,7 +710,7 @@ const Sales = () => {
         title="Receipt"
         open={receiptModalVisible}
         onCancel={() => setReceiptModalVisible(false)}
-        width={420}
+        width={520}
         footer={[
           <Button key="print" type="primary" icon={<PrinterOutlined />}
             onClick={() => window.print()}>
@@ -723,16 +723,16 @@ const Sales = () => {
         {lastOrder && (
           <div id="receipt-content">
             <div style={{ textAlign: 'center', marginBottom: 16 }}>
-              <Text strong style={{ fontSize: 16 }}>MCM Trading System</Text>
+              <Text strong style={{ fontSize: 18 }}>MCM Trading System</Text>
               <br />
-              <Text>{lastOrder.location_name || branchName}</Text>
+              <Text style={{ fontSize: 14 }}>{lastOrder.location_name || branchName}</Text>
               <br />
-              <Text type="secondary">Transaction #{lastOrder.order_id}</Text>
+              <Text type="secondary" style={{ fontSize: 13 }}>Transaction #{lastOrder.order_id}</Text>
               <br />
-              <Text type="secondary">{dayjs(lastOrder.order_date).format('YYYY-MM-DD hh:mm A')}</Text>
+              <Text type="secondary" style={{ fontSize: 13 }}>{dayjs(lastOrder.order_date).format('YYYY-MM-DD hh:mm A')}</Text>
             </div>
             <Divider style={{ margin: '8px 0' }} />
-            <table style={{ width: '100%', fontSize: 13 }}>
+            <table style={{ width: '100%', fontSize: 15 }}>
               <thead>
                 <tr>
                   <th style={{ textAlign: 'left' }}>Item</th>
@@ -752,37 +752,37 @@ const Sales = () => {
                 ))}
               </tbody>
             </table>
-            <Divider style={{ margin: '8px 0' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Text strong>Total:</Text>
-              <Text strong>₱{lastOrder.total_amount?.toLocaleString() || 0}</Text>
+            <Divider style={{ margin: '12px 0' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16 }}>
+              <Text strong style={{ fontSize: 16 }}>Total:</Text>
+              <Text strong style={{ fontSize: 16 }}>₱{lastOrder.total_amount?.toLocaleString() || 0}</Text>
             </div>
             {(lastOrder.payments || []).map((pmt) => (
               <div key={pmt.payment_id}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Text>Payment ({pmt.payment_method}):</Text>
-                  <Text>₱{pmt.price?.toLocaleString() || 0}</Text>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginTop: 4 }}>
+                  <Text style={{ fontSize: 14 }}>Payment ({pmt.payment_method}):</Text>
+                  <Text style={{ fontSize: 14 }}>₱{pmt.price?.toLocaleString() || 0}</Text>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Text>Change:</Text>
-                  <Text style={{ color: '#52c41a' }}>₱{Math.max(0, (pmt.price || 0) - (lastOrder.total_amount || 0)).toLocaleString()}</Text>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                  <Text style={{ fontSize: 14 }}>Change:</Text>
+                  <Text style={{ color: '#52c41a', fontSize: 14 }}>₱{Math.max(0, (pmt.price || 0) - (lastOrder.total_amount || 0)).toLocaleString()}</Text>
                 </div>
               </div>
             ))}
             {(lastOrder.auto_restocks || []).length > 0 && (
               <>
-                <Divider style={{ margin: '8px 0' }} />
-                <div style={{ fontSize: 11, color: '#52c41a' }}>
-                  <Text type="secondary" style={{ fontSize: 11 }}>Auto-Restock Triggered:</Text>
+                <Divider style={{ margin: '12px 0' }} />
+                <div style={{ fontSize: 13, color: '#52c41a' }}>
+                  <Text type="secondary" style={{ fontSize: 13 }}>Auto-Restock Triggered:</Text>
                   {lastOrder.auto_restocks.map((r, i) => (
-                    <div key={i}>{r.product_name}: +{qtyLabel(r.quantity)} from {r.from_location}</div>
+                    <div key={i} style={{ fontSize: 13 }}>{r.product_name}: +{qtyLabel(r.quantity)} from {r.from_location}</div>
                   ))}
                 </div>
               </>
             )}
-            <Divider style={{ margin: '8px 0' }} />
+            <Divider style={{ margin: '12px 0' }} />
             <div style={{ textAlign: 'center', marginTop: 8 }}>
-              <Text type="secondary" style={{ fontSize: 11 }}>Thank you for your purchase!</Text>
+              <Text type="secondary" style={{ fontSize: 14 }}>Thank you for your purchase!</Text>
             </div>
           </div>
         )}
