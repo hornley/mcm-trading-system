@@ -328,7 +328,11 @@ const Reports = () => {
                       <YAxis />
                       <Tooltip />
                       <Legend />
-                      <Bar dataKey="total_quantity" name="Total Quantity" fill="#1677ff" />
+                      <Bar dataKey="total_quantity" name="Total Quantity">
+                        {inventorySummary.by_branch.map((_, idx) => (
+                          <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
