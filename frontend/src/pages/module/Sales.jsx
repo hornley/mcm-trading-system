@@ -421,7 +421,7 @@ const Sales = () => {
       (order.items || []).forEach((item) => {
         const key = item.product_name;
         if (!grouped[key]) grouped[key] = { product_name: item.product_name, total_qty: 0, total_amount: 0, is_fabric: item.category === FABRIC_CATEGORY };
-        grouped[key].total_qty += item.quantity;
+        grouped[key].total_qty += Math.floor(item.quantity);
         grouped[key].total_amount += item.line_total;
       });
     });
@@ -446,7 +446,7 @@ const Sales = () => {
     },
     {
       title: 'Total Quantity Sold', dataIndex: 'total_qty', key: 'total_qty',
-      render: (qty, r) => fmtQty(qty, r.is_fabric),
+      render: (qty) => Math.floor(qty).toLocaleString(),
       sorter: (a, b) => a.total_qty - b.total_qty,
     },
     {
