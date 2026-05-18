@@ -66,6 +66,7 @@ const Sales = () => {
 
   const usertype = user?.usertype;
   const userId = user?.user_id;
+  const locationId = isManager ? user?.location_id : undefined;
 
   const apiParams = `usertype=${usertype}&user_id=${userId}` + (selectedLocationId && selectedLocationId !== 'all' ? `&location_id=${selectedLocationId}` : '');
 
