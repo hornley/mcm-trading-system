@@ -311,8 +311,14 @@ const Reports = () => {
       okType: 'danger',
       onOk: async () => {
         try {
-          const res = await fetch(`/api/store-reports/${reportId}?usertype=${user?.usertype}&user_id=${user?.user_id}`, {
-            method: 'DELETE',
+          const res = await fetch(`/api/store-reports/${reportId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              usertype: user?.usertype, 
+              user_id: user?.user_id,
+              status: 'voided' 
+            }),
           });
           const data = await res.json();
           if (data.success) {
