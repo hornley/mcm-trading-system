@@ -240,8 +240,12 @@ const Settings = () => {
                 }}
               />
             </Form.Item>
-            <div style={{ marginBottom: 16 }}>
-              <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: '#888', listStyleType: 'disc' }}>
+            {passwordSubmitted && (
+              <>
+                <div style={{ color: '#ff4d4f', marginBottom: 8, fontWeight: 500 }}>
+                  Please add all necessary characters to proceed:
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: '#888', listStyleType: 'disc' }}>
                 <li style={{ color: passwordSubmitted && !passwordValidation.length ? '#ff4d4f' : '#888' }}>
                   Minimum 6 characters
                 </li>
@@ -258,7 +262,8 @@ const Settings = () => {
                   One number
                 </li>
               </ul>
-            </div>
+              </>
+            )}
             <Form.Item 
               name="confirmPassword" 
               label="Confirm New Password"
