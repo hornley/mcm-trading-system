@@ -270,29 +270,28 @@ const Settings = () => {
               />
             </Form.Item>
             {passwordSubmitted && (
-              <>
-                <div style={{ color: '#ff4d4f', marginBottom: 8, fontWeight: 500 }}>
-                  Please add all necessary characters to proceed:
-                </div>
-                <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: '#888', listStyleType: 'disc' }}>
-                <li style={{ color: passwordSubmitted && !passwordValidation.length ? '#ff4d4f' : '#888' }}>
-                  Minimum 6 characters
-                </li>
-                <li style={{ color: passwordSubmitted && !passwordValidation.uppercase ? '#ff4d4f' : '#888' }}>
-                  One uppercase character
-                </li>
-                <li style={{ color: passwordSubmitted && !passwordValidation.lowercase ? '#ff4d4f' : '#888' }}>
-                  One lowercase character
-                </li>
-                <li style={{ color: passwordSubmitted && !passwordValidation.special ? '#ff4d4f' : '#888' }}>
-                  One special character
-                </li>
-                <li style={{ color: passwordSubmitted && !passwordValidation.number ? '#ff4d4f' : '#888' }}>
-                  One number
-                </li>
-              </ul>
-              </>
+              <div style={{ color: '#ff4d4f', marginBottom: 8, fontWeight: 500 }}>
+                Please add all necessary characters to proceed:
+              </div>
             )}
+            <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: '#888', listStyleType: 'disc' }}>
+              <li style={{ color: passwordSubmitted && !passwordValidation.length ? '#ff4d4f' : '#888' }}>
+                Minimum 6 characters
+              </li>
+              <li style={{ color: passwordSubmitted && !passwordValidation.uppercase ? '#ff4d4f' : '#888' }}>
+                One uppercase character
+              </li>
+              <li style={{ color: passwordSubmitted && !passwordValidation.lowercase ? '#ff4d4f' : '#888' }}>
+                One lowercase character
+              </li>
+              <li style={{ color: passwordSubmitted && !passwordValidation.special ? '#ff4d4f' : '#888' }}>
+                One special character
+              </li>
+              <li style={{ color: passwordSubmitted && !passwordValidation.number ? '#ff4d4f' : '#888' }}>
+                One number
+              </li>
+            </ul>
+            <div style={{ marginBottom: 16 }} />
             <Form.Item 
               name="confirmPassword" 
               label={<span>Confirm New Password {confirmPasswordMatch && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: 8 }} />}</span>}
