@@ -48,6 +48,8 @@ const Reports = () => {
   const [financialData, setFinancialData] = useState({ stats: {}, revenue: [], paymentMethods: [] });
   const [activityData, setActivityData] = useState({ stats: {}, by_user: [], by_module: [] });
   const [systemData, setSystemData] = useState({ stats: {}, backups: [] });
+  const [storeReports, setStoreReports] = useState([]);
+  const [loadingStoreReports, setLoadingStoreReports] = useState(false);
 
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productsList, setProductsList] = useState([]);
@@ -209,6 +211,21 @@ const Reports = () => {
     }
   };
 
+  const fetchStoreReports = async () => {
+    setLoadingStoreReports(true);
+    try {
+      const res = await fetch(`/api/store-reports?usertype=${user?.usertype}&user_id=${user?.user_id}`);
+      const data = await res.json();
+      if (data.success) {
+        setStoreReports(data.data || []);
+      }
+    } catch {
+      message.error('Failed to load store reports');
+    } finally {
+      setLoadingStoreReports(false);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
     if (activeTab === 'inventory') {
@@ -217,7 +234,10 @@ const Reports = () => {
     }
     else if (activeTab === 'sales') fetchSales();
     else if (activeTab === 'financial') fetchFinancial();
-    else if (activeTab === 'activity') fetchActivity();
+    else if (activeTab === 'activity') {
+      fetchActivity();
+      fetchStoreReports();
+    }
     else if (activeTab === 'system') fetchSystem();
   }, [activeTab]);
 
@@ -556,6 +576,31 @@ const Reports = () => {
               </Card>
             </Col>
           </Row>
+          <Divider />
+          <Card title="Store Reports" extra={<Tag color="blue">{storeReports.length} total</Tag>}>
+            <Spin spinning={loadingStoreReports}>
+              <Table
+                dataSource={storeReports}
+                columns={[
+                  { title: 'User', dataIndex: 'username', key: 'username' },
+                  { title: 'Branch', dataIndex: 'location_name', key: 'location_name' },
+                  { title: 'Issue Type', dataIndex: 'issue_type', key: 'issue_type', render: (v) => {
+                    const labels = { store: 'Store Issue', materials: 'Materials Issue', software: 'Software Issue' };
+                    return <Tag>{labels[v] || v}</Tag>;
+                  }},
+                  { title: 'Status', dataIndex: 'status', key: 'status', render: (v) => {
+                    const colors = { pending: 'orange', resolved: 'green', voided: 'red' };
+                    return <Tag color={colors[v]}>{v}</Tag>;
+                  }},
+                  { title: 'Date', dataIndex: 'created_at', key: 'created_at', render: (v) => v ? new Date(v).toLocaleString() : '' },
+                  { title: 'Description', dataIndex: 'description', key: 'description', ellipsis: true },
+                ]}
+                rowKey="report_id"
+                pagination={{ pageSize: 10 }}
+                size="small"
+              />
+            </Spin>
+          </Card>
         </Spin>
       ),
     });
