@@ -50,6 +50,10 @@ const Reports = () => {
   const [systemData, setSystemData] = useState({ stats: {}, backups: [] });
   const [storeReports, setStoreReports] = useState([]);
   const [loadingStoreReports, setLoadingStoreReports] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportForm] = Form.useForm();
+  const [editingReport, setEditingReport] = useState(null);
+  const [selectedLocationIdForReport, setSelectedLocationIdForReport] = useState('all');
 
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productsList, setProductsList] = useState([]);
@@ -224,6 +228,101 @@ const Reports = () => {
     } finally {
       setLoadingStoreReports(false);
     }
+  };
+
+  const handleCreateReport = () => {
+    setEditingReport(null);
+    reportForm.resetFields();
+    setReportModalOpen(true);
+  };
+
+  const handleEditReport = (report) => {
+    setEditingReport(report);
+    reportForm.setFieldsValue({
+      title: report.title,
+      issue_type: report.issue_type,
+      description: report.description,
+    });
+    setReportModalOpen(true);
+  };
+
+  const handleSubmitReport = async (values) => {
+    try {
+      const payload = {
+        usertype: user?.usertype,
+        user_id: user?.user_id,
+        location_id: selectedLocationId === 'all' ? 1 : selectedLocationId,
+        title: values.title,
+        issue_type: values.issue_type,
+        description: values.description,
+      };
+
+      let res;
+      if (editingReport) {
+        res = await fetch(`/api/store-reports/${editingReport.report_id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        res = await fetch('/api/store-reports', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      const data = await res.json();
+      if (data.success) {
+        message.success(editingReport ? 'Report updated' : 'Report created');
+        setReportModalOpen(false);
+        fetchStoreReports();
+      } else {
+        message.error(data.error || 'Failed to save report');
+      }
+    } catch {
+      message.error('Failed to save report');
+    }
+  };
+
+  const handleUpdateStatus = async (reportId, newStatus) => {
+    try {
+      const res = await fetch(`/api/store-reports/${reportId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usertype: user?.usertype, user_id: user?.user_id, status: newStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        message.success('Status updated');
+        fetchStoreReports();
+      }
+    } catch {
+      message.error('Failed to update status');
+    }
+  };
+
+  const handleVoidReport = (reportId) => {
+    Modal.confirm({
+      title: 'Void Report',
+      content: 'Are you sure you want to void this report?',
+      okText: 'Yes, Void',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          const res = await fetch(`/api/store-reports/${reportId}?usertype=${user?.usertype}&user_id=${user?.user_id}`, {
+            method: 'DELETE',
+          });
+          const data = await res.json();
+          if (data.success) {
+            message.success('Report voided');
+            fetchStoreReports();
+          }
+        } catch {
+          message.error('Failed to void report');
+        }
+      },
+    });
   };
 
   useEffect(() => {
@@ -577,7 +676,7 @@ const Reports = () => {
             </Col>
           </Row>
           <Divider />
-          <Card title="Store Reports" extra={<Tag color="blue">{storeReports.length} total</Tag>}>
+          <Card title="Store Reports" extra={<Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleCreateReport}>New Report</Button>}>
             <Spin spinning={loadingStoreReports}>
               <Table
                 dataSource={storeReports}
@@ -588,11 +687,30 @@ const Reports = () => {
                     const labels = { store: 'Store Issue', materials: 'Materials Issue', software: 'Software Issue' };
                     return <Tag>{labels[v] || v}</Tag>;
                   }},
-                  { title: 'Status', dataIndex: 'status', key: 'status', render: (v) => {
+                  { title: 'Status', dataIndex: 'status', key: 'status', render: (v, record) => {
                     const colors = { pending: 'orange', resolved: 'green', voided: 'red' };
-                    return <Tag color={colors[v]}>{v}</Tag>;
+                    return (
+                      <Space>
+                        <Tag color={colors[v]}>{v}</Tag>
+                        {v === 'pending' && (
+                          <>
+                            <Button size="small" type="link" onClick={() => handleUpdateStatus(record.report_id, 'resolved')}>Resolve</Button>
+                          </>
+                        )}
+                      </Space>
+                    );
                   }},
                   { title: 'Date', dataIndex: 'created_at', key: 'created_at', render: (v) => v ? new Date(v).toLocaleString() : '' },
+                  { title: 'Actions', key: 'actions', render: (_, record) => (
+                    <Space>
+                      {record.status === 'pending' && (
+                        <>
+                          <Button size="small" icon={<EditOutlined />} onClick={() => handleEditReport(record)} />
+                          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleVoidReport(record.report_id)} />
+                        </>
+                      )}
+                    </Space>
+                  )},
                 ]}
                 rowKey="report_id"
                 pagination={{ pageSize: 10 }}
@@ -638,12 +756,42 @@ const Reports = () => {
     return <ManagerReports user={user} selectedLocationId={selectedLocationId} />;
   }
 
+  const isOwnerOrAdmin = user?.role === 'owner' || user?.role === 'admin';
+
   return (
     <div>
       <Title level={4} style={{ marginBottom: 16 }}>Reports</Title>
       <Card styles={{ body: { padding: '16px 24px' } }}>
         <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabs} />
       </Card>
+      {isOwnerOrAdmin && (
+        <Modal
+          title={editingReport ? 'Edit Report' : 'New Report'}
+          open={reportModalOpen}
+          onCancel={() => setReportModalOpen(false)}
+          footer={null}
+        >
+          <Form form={reportForm} layout="vertical" onFinish={handleSubmitReport}>
+            <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Please enter a title' }]}>
+              <Input placeholder="Enter report title" />
+            </Form.Item>
+            <Form.Item name="issue_type" label="Issue Type" rules={[{ required: true, message: 'Please select issue type' }]}>
+              <Select placeholder="Select issue type" options={ISSUE_TYPES} />
+            </Form.Item>
+            <Form.Item name="description" label="Description" rules={[{ required: true, message: 'Please enter description' }]}>
+              <Input.TextArea rows={4} placeholder="Explain the issue in detail..." />
+            </Form.Item>
+            <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+              <Space>
+                <Button onClick={() => setReportModalOpen(false)}>Cancel</Button>
+                <Button type="primary" htmlType="submit">
+                  {editingReport ? 'Update' : 'Submit'}
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
+      )}
     </div>
   );
 };
