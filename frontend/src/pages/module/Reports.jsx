@@ -11,6 +11,7 @@ import {
 import {
   DatabaseOutlined, ShoppingCartOutlined, DollarOutlined,
   UserOutlined, SettingOutlined, PlusOutlined, EditOutlined, DeleteOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { qtyLabel } from '../../utils/format.js';
@@ -51,6 +52,8 @@ const Reports = () => {
   const [storeReports, setStoreReports] = useState([]);
   const [loadingStoreReports, setLoadingStoreReports] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewingReport, setViewingReport] = useState(null);
   const [reportForm] = Form.useForm();
   const [editingReport, setEditingReport] = useState(null);
   const [locations, setLocations] = useState([]);
@@ -245,6 +248,11 @@ const Reports = () => {
       description: report.description,
     });
     setReportModalOpen(true);
+  };
+
+  const handleViewReport = (report) => {
+    setViewingReport(report);
+    setViewModalOpen(true);
   };
 
   const handleSubmitReport = async (values) => {
@@ -729,16 +737,20 @@ const Reports = () => {
                     );
                   }},
                   { title: 'Date', dataIndex: 'created_at', key: 'created_at', render: (v) => v ? new Date(v).toLocaleString() : '' },
-                  { title: 'Actions', key: 'actions', render: (_, record) => (
-                    <Space>
-                      {record.status === 'pending' && (
-                        <>
-                          <Button size="small" icon={<EditOutlined />} onClick={() => handleEditReport(record)} />
-                          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleVoidReport(record.report_id)} />
-                        </>
-                      )}
-                    </Space>
-                  )},
+                  { title: 'Actions', key: 'actions', render: (_, record) => {
+                    const isCreator = user?.user_id === record.user_id;
+                    return (
+                      <Space>
+                        <Button size="small" icon={<EyeOutlined />} onClick={() => handleViewReport(record)} />
+                        {record.status === 'pending' && isCreator && (
+                          <>
+                            <Button size="small" icon={<EditOutlined />} onClick={() => handleEditReport(record)} />
+                            <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleVoidReport(record.report_id)} />
+                          </>
+                        )}
+                      </Space>
+                    );
+                  }},
                 ]}
                 rowKey="report_id"
                 pagination={{ pageSize: 10 }}
@@ -793,35 +805,100 @@ const Reports = () => {
         <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabs} />
       </Card>
       {isOwnerOrAdmin && (
-        <Modal
-          title={editingReport ? 'Edit Report' : 'New Report'}
-          open={reportModalOpen}
-          onCancel={() => setReportModalOpen(false)}
-          footer={null}
-        >
-          <Form form={reportForm} layout="vertical" onFinish={handleSubmitReport}>
-            <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Please enter a title' }]}>
-              <Input placeholder="Enter report title" />
-            </Form.Item>
-            <Form.Item name="location_id" label="Branch" rules={[{ required: true, message: 'Please select branch' }]}>
-              <Select placeholder="Select branch" options={locations} />
-            </Form.Item>
-            <Form.Item name="issue_type" label="Issue Type" rules={[{ required: true, message: 'Please select issue type' }]}>
-              <Select placeholder="Select issue type" options={ISSUE_TYPES} />
-            </Form.Item>
-            <Form.Item name="description" label="Description" rules={[{ required: true, message: 'Please enter description' }]}>
-              <Input.TextArea rows={4} placeholder="Explain the issue in detail..." />
-            </Form.Item>
-            <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-              <Space>
-                <Button onClick={() => setReportModalOpen(false)}>Cancel</Button>
-                <Button type="primary" htmlType="submit">
-                  {editingReport ? 'Update' : 'Submit'}
-                </Button>
-              </Space>
-            </Form.Item>
-          </Form>
+        <>
+          <Modal
+            title={editingReport ? 'Edit Report' : 'New Report'}
+            open={reportModalOpen}
+            onCancel={() => setReportModalOpen(false)}
+            footer={null}
+          >
+            <Form form={reportForm} layout="vertical" onFinish={handleSubmitReport}>
+              <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Please enter a title' }]}>
+                <Input placeholder="Enter report title" />
+              </Form.Item>
+              <Form.Item name="location_id" label="Branch" rules={[{ required: true, message: 'Please select branch' }]}>
+                <Select placeholder="Select branch" options={locations} />
+              </Form.Item>
+              <Form.Item name="issue_type" label="Issue Type" rules={[{ required: true, message: 'Please select issue type' }]}>
+                <Select placeholder="Select issue type" options={ISSUE_TYPES} />
+              </Form.Item>
+              <Form.Item name="description" label="Description" rules={[{ required: true, message: 'Please enter description' }]}>
+                <Input.TextArea rows={4} placeholder="Explain the issue in detail..." />
+              </Form.Item>
+              <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+                <Space>
+                  <Button onClick={() => setReportModalOpen(false)}>Cancel</Button>
+                  <Button type="primary" htmlType="submit">
+                    {editingReport ? 'Update' : 'Submit'}
+                  </Button>
+                </Space>
+              </Form.Item>
+            </Form>
+          </Modal>
+          <Modal
+            title="View Report"
+            open={viewModalOpen}
+            onCancel={() => setViewModalOpen(false)}
+            footer={<Button onClick={() => setViewModalOpen(false)}>Close</Button>}
+          >
+          {viewingReport && (
+            <div>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12}>
+                  <div style={{ color: '#888', fontSize: 12 }}>Title</div>
+                  <div style={{ fontSize: 16, fontWeight: 500 }}>{viewingReport.title}</div>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <div style={{ color: '#888', fontSize: 12 }}>Branch</div>
+                  <div>{viewingReport.location_name}</div>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <div style={{ color: '#888', fontSize: 12 }}>Issue Type</div>
+                  <div>
+                    <Tag color="blue">
+                      {ISSUE_TYPES.find((t) => t.value === viewingReport.issue_type)?.label}
+                    </Tag>
+                  </div>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <div style={{ color: '#888', fontSize: 12 }}>Status</div>
+                  <div>
+                    <Tag color={viewingReport.status === 'resolved' ? 'green' : viewingReport.status === 'voided' ? 'red' : 'orange'}>
+                      {viewingReport.status}
+                    </Tag>
+                  </div>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <div style={{ color: '#888', fontSize: 12 }}>Submitted By</div>
+                  <div>{viewingReport.username}</div>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <div style={{ color: '#888', fontSize: 12 }}>Date Submitted</div>
+                  <div>{viewingReport.created_at ? new Date(viewingReport.created_at).toLocaleString() : ''}</div>
+                </Col>
+                {viewingReport.status === 'resolved' && viewingReport.resolved_by_username && (
+                  <>
+                    <Col xs={24} sm={12}>
+                      <div style={{ color: '#888', fontSize: 12 }}>Resolved By</div>
+                      <div>{viewingReport.resolved_by_username}</div>
+                    </Col>
+                    <Col xs={24} sm={12}>
+                      <div style={{ color: '#888', fontSize: 12 }}>Resolved At</div>
+                      <div>{viewingReport.resolved_at ? new Date(viewingReport.resolved_at).toLocaleString() : ''}</div>
+                    </Col>
+                  </>
+                )}
+                <Col xs={24}>
+                  <div style={{ color: '#888', fontSize: 12 }}>Description</div>
+                  <div style={{ whiteSpace: 'pre-wrap', background: '#fafafa', padding: 12, borderRadius: 4 }}>
+                    {viewingReport.description}
+                  </div>
+                </Col>
+              </Row>
+            </div>
+          )}
         </Modal>
+        </>
       )}
     </div>
   );
