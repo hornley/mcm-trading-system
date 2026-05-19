@@ -53,7 +53,7 @@ const Reports = () => {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportForm] = Form.useForm();
   const [editingReport, setEditingReport] = useState(null);
-  const [selectedLocationIdForReport, setSelectedLocationIdForReport] = useState('all');
+  const [locations, setLocations] = useState([]);
 
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productsList, setProductsList] = useState([]);
@@ -240,6 +240,7 @@ const Reports = () => {
     setEditingReport(report);
     reportForm.setFieldsValue({
       title: report.title,
+      location_id: report.location_id,
       issue_type: report.issue_type,
       description: report.description,
     });
@@ -251,7 +252,7 @@ const Reports = () => {
       const payload = {
         usertype: user?.usertype,
         user_id: user?.user_id,
-        location_id: selectedLocationId === 'all' ? 1 : selectedLocationId,
+        location_id: values.location_id,
         title: values.title,
         issue_type: values.issue_type,
         description: values.description,
@@ -324,6 +325,22 @@ const Reports = () => {
       },
     });
   };
+
+  const fetchLocations = async () => {
+    try {
+      const res = await fetch(`/api/locations?usertype=${user?.usertype}`);
+      const data = await res.json();
+      if (data.success) {
+        setLocations(data.data.map((l) => ({ label: l.name, value: l.location_id })));
+      }
+    } catch {
+      message.error('Failed to load locations');
+    }
+  };
+
+  useEffect(() => {
+    fetchLocations();
+  }, []);
 
   useEffect(() => {
     fetchProducts();
@@ -774,6 +791,9 @@ const Reports = () => {
           <Form form={reportForm} layout="vertical" onFinish={handleSubmitReport}>
             <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Please enter a title' }]}>
               <Input placeholder="Enter report title" />
+            </Form.Item>
+            <Form.Item name="location_id" label="Branch" rules={[{ required: true, message: 'Please select branch' }]}>
+              <Select placeholder="Select branch" options={locations} />
             </Form.Item>
             <Form.Item name="issue_type" label="Issue Type" rules={[{ required: true, message: 'Please select issue type' }]}>
               <Select placeholder="Select issue type" options={ISSUE_TYPES} />
