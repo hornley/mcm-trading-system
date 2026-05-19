@@ -59,14 +59,17 @@ const Help = () => {
       <Title level={4} style={{ marginBottom: 4 }}>Help</Title>
       <Text type="secondary" style={{ marginBottom: 24, display: 'block' }}>How can we help you?</Text>
 
-      <Search
-        placeholder="Search through FAQs and user manual..."
-        value={searchText}
-        onChange={(e) => setSearchText(e.target.value)}
-        enterButton
-        size="large"
-        style={{ maxWidth: 600, marginBottom: 24, display: 'block' }}
-      />
+      <Row justify="center" style={{ marginBottom: 24 }}>
+        <Col xs={24} md={16} lg={12}>
+          <Search
+            placeholder="Search through FAQs and user manual..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            enterButton
+            size="large"
+          />
+        </Col>
+      </Row>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={16}>
