@@ -18,6 +18,15 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [profileForm] = Form.useForm();
   const [prefForm] = Form.useForm();
+  const [passwordForm] = Form.useForm();
+  const [passwordValidation, setPasswordValidation] = useState({
+    length: false,
+    uppercase: false,
+    lowercase: false,
+    special: false,
+    number: false,
+  });
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
     if (!user) return;
@@ -105,6 +114,39 @@ const Settings = () => {
     }
   };
 
+  const handlePasswordChange = async () => {
+    try {
+      const values = await passwordForm.validateFields();
+      const { oldPassword, newPassword, confirmPassword } = values;
+      
+      if (newPassword !== confirmPassword) {
+        message.error('Passwords do not match');
+        return;
+      }
+
+      const res = await fetch('/api/settings/password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.user_id,
+          old_password: oldPassword,
+          new_password: newPassword,
+        }),
+      });
+      const data = await res.json();
+      if (data.message) {
+        message.success('Password changed successfully');
+        passwordForm.resetFields();
+        setPasswordValidation({ length: false, uppercase: false, lowercase: false, special: false, number: false });
+      } else {
+        message.error(data.error || 'Failed to change password');
+      }
+    } catch (err) {
+      if (err?.errorFields) return;
+      message.error('Failed to change password');
+    }
+  };
+
   if (loading) return <Card style={{ textAlign: 'center' }}><Spin size="large" /></Card>;
 
   const menuItems = [
@@ -153,9 +195,74 @@ const Settings = () => {
         );
       case 'password':
         return (
-          <div style={{ padding: 24, textAlign: 'center' }}>
-            <Text type="secondary">Change password functionality coming soon.</Text>
-          </div>
+          <Form form={passwordForm} layout="vertical" style={{ maxWidth: 400 }}>
+            <Form.Item name="oldPassword" label="Old Password" rules={[{ required: true, message: 'Enter old password' }]}>
+              <Input.Password placeholder="Enter old password" />
+            </Form.Item>
+            <Form.Item 
+              name="newPassword" 
+              label="New Password"
+              rules={[{ required: true, message: 'Enter new password' }]}
+            >
+              <Input.Password 
+                placeholder="Enter new password"
+                onChange={(e) => {
+                  const pwd = e.target.value;
+                  setPasswordValidation({
+                    length: pwd.length >= 6,
+                    uppercase: /[A-Z]/.test(pwd),
+                    lowercase: /[a-z]/.test(pwd),
+                    special: /[!@#$%^&*(),.?":{}|<>]/.test(pwd),
+                    number: /[0-9]/.test(pwd),
+                  });
+                }}
+              />
+            </Form.Item>
+            <div style={{ marginBottom: 16, color: '#888' }}>
+              <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13 }}>
+                <li style={{ color: passwordValidation.length ? '#ff4d4f' : '#888' }}>
+                  Minimum 6 characters
+                </li>
+                <li style={{ color: passwordValidation.uppercase ? '#ff4d4f' : '#888' }}>
+                  One uppercase character
+                </li>
+                <li style={{ color: passwordValidation.lowercase ? '#ff4d4f' : '#888' }}>
+                  One lowercase character
+                </li>
+                <li style={{ color: passwordValidation.special ? '#ff4d4f' : '#888' }}>
+                  One special character
+                </li>
+                <li style={{ color: passwordValidation.number ? '#ff4d4f' : '#888' }}>
+                  One number
+                </li>
+              </ul>
+            </div>
+            <Form.Item 
+              name="confirmPassword" 
+              label="Confirm New Password"
+              rules={[
+                { required: true, message: 'Confirm new password' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (!value || getFieldValue('newPassword') === value) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(new Error('Passwords do not match'));
+                  },
+                }),
+              ]}
+            >
+              <Input.Password placeholder="Confirm new password" />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" block onClick={handlePasswordChange}>
+                Change Password
+              </Button>
+            </Form.Item>
+            <div style={{ textAlign: 'center' }}>
+              <a href="/forgot-password" style={{ fontSize: 13 }}>Forgot Password?</a>
+            </div>
+          </Form>
         );
       case 'notifications':
         return (
