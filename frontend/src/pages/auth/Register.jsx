@@ -7,6 +7,7 @@ const { Title } = Typography
 
 const Register = () => {
   const [loading, setLoading] = useState(false)
+  const [phoneError, setPhoneError] = useState('')
   const navigate = useNavigate()
 
   const handleRegister = async (values) => {
@@ -53,8 +54,21 @@ const Register = () => {
         <Form.Item name="address">
           <Input prefix={<HomeOutlined />} placeholder="Address (optional)" size="large" />
         </Form.Item>
-        <Form.Item name="phoneNumber">
-          <Input prefix={<PhoneOutlined />} placeholder="Phone Number (optional)" size="large" />
+        <Form.Item name="phoneNumber" extra={phoneError ? <span style={{ color: '#ff4d4f', fontSize: 12 }}>{phoneError}</span> : null}>
+          <Input 
+            prefix={<><PhoneOutlined /> <span style={{ color: '#666', marginLeft: 4 }}>63+</span></>} 
+            placeholder="9XXXXXXXXX" 
+            size="large"
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, '');
+              if (value && !value.startsWith('639')) {
+                setPhoneError('Invalid number');
+              } else {
+                setPhoneError('');
+              }
+            }}
+            maxLength={10}
+          />
         </Form.Item>
         <Form.Item style={{ marginBottom: 12 }}>
           <Button type="primary" htmlType="submit" loading={loading} block size="large" style={{ borderRadius: 8 }}>

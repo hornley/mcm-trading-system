@@ -18,6 +18,7 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [profileForm] = Form.useForm();
   const [prefForm] = Form.useForm();
+  const [formState, setFormState] = useState({ phoneError: '' });
 
   useEffect(() => {
     if (!user) return;
@@ -125,8 +126,23 @@ const Settings = () => {
               <Form.Item name="email" label="Email" rules={[{ type: 'email', message: 'Enter a valid email' }]}>
                 <Input placeholder="your@email.com" />
               </Form.Item>
-              <Form.Item name="phone" label="Phone">
-                <Input placeholder="Phone number" />
+              <Form.Item name="phone" label="Phone" rules={[
+                { required: false },
+                { pattern: /^639\d{7}$/, message: 'Invalid number' }
+              ]} extra={<span style={{ color: '#ff4d4f', fontSize: 12 }}>{formState.phoneError}</span>}>
+                <Input
+                  placeholder="63+ 9XXXXXXXXX"
+                  prefix={<span style={{ color: '#666' }}>63+</span>}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '');
+                    if (value && !value.startsWith('639')) {
+                      setFormState(prev => ({ ...prev, phoneError: 'Invalid number' }));
+                    } else {
+                      setFormState(prev => ({ ...prev, phoneError: '' }));
+                    }
+                  }}
+                  maxLength={10}
+                />
               </Form.Item>
               <Form.Item>
                 <Button type="primary" icon={<SaveOutlined />} onClick={handleProfileSave} loading={saving}>
