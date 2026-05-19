@@ -18,7 +18,6 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [profileForm] = Form.useForm();
   const [prefForm] = Form.useForm();
-  const [formState, setFormState] = useState({ phoneError: '' });
 
   useEffect(() => {
     if (!user) return;
@@ -28,9 +27,10 @@ const Settings = () => {
         const res = await fetch(`/api/settings?user_id=${user.user_id}&usertype=${user.usertype}`);
         const data = await res.json();
         if (data.user_id) {
+          const phoneValue = data.phone && data.phone.startsWith('63') ? data.phone.slice(2) : data.phone;
           profileForm.setFieldsValue({
             email: data.email,
-            phone: data.phone,
+            phone: phoneValue,
           });
           prefForm.setFieldsValue({
             theme: data.theme || 'light',
@@ -52,13 +52,14 @@ const Settings = () => {
     try {
       const values = await profileForm.validateFields();
       setSaving(true);
+      const phoneValue = values.phone ? '63' + values.phone : values.phone;
       const res = await fetch('/api/settings/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: user.user_id,
           usertype: user.usertype,
-          ...values,
+          phone: phoneValue,
         }),
       });
       const data = await res.json();
@@ -128,21 +129,19 @@ const Settings = () => {
               </Form.Item>
               <Form.Item name="phone" label="Phone" rules={[
                 { required: false },
-                { pattern: /^639\d{7}$/, message: 'Invalid number' }
-              ]} extra={<span style={{ color: '#ff4d4f', fontSize: 12 }}>{formState.phoneError}</span>}>
-                <Input
-                  placeholder="63+ 9XXXXXXXXX"
-                  prefix={<span style={{ color: '#666' }}>63+</span>}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, '');
-                    if (value && !value.startsWith('639')) {
-                      setFormState(prev => ({ ...prev, phoneError: 'Invalid number' }));
-                    } else {
-                      setFormState(prev => ({ ...prev, phoneError: '' }));
-                    }
-                  }}
-                  maxLength={10}
-                />
+                { validator: (_, value) => {
+                  if (!value) return Promise.resolve();
+                  if (!/^\d+$/.test(value)) {
+                    return Promise.reject(new Error('Invalid number'));
+                  }
+                  const fullNumber = '63' + value;
+                  if (fullNumber.length !== 12 || !fullNumber.startsWith('63')) {
+                    return Promise.reject(new Error('Invalid number'));
+                  }
+                  return Promise.resolve();
+                }, validateTrigger: 'onSubmit' },
+              ]}>
+                <Input prefix={<span style={{ color: '#666' }}>63+</span>} maxLength={10} />
               </Form.Item>
               <Form.Item>
                 <Button type="primary" icon={<SaveOutlined />} onClick={handleProfileSave} loading={saving}>

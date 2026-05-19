@@ -7,16 +7,19 @@ const { Title } = Typography
 
 const Register = () => {
   const [loading, setLoading] = useState(false)
-  const [phoneError, setPhoneError] = useState('')
   const navigate = useNavigate()
 
   const handleRegister = async (values) => {
     setLoading(true)
     try {
+      const payload = { ...values }
+      if (payload.phoneNumber) {
+        payload.phoneNumber = '63' + payload.phoneNumber
+      }
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -54,19 +57,22 @@ const Register = () => {
         <Form.Item name="address">
           <Input prefix={<HomeOutlined />} placeholder="Address (optional)" size="large" />
         </Form.Item>
-        <Form.Item name="phoneNumber" extra={phoneError ? <span style={{ color: '#ff4d4f', fontSize: 12 }}>{phoneError}</span> : null}>
+        <Form.Item name="phoneNumber" rules={[
+            { validator: (_, value) => {
+              if (!value) return Promise.resolve();
+              if (!/^\d+$/.test(value)) {
+                return Promise.reject(new Error('Invalid number'));
+              }
+              const fullNumber = '63' + value;
+              if (fullNumber.length !== 12 || !fullNumber.startsWith('63')) {
+                return Promise.reject(new Error('Invalid number'));
+              }
+              return Promise.resolve();
+            }, validateTrigger: 'onSubmit' },
+          ]}>
           <Input 
             prefix={<><PhoneOutlined /> <span style={{ color: '#666', marginLeft: 4 }}>63+</span></>} 
-            placeholder="9XXXXXXXXX" 
             size="large"
-            onChange={(e) => {
-              const value = e.target.value.replace(/\D/g, '');
-              if (value && !value.startsWith('639')) {
-                setPhoneError('Invalid number');
-              } else {
-                setPhoneError('');
-              }
-            }}
             maxLength={10}
           />
         </Form.Item>
