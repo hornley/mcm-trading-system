@@ -233,8 +233,8 @@ const Reports = () => {
   }, [selectedLocationId]);
 
   const isOwner = user?.role === 'owner';
-  const isManager = user?.role === 'manager';
   const isAdmin = user?.role === 'admin';
+  const isManager = user?.role === 'manager';
 
   const inventoryColsBranch = [
     { title: 'Branch', dataIndex: 'location_name', key: 'location_name', sorter: (a, b) => (a.location_name || '').localeCompare(b.location_name || '') },
@@ -286,7 +286,7 @@ const Reports = () => {
 
   const tabs = [];
 
-  if (isOwner || isManager) {
+  if (isOwner) {
     tabs.push({
       key: 'inventory',
       label: <span><DatabaseOutlined /> Inventory</span>,
@@ -587,6 +587,19 @@ const Reports = () => {
         </Spin>
       ),
     });
+  }
+
+  if (isManager) {
+    return (
+      <div>
+        <Title level={4} style={{ marginBottom: 16 }}>Reports</Title>
+        <Card>
+          <div style={{ textAlign: 'center', padding: '48px 0', color: '#888' }}>
+            Reports module coming soon
+          </div>
+        </Card>
+      </div>
+    );
   }
 
   return (
