@@ -12,10 +12,14 @@ const Register = () => {
   const handleRegister = async (values) => {
     setLoading(true)
     try {
+      const payload = { ...values }
+      if (payload.phoneNumber) {
+        payload.phoneNumber = '63' + payload.phoneNumber
+      }
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -53,8 +57,24 @@ const Register = () => {
         <Form.Item name="address">
           <Input prefix={<HomeOutlined />} placeholder="Address (optional)" size="large" />
         </Form.Item>
-        <Form.Item name="phoneNumber">
-          <Input prefix={<PhoneOutlined />} placeholder="Phone Number (optional)" size="large" />
+        <Form.Item name="phoneNumber" rules={[
+            { validator: (_, value) => {
+              if (!value) return Promise.resolve();
+              if (!/^\d+$/.test(value)) {
+                return Promise.reject(new Error('Invalid number'));
+              }
+              const fullNumber = '63' + value;
+              if (fullNumber.length !== 12 || !fullNumber.startsWith('63')) {
+                return Promise.reject(new Error('Invalid number'));
+              }
+              return Promise.resolve();
+            }, validateTrigger: 'onSubmit' },
+          ]}>
+          <Input 
+            prefix={<><PhoneOutlined /> <span style={{ color: '#666', marginLeft: 4 }}>63+</span></>} 
+            size="large"
+            maxLength={10}
+          />
         </Form.Item>
         <Form.Item style={{ marginBottom: 12 }}>
           <Button type="primary" htmlType="submit" loading={loading} block size="large" style={{ borderRadius: 8 }}>
