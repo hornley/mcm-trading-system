@@ -20,13 +20,13 @@ const Settings = () => {
   const [prefForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
   const [passwordValidation, setPasswordValidation] = useState({
-    length: false,
-    uppercase: false,
-    lowercase: false,
-    special: false,
-    number: false,
+    length: null,
+    uppercase: null,
+    lowercase: null,
+    special: null,
+    number: null,
   });
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSubmitted, setPasswordSubmitted] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -119,6 +119,22 @@ const Settings = () => {
       const values = await passwordForm.validateFields();
       const { oldPassword, newPassword, confirmPassword } = values;
       
+      setPasswordSubmitted(true);
+      
+      const pwdCheck = {
+        length: newPassword.length >= 6,
+        uppercase: /[A-Z]/.test(newPassword),
+        lowercase: /[a-z]/.test(newPassword),
+        special: /[!@#$%^&*(),.?":{}|<>]/.test(newPassword),
+        number: /[0-9]/.test(newPassword),
+      };
+      
+      setPasswordValidation(pwdCheck);
+      
+      if (!pwdCheck.length || !pwdCheck.uppercase || !pwdCheck.lowercase || !pwdCheck.special || !pwdCheck.number) {
+        return;
+      }
+
       if (newPassword !== confirmPassword) {
         message.error('Passwords do not match');
         return;
@@ -137,7 +153,8 @@ const Settings = () => {
       if (data.message) {
         message.success('Password changed successfully');
         passwordForm.resetFields();
-        setPasswordValidation({ length: false, uppercase: false, lowercase: false, special: false, number: false });
+        setPasswordValidation({ length: null, uppercase: null, lowercase: null, special: null, number: null });
+        setPasswordSubmitted(false);
       } else {
         message.error(data.error || 'Failed to change password');
       }
@@ -208,31 +225,36 @@ const Settings = () => {
                 placeholder="Enter new password"
                 onChange={(e) => {
                   const pwd = e.target.value;
-                  setPasswordValidation({
-                    length: pwd.length >= 6,
-                    uppercase: /[A-Z]/.test(pwd),
-                    lowercase: /[a-z]/.test(pwd),
-                    special: /[!@#$%^&*(),.?":{}|<>]/.test(pwd),
-                    number: /[0-9]/.test(pwd),
-                  });
+                  setPasswordSubmitted(false);
+                  if (!pwd) {
+                    setPasswordValidation({ length: null, uppercase: null, lowercase: null, special: null, number: null });
+                  } else {
+                    setPasswordValidation({
+                      length: pwd.length >= 6,
+                      uppercase: /[A-Z]/.test(pwd),
+                      lowercase: /[a-z]/.test(pwd),
+                      special: /[!@#$%^&*(),.?":{}|<>]/.test(pwd),
+                      number: /[0-9]/.test(pwd),
+                    });
+                  }
                 }}
               />
             </Form.Item>
-            <div style={{ marginBottom: 16, color: '#888' }}>
-              <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13 }}>
-                <li style={{ color: passwordValidation.length ? '#ff4d4f' : '#888' }}>
+            <div style={{ marginBottom: 16 }}>
+              <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: '#888', listStyleType: 'disc' }}>
+                <li style={{ color: passwordSubmitted && !passwordValidation.length ? '#ff4d4f' : '#888' }}>
                   Minimum 6 characters
                 </li>
-                <li style={{ color: passwordValidation.uppercase ? '#ff4d4f' : '#888' }}>
+                <li style={{ color: passwordSubmitted && !passwordValidation.uppercase ? '#ff4d4f' : '#888' }}>
                   One uppercase character
                 </li>
-                <li style={{ color: passwordValidation.lowercase ? '#ff4d4f' : '#888' }}>
+                <li style={{ color: passwordSubmitted && !passwordValidation.lowercase ? '#ff4d4f' : '#888' }}>
                   One lowercase character
                 </li>
-                <li style={{ color: passwordValidation.special ? '#ff4d4f' : '#888' }}>
+                <li style={{ color: passwordSubmitted && !passwordValidation.special ? '#ff4d4f' : '#888' }}>
                   One special character
                 </li>
-                <li style={{ color: passwordValidation.number ? '#ff4d4f' : '#888' }}>
+                <li style={{ color: passwordSubmitted && !passwordValidation.number ? '#ff4d4f' : '#888' }}>
                   One number
                 </li>
               </ul>
