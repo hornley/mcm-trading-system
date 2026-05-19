@@ -593,7 +593,6 @@ const Reports = () => {
                     return <Tag color={colors[v]}>{v}</Tag>;
                   }},
                   { title: 'Date', dataIndex: 'created_at', key: 'created_at', render: (v) => v ? new Date(v).toLocaleString() : '' },
-                  { title: 'Description', dataIndex: 'description', key: 'description', ellipsis: true },
                 ]}
                 rowKey="report_id"
                 pagination={{ pageSize: 10 }}
