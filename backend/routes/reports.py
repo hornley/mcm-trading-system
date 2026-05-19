@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from sqlalchemy import cast, Integer, func
 from models import db, User, Product, Location, Inventory, Order, OrderItem, Payment
-from models import StockTransfer, StockAdjustment, ActivityLog
+from models import StockTransfer, StockAdjustment, ActivityLog, StoreReport
 
 reports_bp = Blueprint("reports", __name__)
 
@@ -403,4 +403,146 @@ def system_summary():
             }
         })
     except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@reports_bp.route("/api/store-reports", methods=["GET"])
+def get_store_reports():
+    usertype = request.args.get("usertype", type=int)
+    user_id = request.args.get("user_id", type=int)
+
+    if not _authorized(usertype):
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        query = StoreReport.query
+
+        if usertype == 3:
+            query = query.filter(StoreReport.user_id == user_id)
+
+        reports = query.order_by(StoreReport.created_at.desc()).all()
+
+        return jsonify({
+            "success": True,
+            "data": [{
+                "report_id": r.report_id,
+                "user_id": r.user_id,
+                "username": r.user.username if r.user else None,
+                "location_id": r.location_id,
+                "location_name": r.location.name if r.location else None,
+                "title": r.title,
+                "issue_type": r.issue_type,
+                "description": r.description,
+                "status": r.status,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            } for r in reports]
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@reports_bp.route("/api/store-reports", methods=["POST"])
+def create_store_report():
+    data = request.get_json()
+    usertype = data.get("usertype")
+    user_id = data.get("user_id")
+    location_id = data.get("location_id")
+    title = data.get("title")
+    issue_type = data.get("issue_type")
+    description = data.get("description")
+
+    if not all([usertype, user_id, location_id, title, issue_type, description]):
+        return jsonify({"success": False, "error": "Missing required fields"}), 400
+
+    if not _authorized(usertype):
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        report = StoreReport(
+            user_id=user_id,
+            location_id=location_id,
+            title=title,
+            issue_type=issue_type,
+            description=description,
+            status="pending"
+        )
+        db.session.add(report)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "report_id": report.report_id,
+                "status": report.status,
+                "created_at": report.created_at.isoformat()
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@reports_bp.route("/api/store-reports/<int:report_id>", methods=["PUT"])
+def update_store_report(report_id):
+    data = request.get_json()
+    usertype = data.get("usertype")
+    user_id = data.get("user_id")
+
+    report = StoreReport.query.get(report_id)
+    if not report:
+        return jsonify({"success": False, "error": "Report not found"}), 404
+
+    if usertype not in [1, 2, 3]:
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    if usertype == 3 and report.user_id != user_id:
+        return jsonify({"success": False, "error": "Cannot update other user's report"}), 403
+
+    try:
+        if "title" in data:
+            report.title = data["title"]
+        if "issue_type" in data:
+            report.issue_type = data["issue_type"]
+        if "description" in data:
+            report.description = data["description"]
+        if "status" in data:
+            report.status = data["status"]
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "report_id": report.report_id,
+                "status": report.status,
+                "updated_at": report.updated_at.isoformat()
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@reports_bp.route("/api/store-reports/<int:report_id>", methods=["DELETE"])
+def delete_store_report(report_id):
+    usertype = request.args.get("usertype", type=int)
+    user_id = request.args.get("user_id", type=int)
+
+    report = StoreReport.query.get(report_id)
+    if not report:
+        return jsonify({"success": False, "error": "Report not found"}), 404
+
+    if usertype not in [1, 2, 3]:
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    if usertype == 3 and report.user_id != user_id:
+        return jsonify({"success": False, "error": "Cannot delete other user's report"}), 403
+
+    try:
+        db.session.delete(report)
+        db.session.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        db.session.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
