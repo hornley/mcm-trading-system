@@ -35,7 +35,7 @@ const formatFileSize = (bytes) => {
 
 const Reports = () => {
   const { user, selectedLocationId } = useAuth();
-  const [activeTab, setActiveTab] = useState('inventory');
+  const [activeTab, setActiveTab] = useState(user?.role === 'admin' ? 'activity' : 'inventory');
   const [inventoryPeriod, setInventoryPeriod] = useState(30);
   const [salesPeriod, setSalesPeriod] = useState(7);
   const [financialPeriod, setFinancialPeriod] = useState(30);
