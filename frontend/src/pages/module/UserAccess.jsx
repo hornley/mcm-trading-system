@@ -85,7 +85,6 @@ const UserAccess = () => {
       title: 'Location',
       dataIndex: 'location',
       key: 'location',
-      width: 150,
       render: (loc, record) =>
         editing ? (
           <Select
@@ -104,7 +103,6 @@ const UserAccess = () => {
       title: 'Role',
       dataIndex: 'usertype',
       key: 'role',
-      width: 120,
       render: (usertype, record) =>
         editing ? (
           <Select
