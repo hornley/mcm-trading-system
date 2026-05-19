@@ -544,8 +544,8 @@ const Sales = () => {
           <Col xs={24} md={14}>
             <Form form={form} layout="vertical">
               <Text strong>Add Products</Text>
-              <Row gutter={8} style={{ marginTop: 8 }}>
-                <Col flex="auto">
+              <div style={{ marginTop: 8 }}>
+                <div style={{ marginBottom: 8 }}>
                   <Select
                     showSearch
                     style={{ width: '100%' }}
@@ -570,8 +570,8 @@ const Sales = () => {
                       </Select.Option>
                     ))}
                   </Select>
-                </Col>
-                <Col>
+                </div>
+                <Space>
                   {(() => {
                     const sp = products.find(p => p.product_id === selectedProductId);
                     const isFab = sp?.category === FABRIC_CATEGORY;
@@ -608,13 +608,11 @@ const Sales = () => {
                       />
                     );
                   })()}
-                </Col>
-                <Col>
                   <Button type="primary" icon={<PlusOutlined />} disabled={!canAddToCart} onClick={handleAddToCart}>
                     Add
                   </Button>
-                </Col>
-              </Row>
+                </Space>
+              </div>
 
               <Divider />
               <Text strong>Cart ({cart.length} item{cart.length !== 1 ? 's' : ''})</Text>

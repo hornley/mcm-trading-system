@@ -326,32 +326,37 @@ const StockManagement = () => {
     {
       title: 'Actions',
       key: 'actions',
+      width: 240,
       render: (_, record) => (
-        <Space wrap>
-          {can('update') && (
-            <Button type="link" disabled={selectedLocationId === "all"} onClick={() => handleRequestStock(record)}>
-              Request Stock
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Space size={4}>
+            {can('update') && (
+              <Button type="link" size="small" disabled={selectedLocationId === "all"} onClick={() => handleRequestStock(record)}>
+                Request
+              </Button>
+            )}
+            {can('update') && (
+              <Button type="link" size="small" disabled={selectedLocationId === "all"} onClick={() => handleSetReorder(record)}>
+                Reorder
+              </Button>
+            )}
+            {can('update') && (
+              <Button type="link" size="small" disabled={selectedLocationId === "all"} onClick={() => handleAdjustStock(record)}>
+                Adjust
+              </Button>
+            )}
+          </Space>
+          <Space size={4}>
+            {can('update') && (
+              <Button type="link" size="small" disabled={selectedLocationId === "all" || record.quantity === 0} onClick={() => handleTransferStock(record)}>
+                Transfer
+              </Button>
+            )}
+            <Button type="link" size="small" onClick={() => handleViewDetails(record)}>
+              Details
             </Button>
-          )}
-          {can('update') && (
-            <Button type="link" disabled={selectedLocationId === "all"} onClick={() => handleSetReorder(record)}>
-              Set Reorder Level
-            </Button>
-          )}
-          {can('update') && (
-            <Button type="link" disabled={selectedLocationId === "all"} onClick={() => handleAdjustStock(record)}>
-              Adjust Stock
-            </Button>
-          )}
-          {can('update') && (
-            <Button type="link" disabled={selectedLocationId === "all" || record.quantity === 0} onClick={() => handleTransferStock(record)}>
-              Transfer
-            </Button>
-          )}
-          <Button type="link" onClick={() => handleViewDetails(record)}>
-            View Details
-          </Button>
-        </Space>
+          </Space>
+        </div>
       ),
     },
   ];
@@ -410,7 +415,7 @@ const StockManagement = () => {
       </Row>
 
       {storehouse && (
-        <Card size="small" style={{ marginBottom: 16, background: '#f6ffed', borderColor: '#b7eb8f' }}>
+        <Card size="small" style={{ marginBottom: 16, background: 'rgba(82, 196, 26, 0.08)', borderColor: 'rgba(82, 196, 26, 0.3)' }}>
           <Space>
             <Tag color="green">Storehouse</Tag>
             <span><strong>{storehouse.name}</strong> — auto-restock source branch</span>
