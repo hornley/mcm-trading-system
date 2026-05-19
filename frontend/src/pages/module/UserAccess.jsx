@@ -85,13 +85,14 @@ const UserAccess = () => {
       title: 'Location',
       dataIndex: 'location',
       key: 'location',
+      width: 150,
       render: (loc, record) =>
         editing ? (
           <Select
             value={record.location_id}
             onChange={(val) => handleLocationChange(record.user_id, val)}
             size="small"
-            style={{ width: 130 }}
+            style={{ width: '100%' }}
             disabled={record.usertype === 1 || record.user_id === user?.user_id}
             options={LOCATIONS.map((l) => ({ value: l.id, label: l.name }))}
           />
@@ -103,13 +104,14 @@ const UserAccess = () => {
       title: 'Role',
       dataIndex: 'usertype',
       key: 'role',
+      width: 120,
       render: (usertype, record) =>
         editing ? (
           <Select
             value={usertype}
             onChange={(val) => handleTypeChange(record.user_id, val)}
             size="small"
-            style={{ width: 100 }}
+            style={{ width: '100%' }}
             disabled={record.user_id === user?.user_id}
             options={typeOptions}
           />
