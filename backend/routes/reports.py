@@ -434,6 +434,9 @@ def get_store_reports():
                 "issue_type": r.issue_type,
                 "description": r.description,
                 "status": r.status,
+                "resolved_by": r.resolved_by,
+                "resolved_by_username": r.resolver.username if r.resolver else None,
+                "resolved_at": r.resolved_at.isoformat() if r.resolved_at else None,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
                 "updated_at": r.updated_at.isoformat() if r.updated_at else None,
             } for r in reports]
@@ -508,6 +511,10 @@ def update_store_report(report_id):
             report.description = data["description"]
         if "status" in data:
             report.status = data["status"]
+            if data["status"] == "resolved":
+                from datetime import datetime
+                report.resolved_by = user_id
+                report.resolved_at = datetime.now()
 
         db.session.commit()
 
@@ -516,6 +523,7 @@ def update_store_report(report_id):
             "data": {
                 "report_id": report.report_id,
                 "status": report.status,
+                "resolved_at": report.resolved_at.isoformat() if report.resolved_at else None,
                 "updated_at": report.updated_at.isoformat()
             }
         })

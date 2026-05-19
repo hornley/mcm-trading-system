@@ -151,7 +151,10 @@ class StoreReport(db.Model):
     issue_type = db.Column(db.String, nullable=False)  # store, materials, software
     description = db.Column(db.Text, nullable=False)
     status = db.Column(db.String, nullable=False, default="pending")  # pending, resolved, voided
+    resolved_by = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=True)
+    resolved_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
-    user = db.relationship("User")
+    user = db.relationship("User", foreign_keys=[user_id])
     location = db.relationship("Location")
+    resolver = db.relationship("User", foreign_keys=[resolved_by])

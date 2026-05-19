@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import {
   Card, Typography, Row, Col, Table, Tabs, Statistic,
   Select, Spin, Space, message, Divider, Button, Modal, Form,
-  Input, Tag, List, Badge,
+  Input, Tag, List, Badge, Tooltip,
 } from 'antd';
 import {
   PieChart, Pie, Cell, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import {
   DatabaseOutlined, ShoppingCartOutlined, DollarOutlined,
@@ -706,13 +706,18 @@ const Reports = () => {
                   }},
                   { title: 'Status', dataIndex: 'status', key: 'status', render: (v, record) => {
                     const colors = { pending: 'orange', resolved: 'green', voided: 'red' };
+                    const statusTag = <Tag color={colors[v]}>{v}</Tag>;
                     return (
                       <Space>
-                        <Tag color={colors[v]}>{v}</Tag>
+                        {v === 'resolved' && record.resolved_by_username && record.resolved_at ? (
+                          <Tooltip title={`Resolved by ${record.resolved_by_username} on ${new Date(record.resolved_at).toLocaleString()}`}>
+                            {statusTag}
+                          </Tooltip>
+                        ) : (
+                          statusTag
+                        )}
                         {v === 'pending' && (
-                          <>
-                            <Button size="small" type="link" onClick={() => handleUpdateStatus(record.report_id, 'resolved')}>Resolve</Button>
-                          </>
+                          <Button size="small" type="link" onClick={() => handleUpdateStatus(record.report_id, 'resolved')}>Resolve</Button>
                         )}
                       </Space>
                     );
