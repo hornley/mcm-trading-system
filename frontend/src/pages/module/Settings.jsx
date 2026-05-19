@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import {
   UserOutlined, SettingOutlined, SaveOutlined, LockOutlined,
-  BellOutlined,   BgColorsOutlined,
+  BellOutlined,   BgColorsOutlined, CheckCircleOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -27,6 +27,9 @@ const Settings = () => {
     number: null,
   });
   const [passwordSubmitted, setPasswordSubmitted] = useState(false);
+  const [oldPasswordEntered, setOldPasswordEntered] = useState(false);
+  const [oldPasswordValid, setOldPasswordValid] = useState(false);
+  const [confirmPasswordMatch, setConfirmPasswordMatch] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -213,12 +216,38 @@ const Settings = () => {
       case 'password':
         return (
           <Form form={passwordForm} layout="vertical" style={{ maxWidth: 400 }}>
-            <Form.Item name="oldPassword" label="Old Password" rules={[{ required: true, message: 'Enter old password' }]}>
-              <Input.Password placeholder="Enter old password" />
+            <Form.Item 
+              name="oldPassword" 
+              label={<span>Old Password {oldPasswordValid && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: 8 }} />}</span>} 
+              rules={[{ required: true, message: 'Enter old password' }]}
+            >
+              <Input.Password 
+                placeholder="Enter old password" 
+                onChange={() => {
+                  setOldPasswordValid(false);
+                  setOldPasswordEntered(false);
+                }}
+                onBlur={async (e) => {
+                  const pwd = e.target.value;
+                  if (!pwd) return;
+                  setOldPasswordEntered(true);
+                  try {
+                    const res = await fetch('/api/settings/verify-password', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ user_id: user.user_id, password: pwd }),
+                    });
+                    const data = await res.json();
+                    setOldPasswordValid(data.valid);
+                  } catch {
+                    setOldPasswordValid(false);
+                  }
+                }}
+              />
             </Form.Item>
             <Form.Item 
               name="newPassword" 
-              label="New Password"
+              label={<span>New Password {passwordValidation.length && passwordValidation.uppercase && passwordValidation.lowercase && passwordValidation.special && passwordValidation.number && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: 8 }} />}</span>}
               rules={[{ required: true, message: 'Enter new password' }]}
             >
               <Input.Password 
@@ -266,20 +295,22 @@ const Settings = () => {
             )}
             <Form.Item 
               name="confirmPassword" 
-              label="Confirm New Password"
+              label={<span>Confirm New Password {confirmPasswordMatch && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: 8 }} />}</span>}
               rules={[
                 { required: true, message: 'Confirm new password' },
                 ({ getFieldValue }) => ({
                   validator(_, value) {
                     if (!value || getFieldValue('newPassword') === value) {
+                      setConfirmPasswordMatch(value && getFieldValue('newPassword') === value);
                       return Promise.resolve();
                     }
+                    setConfirmPasswordMatch(false);
                     return Promise.reject(new Error('Passwords do not match'));
                   },
                 }),
               ]}
             >
-              <Input.Password placeholder="Confirm new password" />
+              <Input.Password placeholder="Confirm new password" onChange={() => setConfirmPasswordMatch(false)} />
             </Form.Item>
             <Form.Item>
               <Button type="primary" block onClick={handlePasswordChange}>

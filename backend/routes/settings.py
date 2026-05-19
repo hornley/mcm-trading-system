@@ -103,3 +103,23 @@ def change_password():
     user.password = generate_password_hash(new_password)
     db.session.commit()
     return jsonify({"message": "Password changed successfully"})
+
+@settings_bp.route("/api/settings/verify-password", methods=["POST"])
+def verify_password():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body is required"}), 400
+    
+    user_id = data.get("user_id")
+    password = data.get("password")
+    
+    if not user_id or not password:
+        return jsonify({"error": "user_id and password are required"}), 400
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    if check_password_hash(user.password, password):
+        return jsonify({"valid": True})
+    return jsonify({"valid": False})
