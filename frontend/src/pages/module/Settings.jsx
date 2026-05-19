@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
   Row, Col, Card, Typography, Form, Input, Select, Button, message,
-  Spin, Descriptions, Menu,
+  Spin, Descriptions, Menu, Modal,
 } from 'antd';
 import {
   UserOutlined, SettingOutlined, SaveOutlined, LockOutlined,
-  BellOutlined,   BgColorsOutlined, CheckCircleOutlined,
+  BellOutlined,   BgColorsOutlined, CheckCircleOutlined, MailOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -30,6 +30,9 @@ const Settings = () => {
   const [oldPasswordEntered, setOldPasswordEntered] = useState(false);
   const [oldPasswordValid, setOldPasswordValid] = useState(false);
   const [confirmPasswordMatch, setConfirmPasswordMatch] = useState(false);
+  const [forgotModalOpen, setForgotModalOpen] = useState(false);
+  const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -164,6 +167,27 @@ const Settings = () => {
     } catch (err) {
       if (err?.errorFields) return;
       message.error('Failed to change password');
+    }
+  };
+
+  const handleForgotPassword = async (values) => {
+    setForgotPasswordLoading(true);
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: values.email }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setForgotPasswordSent(true)
+      } else {
+        message.error(data.error || 'Failed to send reset link')
+      }
+    } catch {
+      message.error('Connection error. Is the server running?')
+    } finally {
+      setForgotPasswordLoading(false)
     }
   };
 
@@ -317,7 +341,7 @@ const Settings = () => {
               </Button>
             </Form.Item>
             <div style={{ textAlign: 'center' }}>
-              <a href="/forgot-password" style={{ fontSize: 13 }}>Forgot Password?</a>
+              <a onClick={() => setForgotModalOpen(true)} style={{ fontSize: 13, cursor: 'pointer', color: '#1890ff' }}>Forgot Password?</a>
             </div>
           </Form>
         );
@@ -378,6 +402,37 @@ const Settings = () => {
           </Card>
         </Col>
       </Row>
+      <Modal
+        title="Forgot Password"
+        open={forgotModalOpen}
+        onCancel={() => { setForgotModalOpen(false); setForgotPasswordSent(false); }}
+        footer={null}
+        centered
+      >
+        {forgotPasswordSent ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <CheckCircleOutlined style={{ fontSize: 48, color: '#52c41a' }} />
+            <p style={{ marginTop: 16, fontSize: 16 }}>Password reset link sent to your email</p>
+            <p type="secondary">Please check your inbox and follow the instructions.</p>
+          </div>
+        ) : (
+          <Form layout="vertical" onFinish={handleForgotPassword}>
+            <Form.Item 
+              name="email" 
+              label="Email Address"
+              rules={[
+                { required: true, message: 'Please enter your email' },
+                { type: 'email', message: 'Please enter a valid email' }
+              ]}
+            >
+              <Input prefix={<MailOutlined />} placeholder="Enter your email" />
+            </Form.Item>
+            <Button type="primary" htmlType="submit" block loading={forgotPasswordLoading}>
+              Send Reset Link
+            </Button>
+          </Form>
+        )}
+      </Modal>
     </div>
   );
 };

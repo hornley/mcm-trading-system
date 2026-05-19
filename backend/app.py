@@ -11,6 +11,8 @@ supabase: Client = create_client(
 )
 
 from flask_cors import CORS
+from flask_mail import Mail
+mail = Mail()
 from config import Config, FRONTEND_DIST
 from models import db
 from routes.auth import auth_bp
@@ -27,7 +29,13 @@ from routes.orders import orders_bp
 def create_app():
     app = Flask(__name__, static_folder=FRONTEND_DIST, static_url_path="")
     app.config.from_object(Config)
+    app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+    app.config['MAIL_PORT'] = 587
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+    app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
     CORS(app)
+    mail.init_app(app)
     db.init_app(app)
     app.register_blueprint(account_bp)
     app.register_blueprint(auth_bp)
@@ -44,6 +52,7 @@ def create_app():
         from models import (
             User, Location, Category, Product, Order, OrderItem,
             Payment, Inventory, StockTransfer, StockAdjustment, ActivityLog,
+            PasswordResetToken,
         )
         db.create_all()
 

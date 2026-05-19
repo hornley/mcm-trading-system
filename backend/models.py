@@ -19,6 +19,16 @@ class User(db.Model):
     # profile_picture = db.Column(db.String, nullable=True)
 
 
+class PasswordResetToken(db.Model):
+    __tablename__ = "Password_Reset_Tokens"
+    token_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
+    token = db.Column(db.String, nullable=False, unique=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False)
+    user = db.relationship("User", backref="reset_tokens")
+
+
 
 class Location(db.Model):
     __tablename__ = "Locations"
