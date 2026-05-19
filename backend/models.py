@@ -140,3 +140,21 @@ class ActivityLog(db.Model):
     details = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
     user = db.relationship("User")
+
+
+class StoreReport(db.Model):
+    __tablename__ = "Store_Reports"
+    report_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
+    title = db.Column(db.String, nullable=False)
+    issue_type = db.Column(db.String, nullable=False)  # store, materials, software
+    description = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String, nullable=False, default="pending")  # pending, resolved, voided
+    resolved_by = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=True)
+    resolved_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.now)
+    user = db.relationship("User", foreign_keys=[user_id])
+    location = db.relationship("Location")
+    resolver = db.relationship("User", foreign_keys=[resolved_by])
