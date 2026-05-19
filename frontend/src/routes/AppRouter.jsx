@@ -23,6 +23,8 @@ import Sales from '../pages/module/Sales'
 import UserAccess from '../pages/module/UserAccess'
 import Report from '../pages/module/Reports'
 import SettingsPage from '../pages/module/Settings'
+import Help from '../pages/module/Help'
+import About from '../pages/module/About'
 //Contains all paths to pages
 
 const router = createBrowserRouter (
@@ -76,6 +78,12 @@ const router = createBrowserRouter (
           {/* settings - all roles */}
           <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "admin"]} />}>
             <Route path="settings" element={<SettingsPage />} />
+          </Route>
+
+          {/* help and about - all roles */}
+          <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "admin"]} />}>
+            <Route path="help" element={<Help />} />
+            <Route path="about" element={<About />} />
           </Route>
 
         </Route>

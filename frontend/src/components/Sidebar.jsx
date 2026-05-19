@@ -4,6 +4,7 @@ import {
   DashboardOutlined, AppstoreOutlined, AuditOutlined, TeamOutlined,
   ShoppingCartOutlined, ToolOutlined, SettingOutlined, BarChartOutlined,
   UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
+  QuestionCircleOutlined, InfoCircleOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -21,6 +22,8 @@ const iconMap = {
   Settings: <SettingOutlined />,
   Report: <BarChartOutlined />,
   'Manage Staff': <TeamOutlined />,
+  Help: <QuestionCircleOutlined />,
+  About: <InfoCircleOutlined />,
 }
 
 const mapModules = (modules) =>
@@ -35,6 +38,8 @@ const ownerModules = mapModules([
   { key: '6', label: 'Maintenance', path: '/dashboard/maintenance' },
   { key: '7', label: 'Settings', path: '/dashboard/settings' },
   { key: '8', label: 'Report', path: '/dashboard/report' },
+  { key: '9', label: 'Help', path: '/dashboard/help' },
+  { key: '10', label: 'About', path: '/dashboard/about' },
 ])
 
 const managerModules = mapModules([
@@ -44,6 +49,8 @@ const managerModules = mapModules([
   { key: '4', label: 'Stock Management', path: '/dashboard/stock-management' },
   { key: '5', label: 'Settings', path: '/dashboard/settings' },
   { key: '6', label: 'Report', path: '/dashboard/report' },
+  { key: '7', label: 'Help', path: '/dashboard/help' },
+  { key: '8', label: 'About', path: '/dashboard/about' },
 ])
 
 const adminModules = mapModules([
@@ -51,6 +58,8 @@ const adminModules = mapModules([
   { key: '2', label: 'Maintenance', path: '/dashboard/maintenance' },
   { key: '3', label: 'Settings', path: '/dashboard/settings' },
   { key: '4', label: 'Report', path: '/dashboard/report' },
+  { key: '5', label: 'Help', path: '/dashboard/help' },
+  { key: '6', label: 'About', path: '/dashboard/about' },
 ])
 
 const Sidebar = () => {
