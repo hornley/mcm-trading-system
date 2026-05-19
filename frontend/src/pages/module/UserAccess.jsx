@@ -1,4 +1,5 @@
-import { Table, Card, Select, Tag, message, Space, Typography } from 'antd';
+import { Table, Card, Select, Tag, message, Typography, Button, Space } from 'antd';
+import { EditOutlined, CloseOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -22,25 +23,11 @@ const LOCATIONS = [
   { id: 3, name: 'Branch 2' },
 ];
 
-const columns = [
-  { title: 'Employee Code', dataIndex: 'employee_code', key: 'employee_code' },
-  { title: 'Username', dataIndex: 'username', key: 'username' },
-  { title: 'Location', dataIndex: 'location', key: 'location' },
-  {
-    title: 'Role',
-    dataIndex: 'usertype',
-    key: 'role',
-    render: (usertype) => {
-      const info = USERTYPE_MAP[usertype];
-      return <Tag color={info?.color}>{info?.label}</Tag>;
-    },
-  },
-];
-
 const UserAccess = () => {
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -62,28 +49,13 @@ const UserAccess = () => {
       const res = await fetch(`/api/account/users/${targetId}/access`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requester_usertype: user.usertype,
-          new_usertype: newUsertype,
-        }),
+        body: JSON.stringify({ requester_usertype: user.usertype, new_usertype: newUsertype }),
       });
-
       const data = await res.json();
-
-      if (!res.ok) {
-        message.error(data.error);
-        return;
-      }
-
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.user_id === targetId ? { ...u, usertype: newUsertype } : u
-        )
-      );
-      message.success('User type updated');
-    } catch {
-      message.error('Failed to update user type');
-    }
+      if (!res.ok) { message.error(data.error); return; }
+      setUsers((prev) => prev.map((u) => u.user_id === targetId ? { ...u, usertype: newUsertype } : u));
+      message.success('Role updated');
+    } catch { message.error('Failed to update role'); }
   };
 
   const handleLocationChange = async (targetId, newLocationId) => {
@@ -91,19 +63,10 @@ const UserAccess = () => {
       const res = await fetch(`/api/account/users/${targetId}/access`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requester_usertype: user.usertype,
-          location_id: newLocationId,
-        }),
+        body: JSON.stringify({ requester_usertype: user.usertype, location_id: newLocationId }),
       });
-
       const data = await res.json();
-
-      if (!res.ok) {
-        message.error(data.error);
-        return;
-      }
-
+      if (!res.ok) { message.error(data.error); return; }
       setUsers((prev) =>
         prev.map((u) =>
           u.user_id === targetId
@@ -112,47 +75,66 @@ const UserAccess = () => {
         )
       );
       message.success('Location updated');
-    } catch {
-      message.error('Failed to update location');
-    }
+    } catch { message.error('Failed to update location'); }
   };
 
-  const actionColumn = {
-    title: 'Actions',
-    key: 'actions',
-    render: (_, record) => (
-      <Space size={4}>
-        <Select
-          value={record.usertype}
-          onChange={(val) => handleTypeChange(record.user_id, val)}
-          style={{ width: 100 }}
-          size="small"
-          disabled={record.user_id === user?.user_id}
-          options={typeOptions}
-        />
-        <Select
-          value={record.location_id}
-          onChange={(val) => handleLocationChange(record.user_id, val)}
-          style={{ width: 120 }}
-          size="small"
-          disabled={record.usertype === 1 || record.user_id === user?.user_id}
-          options={LOCATIONS.map((l) => ({ value: l.id, label: l.name }))}
-        />
-      </Space>
-    ),
-  };
+  const columns = [
+    { title: 'Employee Code', dataIndex: 'employee_code', key: 'employee_code' },
+    { title: 'Username', dataIndex: 'username', key: 'username' },
+    {
+      title: 'Location',
+      dataIndex: 'location',
+      key: 'location',
+      render: (loc, record) =>
+        editing ? (
+          <Select
+            value={record.location_id}
+            onChange={(val) => handleLocationChange(record.user_id, val)}
+            size="small"
+            style={{ width: 130 }}
+            disabled={record.usertype === 1 || record.user_id === user?.user_id}
+            options={LOCATIONS.map((l) => ({ value: l.id, label: l.name }))}
+          />
+        ) : (
+          loc
+        ),
+    },
+    {
+      title: 'Role',
+      dataIndex: 'usertype',
+      key: 'role',
+      render: (usertype, record) =>
+        editing ? (
+          <Select
+            value={usertype}
+            onChange={(val) => handleTypeChange(record.user_id, val)}
+            size="small"
+            style={{ width: 100 }}
+            disabled={record.user_id === user?.user_id}
+            options={typeOptions}
+          />
+        ) : (
+          <Tag color={USERTYPE_MAP[usertype]?.color}>{USERTYPE_MAP[usertype]?.label}</Tag>
+        ),
+    },
+  ];
 
   return (
     <div>
-      <Title level={4} style={{ marginBottom: 16 }}>User Access</Title>
+      <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
+        <Title level={4} style={{ margin: 0 }}>User Access</Title>
+        <Button icon={editing ? <CloseOutlined /> : <EditOutlined />} onClick={() => setEditing(!editing)}>
+          {editing ? 'Done Editing' : 'Edit'}
+        </Button>
+      </Space>
       <Card styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}>
         <Table
-        dataSource={users}
-        columns={[...columns, actionColumn]}
-        rowKey="user_id"
-        loading={loading}
-        pagination={{ pageSize: 10 }}
-      />
+          dataSource={users}
+          columns={columns}
+          rowKey="user_id"
+          loading={loading}
+          pagination={{ pageSize: 10 }}
+        />
       </Card>
     </div>
   );
