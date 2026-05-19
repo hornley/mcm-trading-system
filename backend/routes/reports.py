@@ -417,7 +417,7 @@ def get_store_reports():
     try:
         query = StoreReport.query
 
-        if usertype == 3:
+        if usertype == 2:
             query = query.filter(StoreReport.user_id == user_id)
 
         reports = query.order_by(StoreReport.created_at.desc()).all()
