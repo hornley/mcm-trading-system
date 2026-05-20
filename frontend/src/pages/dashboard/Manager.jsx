@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Row, Col, Card, Statistic, Table, Tag, Typography, Button, Space } from 'antd'
 import {
-  DatabaseOutlined, ShoppingCartOutlined, WarningOutlined, TeamOutlined,
+  DatabaseOutlined, ShoppingCartOutlined, WarningOutlined,
   ArrowUpOutlined, ArrowDownOutlined, RightCircleOutlined,
 } from '@ant-design/icons'
 import {
@@ -93,12 +93,6 @@ const Manager = () => {
       valueStyle: stats.low_stock_count > 0 ? { color: '#fa8c16' } : undefined,
       trend: computeTrend(stats.low_stock_count),
       route: '/dashboard/stock-management',
-    },
-    {
-      title: 'Total Staff',
-      value: stats.active_users,
-      icon: <TeamOutlined />,
-      route: '/dashboard/settings',
     },
   ]
 
