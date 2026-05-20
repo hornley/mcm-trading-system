@@ -78,10 +78,10 @@ def edit_user_access(target_id):
         return jsonify({"error": "User not found"}), 404
 
     new_usertype = data.get("new_usertype")
-    if new_usertype is None or new_usertype not in ALLOWED_TYPES | {2, 4}:
-        return jsonify({"error": "usertype must be 1 (owner), 2 (manager), 3 (admin), or 4 (staff)"}), 400
-
-    target.usertype = new_usertype
+    if new_usertype is not None:
+        if new_usertype not in ALLOWED_TYPES | {2, 4}:
+            return jsonify({"error": "usertype must be 1 (owner), 2 (manager), 3 (admin), or 4 (staff)"}), 400
+        target.usertype = new_usertype
 
     target.location_id = data.get("location_id", target.location_id)
     db.session.commit()

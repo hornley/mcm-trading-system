@@ -33,6 +33,8 @@ const UserAccess = () => {
   const [filterLocation, setFilterLocation] = useState(null);
   const [appliedRole, setAppliedRole] = useState(null);
   const [appliedLocation, setAppliedLocation] = useState(null);
+  const [sortField, setSortField] = useState(null);
+  const [sortOrder, setSortOrder] = useState(null);
 
   const fetchUsers = (role, location) => {
     if (!user) return;
@@ -51,6 +53,15 @@ const UserAccess = () => {
       .catch((err) => message.error(err.message))
       .finally(() => setLoading(false));
   };
+
+  const sortedUsers = [...users].sort((a, b) => {
+    if (!sortField || !sortOrder) return 0;
+    let cmp;
+    if (sortField === 'username') cmp = a.username.localeCompare(b.username);
+    else if (sortField === 'location_id') cmp = a.location_id - b.location_id;
+    else if (sortField === 'usertype') cmp = a.usertype - b.usertype;
+    return sortOrder === 'ascend' ? cmp : -cmp;
+  });
 
   useEffect(() => {
     fetchUsers();
@@ -114,7 +125,7 @@ const UserAccess = () => {
     {
       title: 'Location',
       dataIndex: 'location',
-      key: 'location',
+      key: 'location_id',
       sorter: (a, b) => a.location_id - b.location_id,
       sortDirections: ['ascend', 'descend'],
       render: (loc, record) =>
@@ -134,7 +145,7 @@ const UserAccess = () => {
     {
       title: 'Role',
       dataIndex: 'usertype',
-      key: 'role',
+      key: 'usertype',
       sorter: (a, b) => a.usertype - b.usertype,
       sortDirections: ['ascend', 'descend'],
       render: (usertype, record) =>
@@ -168,11 +179,16 @@ const UserAccess = () => {
       </Space>
       <Card styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}>
         <Table
-          dataSource={users}
+          dataSource={sortedUsers}
           columns={columns}
           rowKey="user_id"
           loading={loading}
           pagination={{ pageSize: 10 }}
+          onChange={(_pagination, _filters, sorter) => {
+            if (Array.isArray(sorter)) sorter = sorter[0];
+            setSortField(sorter.columnKey || null);
+            setSortOrder(sorter.order || null);
+          }}
         />
       </Card>
       <Modal
