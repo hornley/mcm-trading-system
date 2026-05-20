@@ -6,7 +6,7 @@ account_bp = Blueprint("account", __name__)
 
 ALLOWED_TYPES = {1, 3}
 
-LOCATION_MAP = {0: "all", 1: "storehouse", 2: "branch 1", 3: "branch 2"}
+LOCATION_MAP = {0: "All Branches", 1: "Storehouse", 2: "Branch 1", 3: "Branch 2"}
 
 
 def _location_name(location_id):
