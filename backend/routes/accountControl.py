@@ -6,7 +6,7 @@ account_bp = Blueprint("account", __name__)
 
 ALLOWED_TYPES = {1, 3}
 
-LOCATION_MAP = {0: "all", 1: "storehouse", 2: "branch 1", 3: "branch 2"}
+LOCATION_MAP = {0: "All Branches", 1: "Storehouse", 2: "Branch 1", 3: "Branch 2"}
 
 
 def _location_name(location_id):
@@ -78,10 +78,10 @@ def edit_user_access(target_id):
         return jsonify({"error": "User not found"}), 404
 
     new_usertype = data.get("new_usertype")
-    if new_usertype is None or new_usertype not in ALLOWED_TYPES | {2, 4}:
-        return jsonify({"error": "usertype must be 1 (owner), 2 (manager), 3 (admin), or 4 (staff)"}), 400
-
-    target.usertype = new_usertype
+    if new_usertype is not None:
+        if new_usertype not in ALLOWED_TYPES | {2, 4}:
+            return jsonify({"error": "usertype must be 1 (owner), 2 (manager), 3 (admin), or 4 (staff)"}), 400
+        target.usertype = new_usertype
 
     target.location_id = data.get("location_id", target.location_id)
     db.session.commit()
