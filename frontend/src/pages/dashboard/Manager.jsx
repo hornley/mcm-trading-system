@@ -118,7 +118,7 @@ const Manager = () => {
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         {statCards.map((stat, i) => (
-          <Col xs={24} sm={12} lg={6} key={i}>
+          <Col xs={24} sm={12} lg={8} key={i}>
             <Card
               hoverable
               styles={{ body: { padding: '20px 24px', height: '100%' } }}
