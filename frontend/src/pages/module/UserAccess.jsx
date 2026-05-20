@@ -110,12 +110,13 @@ const UserAccess = () => {
 
   const columns = [
     { title: 'Employee Code', dataIndex: 'employee_code', key: 'employee_code' },
-    { title: 'Username', dataIndex: 'username', key: 'username', sorter: (a, b) => a.username.localeCompare(b.username) },
+    { title: 'Username', dataIndex: 'username', key: 'username', sorter: (a, b) => a.username.localeCompare(b.username), sortDirections: ['ascend', 'descend'] },
     {
       title: 'Location',
       dataIndex: 'location',
       key: 'location',
       sorter: (a, b) => a.location_id - b.location_id,
+      sortDirections: ['ascend', 'descend'],
       render: (loc, record) =>
         editing ? (
           <Select
@@ -135,6 +136,7 @@ const UserAccess = () => {
       dataIndex: 'usertype',
       key: 'role',
       sorter: (a, b) => a.usertype - b.usertype,
+      sortDirections: ['ascend', 'descend'],
       render: (usertype, record) =>
         editing ? (
           <Select
