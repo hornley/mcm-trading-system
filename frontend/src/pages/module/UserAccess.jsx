@@ -1,5 +1,5 @@
-import { Table, Card, Select, Tag, message, Typography, Button, Space } from 'antd';
-import { EditOutlined, CloseOutlined } from '@ant-design/icons';
+import { Table, Card, Select, Tag, message, Typography, Button, Space, Modal } from 'antd';
+import { EditOutlined, CloseOutlined, FilterOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -28,11 +28,19 @@ const UserAccess = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterRole, setFilterRole] = useState(null);
+  const [filterLocation, setFilterLocation] = useState(null);
+  const [appliedRole, setAppliedRole] = useState(null);
+  const [appliedLocation, setAppliedLocation] = useState(null);
 
-  useEffect(() => {
+  const fetchUsers = (role, location) => {
     if (!user) return;
     setLoading(true);
-    fetch(`/api/account/users?usertype=${user.usertype}`)
+    const params = new URLSearchParams({ usertype: user.usertype });
+    if (role) params.append('filter_usertype', role);
+    if (location) params.append('location_id', location);
+    fetch(`/api/account/users?${params}`)
       .then((res) => {
         if (!res.ok) {
           return res.json().then((data) => Promise.reject(new Error(data.error || 'Failed to load users')));
@@ -42,7 +50,29 @@ const UserAccess = () => {
       .then(setUsers)
       .catch((err) => message.error(err.message))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchUsers();
   }, [user]);
+
+  const applyFilter = () => {
+    setAppliedRole(filterRole);
+    setAppliedLocation(filterLocation);
+    setFilterOpen(false);
+    fetchUsers(filterRole, filterLocation);
+  };
+
+  const resetFilter = () => {
+    setFilterRole(null);
+    setFilterLocation(null);
+    setAppliedRole(null);
+    setAppliedLocation(null);
+    setFilterOpen(false);
+    fetchUsers(null, null);
+  };
+
+  const hasActiveFilter = appliedRole || appliedLocation;
 
   const handleTypeChange = async (targetId, newUsertype) => {
     try {
@@ -123,9 +153,14 @@ const UserAccess = () => {
     <div>
       <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
         <Title level={4} style={{ margin: 0 }}>User Access</Title>
-        <Button icon={editing ? <CloseOutlined /> : <EditOutlined />} onClick={() => setEditing(!editing)}>
-          {editing ? 'Done Editing' : 'Edit'}
-        </Button>
+        <Space>
+          <Button icon={<FilterOutlined />} type={hasActiveFilter ? 'primary' : 'default'} onClick={() => setFilterOpen(true)}>
+            Filter{hasActiveFilter ? ' (1)' : ''}
+          </Button>
+          <Button icon={editing ? <CloseOutlined /> : <EditOutlined />} onClick={() => setEditing(!editing)}>
+            {editing ? 'Done Editing' : 'Edit'}
+          </Button>
+        </Space>
       </Space>
       <Card styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}>
         <Table
@@ -136,6 +171,42 @@ const UserAccess = () => {
           pagination={{ pageSize: 10 }}
         />
       </Card>
+      <Modal
+        title="Filter Users"
+        open={filterOpen}
+        onCancel={() => { setFilterOpen(false); setFilterRole(appliedRole); setFilterLocation(appliedLocation); }}
+        footer={
+          <Space>
+            <Button onClick={resetFilter}>Reset</Button>
+            <Button type="primary" onClick={applyFilter}>Apply</Button>
+          </Space>
+        }
+      >
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <div>
+            <Typography.Text strong>Role</Typography.Text>
+            <Select
+              allowClear
+              placeholder="All Roles"
+              value={filterRole}
+              onChange={setFilterRole}
+              style={{ width: '100%', marginTop: 4 }}
+              options={[{ value: null, label: 'All' }, ...typeOptions]}
+            />
+          </div>
+          <div>
+            <Typography.Text strong>Location</Typography.Text>
+            <Select
+              allowClear
+              placeholder="All Locations"
+              value={filterLocation}
+              onChange={setFilterLocation}
+              style={{ width: '100%', marginTop: 4 }}
+              options={[{ value: null, label: 'All' }, ...LOCATIONS.map((l) => ({ value: l.id, label: l.name }))]}
+            />
+          </div>
+        </Space>
+      </Modal>
     </div>
   );
 };
