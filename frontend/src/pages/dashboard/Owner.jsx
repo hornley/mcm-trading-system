@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Card, Row, Col, Statistic, Table, Tag, Typography, Button, Space } from 'antd'
+import { Card, Row, Col, Statistic, Table, Tag, Typography, Button, Space, Modal } from 'antd'
 import { ArrowUpOutlined, ArrowDownOutlined, RightCircleOutlined } from '@ant-design/icons'
 import {
   PieChart, Pie, Cell, BarChart, Bar, Line, ComposedChart,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { useNavigate } from 'react-router-dom'
 import { FABRIC_CATEGORY, fmtQty, qtyLabel } from '../../utils/format.js'
 
 const { Title, Text } = Typography
@@ -21,7 +20,6 @@ const computeTrend = (current) => {
 
 const Owner = () => {
   const { user, selectedLocationId } = useAuth()
-  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [data, setData] = useState({
@@ -31,6 +29,10 @@ const Owner = () => {
     recent_transactions: [],
     low_stock_items: [],
   })
+
+  const [inventoryModal, setInventoryModal] = useState({ open: false, data: [], loading: false })
+  const [salesModal, setSalesModal] = useState({ open: false, data: [], loading: false })
+  const [stockAlertModal, setStockAlertModal] = useState({ open: false })
 
   const fetchData = () => {
     setLoading(true)
@@ -71,25 +73,96 @@ const Owner = () => {
       title: 'Total Inventory Items',
       value: stats.total_items,
       trend: computeTrend(stats.total_items),
-      route: '/dashboard/inventory',
+      action: () => fetchInventoryPreview(),
     },
     {
       title: 'Sales Today',
       value: `₱${stats.sales_today}`,
       trend: computeTrend(stats.sales_today),
-      route: '/dashboard/sales',
+      action: () => fetchSalesToday(),
     },
     {
       title: 'Low Stock Alerts',
       value: stats.low_stock_count,
       valueStyle: stats.low_stock_count > 0 ? { color: '#fa8c16' } : undefined,
       trend: computeTrend(stats.low_stock_count),
-      route: '/dashboard/stock-management',
+      action: () => setStockAlertModal({ open: true }),
     },
     {
       title: 'Active Users',
       value: stats.active_users,
-      route: '/dashboard/users',
+    },
+  ]
+
+  const fetchInventoryPreview = async () => {
+    setInventoryModal({ open: true, data: [], loading: true })
+    try {
+      const params = new URLSearchParams({ usertype: user?.usertype })
+      if (selectedLocationId && selectedLocationId !== 'all') {
+        params.set('location_id', selectedLocationId)
+      }
+      const res = await fetch(`/api/inventory?${params}`)
+      const json = await res.json()
+      if (json.success) {
+        const items = Array.isArray(json.data) ? json.data : json.data?.data || []
+        setInventoryModal({ open: true, data: items, loading: false })
+      }
+    } catch {
+      setInventoryModal({ open: true, data: [], loading: false })
+    }
+  }
+
+  const fetchSalesToday = async () => {
+    setSalesModal({ open: true, data: [], loading: true })
+    try {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const params = new URLSearchParams({
+        usertype: user?.usertype,
+        user_id: user?.user_id,
+        date_from: today.toISOString(),
+        date_to: new Date().toISOString(),
+        page: 1,
+        limit: 50,
+      })
+      const res = await fetch(`/api/orders?${params}`)
+      const json = await res.json()
+      if (json.success) {
+        setSalesModal({ open: true, data: json.data?.orders || [], loading: false })
+      }
+    } catch {
+      setSalesModal({ open: true, data: [], loading: false })
+    }
+  }
+
+  const inventoryColumns = [
+    { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
+    { title: 'SKU', dataIndex: 'sku', key: 'sku' },
+    { title: 'Branch', dataIndex: 'location_name', key: 'location_name' },
+    { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty) => fmtQty(qty) },
+  ]
+
+  const salesColumns = [
+    { title: 'ID', dataIndex: 'order_id', key: 'order_id', render: (v) => `#${v}` },
+    { title: 'Branch', dataIndex: 'location_name', key: 'location_name' },
+    { title: 'Items', dataIndex: 'product_names', key: 'items', render: (names) => names?.join(', ') || '-' },
+    { title: 'Amount', dataIndex: 'total_amount', key: 'total_amount', render: (v) => `₱${v?.toLocaleString() || 0}` },
+    {
+      title: 'Status', dataIndex: 'status', key: 'status',
+      render: (s) => <Tag color={s === 'completed' ? 'green' : 'red'}>{s}</Tag>,
+    },
+  ]
+
+  const stockAlertColumns = [
+    { title: 'Product Name', dataIndex: 'product_name', key: 'product_name' },
+    { title: 'Category', dataIndex: 'category', key: 'category' },
+    { title: 'Current Stock', dataIndex: 'quantity', key: 'quantity', render: (qty, r) => fmtQty(qty, r.category === FABRIC_CATEGORY) },
+    {
+      title: 'Status', key: 'status',
+      render: (_, record) => {
+        const q = Number(record.quantity);
+        return <Tag color={q === 0 ? 'red' : 'orange'}>{q === 0 ? 'Out of Stock' : 'Low Stock'}</Tag>;
+      },
     },
   ]
 
@@ -106,7 +179,7 @@ const Owner = () => {
             <Card
               hoverable
               styles={{ body: { padding: '20px 24px', height: '100%' } }}
-              style={{ height: '100%', ...(stat.title === 'Low Stock Alerts' && stats.low_stock_count > 0 ? { borderLeft: '3px solid #fa8c16' } : {}) }}
+              style={{ height: '100%' }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <Statistic title={stat.title} value={stat.value} valueStyle={stat.valueStyle} loading={loading} />
@@ -120,8 +193,8 @@ const Owner = () => {
                     <Text type="secondary" style={{ fontSize: 12 }}>since last week</Text>
                   </Space>
                 )}
-                {stat.route && (
-                  <Button type="link" size="small" icon={<RightCircleOutlined />} onClick={() => navigate(stat.route)} style={{ padding: 0, marginTop: 8 }}>
+                {stat.action && (
+                  <Button type="link" size="small" icon={<RightCircleOutlined />} onClick={stat.action} disabled={loading} style={{ padding: 0, marginTop: 8 }}>
                     View {stat.title.replace(/^(Total |Low )/, '')}
                   </Button>
                 )}
@@ -218,7 +291,7 @@ const Owner = () => {
         <Col xs={24} lg={12}>
           <Card
             title="Recent Transactions"
-            extra={<Button type="link" onClick={() => navigate('/dashboard/sales')}>View All Sales</Button>}
+            extra={<Button type="link" onClick={() => fetchSalesToday()} disabled={loading}>View All Sales</Button>}
             styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}
           >
             <Table
@@ -239,14 +312,14 @@ const Owner = () => {
               size="small"
               loading={loading}
               scroll={{ y: 280 }}
-              onRow={() => ({ style: { cursor: 'pointer' }, onClick: () => navigate('/dashboard/sales') })}
+              onRow={() => ({ style: { cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.5 : 1 }, onClick: () => { if (!loading) fetchSalesToday() } })}
             />
           </Card>
         </Col>
         <Col xs={24} lg={12}>
           <Card
             title={`Low Stock Items${low_stock_items.length > 0 ? ` (${low_stock_items.length})` : ''}`}
-            extra={<Button type="link" onClick={() => navigate('/dashboard/stock-management')}>View All</Button>}
+            extra={<Button type="link" onClick={() => setStockAlertModal({ open: true })} disabled={loading}>View All</Button>}
             styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}
           >
             <Table
@@ -272,6 +345,62 @@ const Owner = () => {
           </Card>
         </Col>
       </Row>
+
+      <Modal
+        title="Inventory Items"
+        open={inventoryModal.open}
+        onCancel={() => setInventoryModal({ open: false, data: [], loading: false })}
+        footer={null}
+        width={800}
+      >
+        <Table
+          dataSource={inventoryModal.data}
+          columns={inventoryColumns}
+          rowKey="inventory_id"
+          loading={inventoryModal.loading}
+          pagination={{ pageSize: 10 }}
+          size="small"
+          scroll={{ y: 400 }}
+          locale={{ emptyText: inventoryModal.loading ? '' : 'No inventory items found' }}
+        />
+      </Modal>
+
+      <Modal
+        title="Sales Today"
+        open={salesModal.open}
+        onCancel={() => setSalesModal({ open: false, data: [], loading: false })}
+        footer={null}
+        width={800}
+      >
+        <Table
+          dataSource={salesModal.data}
+          columns={salesColumns}
+          rowKey="order_id"
+          loading={salesModal.loading}
+          pagination={{ pageSize: 10 }}
+          size="small"
+          scroll={{ y: 400 }}
+          locale={{ emptyText: salesModal.loading ? '' : 'No sales recorded today' }}
+        />
+      </Modal>
+
+      <Modal
+        title={`Stock Alerts${stats.low_stock_count > 0 ? ` (${stats.low_stock_count})` : ''}`}
+        open={stockAlertModal.open}
+        onCancel={() => setStockAlertModal({ open: false })}
+        footer={null}
+        width={800}
+      >
+        <Table
+          dataSource={low_stock_items}
+          columns={stockAlertColumns}
+          rowKey="key"
+          pagination={{ pageSize: 10 }}
+          size="small"
+          scroll={{ y: 400 }}
+          locale={{ emptyText: 'No stock alerts — all items are healthy' }}
+        />
+      </Modal>
     </div>
   )
 }
