@@ -37,7 +37,7 @@ const ownerModules = mapModules([
   { key: '5', label: 'Sales', path: '/dashboard/sales' },
   { key: '6', label: 'Maintenance', path: '/dashboard/maintenance' },
   { key: '7', label: 'Settings', path: '/dashboard/settings' },
-  { key: '8', label: 'Report', path: '/dashboard/report' },
+  { key: '8', label: 'Reports', path: '/dashboard/report' },
   { key: '9', label: 'Help', path: '/dashboard/help' },
   { key: '10', label: 'About', path: '/dashboard/about' },
 ])
@@ -48,7 +48,7 @@ const managerModules = mapModules([
   { key: '3', label: 'Sales', path: '/dashboard/sales' },
   { key: '4', label: 'Stock Management', path: '/dashboard/stock-management' },
   { key: '5', label: 'Settings', path: '/dashboard/settings' },
-  { key: '6', label: 'Report', path: '/dashboard/report' },
+  { key: '6', label: 'Reports', path: '/dashboard/report' },
   { key: '7', label: 'Help', path: '/dashboard/help' },
   { key: '8', label: 'About', path: '/dashboard/about' },
 ])
@@ -57,7 +57,7 @@ const adminModules = mapModules([
   { key: '1', label: 'Dashboard', path: '/dashboard/admin' },
   { key: '2', label: 'Maintenance', path: '/dashboard/maintenance' },
   { key: '3', label: 'Settings', path: '/dashboard/settings' },
-  { key: '4', label: 'Report', path: '/dashboard/report' },
+  { key: '4', label: 'Reports', path: '/dashboard/report' },
   { key: '5', label: 'Help', path: '/dashboard/help' },
   { key: '6', label: 'About', path: '/dashboard/about' },
 ])
