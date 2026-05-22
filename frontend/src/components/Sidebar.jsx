@@ -20,7 +20,7 @@ const iconMap = {
   Sales: <ShoppingCartOutlined />,
   Maintenance: <ToolOutlined />,
   Settings: <SettingOutlined />,
-  Report: <BarChartOutlined />,
+  Reports: <BarChartOutlined />,
   'Manage Staff': <TeamOutlined />,
   Help: <QuestionCircleOutlined />,
   About: <InfoCircleOutlined />,
