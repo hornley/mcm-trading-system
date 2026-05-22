@@ -1,24 +1,22 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Row, Col, Card, Table, Tag, Typography, Input, Select, Button, Modal,
-  Form, InputNumber, DatePicker, Descriptions, Popconfirm, Space, message,
-  Statistic, Divider,
+  DatePicker, Popconfirm, Space, message,
+  Statistic,
 } from 'antd';
 import {
-  SearchOutlined, ShoppingCartOutlined, DollarOutlined, TransactionOutlined,
-  PlusOutlined, DeleteOutlined, PrinterOutlined,
+  SearchOutlined,
+  PlusOutlined, PrinterOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
 import dayjs from 'dayjs';
+import POSModal from '../../components/POSModal.jsx';
+import receiptConfig from '../../config/receipt.json';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
-const PAYMENT_METHODS = ['Cash', 'Card', 'GCash', 'Bank Transfer'];
 import { FABRIC_CATEGORY, qtyLabel, fmtQty } from '../../utils/format.js';
-
-const STEP_QTY = 0.25;
-const MIN_QTY = 0.5;
 
 const Sales = () => {
   const { user, selectedLocationId } = useAuth();
@@ -41,28 +39,18 @@ const Sales = () => {
   const [searchText, setSearchText] = useState('');
   const [dateRange, setDateRange] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
-  const [branchFilter, setBranchFilter] = useState(null);
   const [locations, setLocations] = useState([]);
 
   const [saleModalVisible, setSaleModalVisible] = useState(false);
   const [receiptModalVisible, setReceiptModalVisible] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
-  const [selectedRecord, setSelectedRecord] = useState(null);
   const [totalSalesModalVisible, setTotalSalesModalVisible] = useState(false);
   const [totalSalesDateRange, setTotalSalesDateRange] = useState(null);
   const [totalSalesBranch, setTotalSalesBranch] = useState(defaultTotalBranch);
   const [totalSalesLoading, setTotalSalesLoading] = useState(false);
 
-  const [cart, setCart] = useState([]);
-  const [selectedProductId, setSelectedProductId] = useState(null);
-  const [cartQuantity, setCartQuantity] = useState(1);
-  const [paymentMethod, setPaymentMethod] = useState('Cash');
-  const [paymentAmount, setPaymentAmount] = useState(null);
-  const [orderDate, setOrderDate] = useState(dayjs());
-  const [remarks, setRemarks] = useState('');
   const [expandedRowKeys, setExpandedRowKeys] = useState([]);
   const [orderDetailsMap, setOrderDetailsMap] = useState({});
-  const [form] = Form.useForm();
 
   const usertype = user?.usertype;
   const userId = user?.user_id;
@@ -163,75 +151,22 @@ const Sales = () => {
     }
   }, [totalSalesModalVisible, totalSalesBranch, totalSalesDateRange]);
 
-  const grandTotal = useMemo(() =>
-    cart.reduce((sum, item) => sum + item.quantity * item.price, 0),
-    [cart],
-  );
-
-  const change = useMemo(() =>
-    Math.max(0, (paymentAmount || 0) - grandTotal),
-    [paymentAmount, grandTotal],
-  );
-
-  const canAddToCart = selectedProductId && cartQuantity > 0;
-  const canConfirm = cart.length > 0 && (paymentAmount || 0) >= grandTotal && !submitting;
-
-  const handleAddToCart = () => {
-    const product = products.find((p) => p.product_id === selectedProductId);
-    if (!product) return;
-    if (cart.some((c) => c.product_id === product.product_id)) {
-      message.warning('Product already in cart');
-      return;
-    }
-    setCart((prev) => [
-      ...prev,
-      {
-        product_id: product.product_id,
-        product_name: product.name,
-        quantity: cartQuantity,
-        price: product.price,
-        is_fabric: product.category === FABRIC_CATEGORY,
-      },
-    ]);
-    setSelectedProductId(null);
-    setCartQuantity(1);
-  };
-
-  const handleRemoveFromCart = (productId) => {
-    setCart((prev) => prev.filter((c) => c.product_id !== productId));
-  };
-
   const handleAdd = () => {
-    setSelectedRecord(null);
-    setCart([]);
-    setSelectedProductId(null);
-    setCartQuantity(1);
-    setPaymentMethod('Cash');
-    setPaymentAmount(null);
-    setOrderDate(dayjs());
-    setRemarks('');
-    form.resetFields();
-    form.setFieldsValue({ orderDate: dayjs() });
     setSaleModalVisible(true);
   };
 
-  const handleConfirmOrder = async () => {
-    if (!canConfirm) return;
+  const handleConfirmOrder = async (payload) => {
     setSubmitting(true);
     try {
-      const payload = {
-        usertype,
+      const finalPayload = {
+        ...payload,
         user_id: userId,
         location_id: isManager ? locationId : undefined,
-        items: cart.map((c) => ({ product_id: c.product_id, quantity: c.quantity })),
-        payment_method: paymentMethod,
-        payment_amount: paymentAmount,
-        order_date: orderDate.toISOString(),
       };
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(finalPayload),
       });
       const json = await res.json();
       if (json.success) {
@@ -243,7 +178,6 @@ const Sales = () => {
         setLastOrder(json.data);
         setSaleModalVisible(false);
         setReceiptModalVisible(true);
-        form.resetFields();
         fetchSales();
         fetchProducts();
       } else {
@@ -527,182 +461,15 @@ const Sales = () => {
         pagination={{ current: currentPage, pageSize, total: totalCount, showSizeChanger: false, onChange: (p) => fetchSales(p) }}
       />
 
-      <Modal
-        title="Add Sale"
+      <POSModal
         open={saleModalVisible}
-        onCancel={() => { setSaleModalVisible(false); form.resetFields(); }}
-        width={900}
-        styles={{ body: { maxHeight: '65vh', overflowY: 'auto', overflowX: 'hidden' } }}
-        footer={[
-          <Button key="cancel" onClick={() => { setSaleModalVisible(false); form.resetFields(); }}>Cancel</Button>,
-          <Button key="confirm" type="primary" onClick={handleConfirmOrder} disabled={!canConfirm} loading={submitting}>
-            Confirm Order
-          </Button>,
-        ]}
-      >
-        <Row gutter={24}>
-          <Col xs={24} md={14}>
-            <Form form={form} layout="vertical">
-              <Text strong>Add Products</Text>
-              <div style={{ marginTop: 8 }}>
-                <div style={{ marginBottom: 8 }}>
-                  <Select
-                    showSearch
-                    style={{ width: '100%' }}
-                    placeholder="Search product"
-                    optionFilterProp="label"
-                    value={selectedProductId}
-                    onChange={(id) => {
-                      setSelectedProductId(id);
-                      const p = products.find(p => p.product_id === id);
-                      if (p?.category !== FABRIC_CATEGORY) setCartQuantity(1);
-                    }}
-                  >
-                    {products
-                      .filter((p) => p.is_active !== false)
-                      .slice()
-                      .sort((a, b) => (b.quantity || 0) - (a.quantity || 0))
-                      .map((p) => (
-                      <Select.Option key={p.product_id} value={p.product_id} disabled={!p.quantity} label={p.name}>
-                        <span style={{ opacity: p.quantity ? 1 : 0.45 }}>
-                          {p.name} — ₱{p.price} (stock: {fmtQty(p.quantity, p.category === FABRIC_CATEGORY)})
-                        </span>
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </div>
-                <Space>
-                  {(() => {
-                    const sp = products.find(p => p.product_id === selectedProductId);
-                    const isFab = sp?.category === FABRIC_CATEGORY;
-                    const maxQty = sp?.quantity ?? 1;
-                    if (isFab) {
-                      return (
-                        <div>
-                          <Space.Compact>
-                            <Button onClick={() => setCartQuantity(Math.max(MIN_QTY, cartQuantity - STEP_QTY))}>−</Button>
-                            <InputNumber
-                              min={MIN_QTY}
-                              max={maxQty}
-                              step={STEP_QTY}
-                              value={cartQuantity}
-                              onChange={(v) => setCartQuantity(v ?? MIN_QTY)}
-                              style={{ width: 70, textAlign: 'center' }}
-                            />
-                            <Button onClick={() => setCartQuantity(Math.min(maxQty, cartQuantity + STEP_QTY))}>+</Button>
-                          </Space.Compact>
-                          <div style={{ fontSize: 12, color: '#888', marginTop: 2, textAlign: 'center' }}>
-                            {qtyLabel(cartQuantity)} yd
-                          </div>
-                        </div>
-                      );
-                    }
-                    return (
-                      <InputNumber
-                        min={1}
-                        max={maxQty}
-                        step={1}
-                        value={cartQuantity}
-                        onChange={(v) => setCartQuantity(v)}
-                        style={{ width: 80 }}
-                      />
-                    );
-                  })()}
-                  <Button type="primary" icon={<PlusOutlined />} disabled={!canAddToCart} onClick={handleAddToCart}>
-                    Add
-                  </Button>
-                </Space>
-              </div>
-
-              <Divider />
-              <Text strong>Cart ({cart.length} item{cart.length !== 1 ? 's' : ''})</Text>
-              <Table
-                dataSource={cart}
-                columns={[
-                  { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
-                  { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty, r) => fmtQty(qty, r.is_fabric) },
-                  { title: 'Unit Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}` },
-                  {
-                    title: 'Total', key: 'line_total',
-                    render: (_, r) => `₱${(r.quantity * r.price).toLocaleString()}`,
-                  },
-                  {
-                    title: '', key: 'action', width: 40,
-                    render: (_, r) => (
-                      <Button type="text" danger icon={<DeleteOutlined />} onClick={() => handleRemoveFromCart(r.product_id)} />
-                    ),
-                  },
-                ]}
-                rowKey="product_id"
-                pagination={false}
-                size="small"
-                locale={{ emptyText: 'No items in cart' }}
-              />
-
-              <Divider />
-              <Form.Item name="orderDate" label="Date">
-                <DatePicker
-                  style={{ width: '100%' }}
-                  value={orderDate}
-                  onChange={(d) => setOrderDate(d || dayjs())}
-                />
-              </Form.Item>
-              <Form.Item name="remarks" label="Remarks">
-                <Input.TextArea
-                  rows={2}
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Optional notes"
-                />
-              </Form.Item>
-            </Form>
-          </Col>
-
-          <Col xs={24} md={10}>
-            <Card title="Order Summary">
-              <Descriptions bordered column={1} size="small">
-                {cart.map((item, idx) => (
-                  <Descriptions.Item key={idx} label={item.product_name}>
-                    {fmtQty(item.quantity, item.is_fabric)} × ₱{item.price} = ₱{(item.quantity * item.price).toLocaleString()}
-                  </Descriptions.Item>
-                ))}
-                {cart.length === 0 && (
-                  <Descriptions.Item label="—">No items added</Descriptions.Item>
-                )}
-              </Descriptions>
-              <div style={{ marginTop: 12 }}>
-                <Text strong style={{ fontSize: 16 }}>Grand Total: ₱{grandTotal.toLocaleString()}</Text>
-              </div>
-              <Divider />
-              <Select
-                value={paymentMethod}
-                onChange={setPaymentMethod}
-                style={{ width: '100%', marginBottom: 8 }}
-              >
-                {PAYMENT_METHODS.map((m) => (
-                  <Select.Option key={m} value={m}>{m}</Select.Option>
-                ))}
-              </Select>
-              <InputNumber
-                min={0}
-                style={{ width: '100%', marginBottom: 8 }}
-                placeholder="Payment Amount"
-                prefix="₱"
-                value={paymentAmount}
-                onChange={(v) => setPaymentAmount(v)}
-              />
-              <div style={{ marginBottom: 8 }}>
-                <Text>Change: </Text>
-                <Text strong style={{ color: change > 0 ? '#52c41a' : undefined }}>₱{change.toLocaleString()}</Text>
-              </div>
-              {paymentAmount > 0 && paymentAmount < grandTotal && (
-                <Text type="danger" style={{ display: 'block', marginBottom: 8 }}>Insufficient amount of money</Text>
-              )}
-              <Text type="secondary">Branch: {branchName}</Text>
-            </Card>
-          </Col>
-        </Row>
-      </Modal>
+        onClose={() => setSaleModalVisible(false)}
+        onConfirm={handleConfirmOrder}
+        products={products}
+        usertype={usertype}
+        branchName={branchName}
+        confirmLoading={submitting}
+      />
 
       <Modal
         title="Receipt"
@@ -720,68 +487,116 @@ const Sales = () => {
       >
         {lastOrder && (
           <div id="receipt-content">
-            <div style={{ textAlign: 'center', marginBottom: 16 }}>
-              <Text strong style={{ fontSize: 18 }}>MCM Trading System</Text>
-              <br />
-              <Text style={{ fontSize: 14 }}>{lastOrder.location_name || branchName}</Text>
-              <br />
-              <Text type="secondary" style={{ fontSize: 13 }}>Transaction #{lastOrder.order_id}</Text>
-              <br />
-              <Text type="secondary" style={{ fontSize: 13 }}>{dayjs(lastOrder.order_date).format('YYYY-MM-DD hh:mm A')}</Text>
-            </div>
-            <Divider style={{ margin: '8px 0' }} />
-            <table style={{ width: '100%', fontSize: 15 }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left' }}>Item</th>
-                  <th style={{ textAlign: 'center' }}>Qty</th>
-                  <th style={{ textAlign: 'right' }}>Price</th>
-                  <th style={{ textAlign: 'right' }}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(lastOrder.items || []).map((item) => (
-                  <tr key={item.order_item_id}>
-                    <td>{item.product_name}</td>
-                    <td style={{ textAlign: 'center' }}>{fmtQty(item.quantity, item.category === FABRIC_CATEGORY)}</td>
-                    <td style={{ textAlign: 'right' }}>₱{item.price}</td>
-                    <td style={{ textAlign: 'right' }}>₱{(item.line_total || (item.quantity * item.price)).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <Divider style={{ margin: '12px 0' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16 }}>
-              <Text strong style={{ fontSize: 16 }}>Total:</Text>
-              <Text strong style={{ fontSize: 16 }}>₱{lastOrder.total_amount?.toLocaleString() || 0}</Text>
-            </div>
-            {(lastOrder.payments || []).map((pmt) => (
-              <div key={pmt.payment_id}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginTop: 4 }}>
-                  <Text style={{ fontSize: 14 }}>Payment ({pmt.payment_method}):</Text>
-                  <Text style={{ fontSize: 14 }}>₱{pmt.price?.toLocaleString() || 0}</Text>
+            {(() => {
+              const pmt = (lastOrder.payments || [])[0];
+              const total = lastOrder.total_amount || 0;
+              const payment = pmt?.price || 0;
+              const change = Math.max(0, payment - total);
+              const vatableSales = total / 1.12;
+              const vatAmount = total - vatableSales;
+              const cfg = receiptConfig;
+              return (
+                <div style={{ fontSize: 13, fontFamily: "'Courier New', monospace" }}>
+                  <div style={{ textAlign: 'center', marginBottom: 10 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>{cfg.companyName}</div>
+                    {cfg.companyAddress && <div style={{ fontSize: 11 }}>{cfg.companyAddress}</div>}
+                    <div style={{ fontSize: 10, marginTop: 4 }}>VAT REG TIN: {cfg.vatRegTin}</div>
+                    <div style={{ fontSize: 10 }}>MIN NO: {cfg.minNo}</div>
+                    <div style={{ fontSize: 10 }}>SALES INVOICE NO: {cfg.salesInvoiceNo}</div>
+                  </div>
+
+                  <div style={{ borderTop: '1px dashed #333', borderBottom: '1px dashed #333', padding: '4px 0', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', fontWeight: 600, fontSize: 11, padding: '2px 0', borderBottom: '1px solid #333' }}>
+                      <span style={{ width: '45px', textAlign: 'center' }}>QTY</span>
+                      <span style={{ flex: 1, paddingLeft: 4 }}>ITEM</span>
+                      <span style={{ width: '5.5em', textAlign: 'right' }}>AMOUNT</span>
+                    </div>
+                    {(lastOrder.items || []).map((item) => (
+                      <div key={item.order_item_id} style={{ display: 'flex', fontSize: 11, padding: '2px 0' }}>
+                        <span style={{ width: '45px', textAlign: 'center', fontFamily: "'Courier New', monospace" }}>
+                          {fmtQty(item.quantity, item.category === FABRIC_CATEGORY)}
+                        </span>
+                        <span style={{ flex: 1, paddingLeft: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Courier New', monospace" }}>
+                          {item.product_name}
+                        </span>
+                        <span style={{ width: '5.5em', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>
+                          ₱{(item.line_total || (item.quantity * item.price)).toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700 }}>
+                      <span>TOTAL:</span>
+                      <span>₱{total.toLocaleString()}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 2 }}>
+                      <span>Payment ({pmt?.payment_method || 'N/A'}):</span>
+                      <span>₱{payment.toLocaleString()}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                      <span>Change:</span>
+                      <span>₱{change.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px dashed #333', padding: '4px 0', marginBottom: 8, fontSize: 11 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Vatable Sales:</span>
+                      <span>₱{vatableSales.toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>VAT (12%):</span>
+                      <span>₱{vatAmount.toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>VAT Exempt Sale:</span>
+                      <span>₱0.00</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Zero Rated Sale:</span>
+                      <span>₱0.00</span>
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px dashed #333', padding: '4px 0', marginBottom: 8, fontSize: 11 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Date:</span>
+                      <span>{dayjs(lastOrder.order_date).format('YYYY-MM-DD')}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Time:</span>
+                      <span>{dayjs(lastOrder.order_date).format('hh:mm A')}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Transaction:</span>
+                      <span>#{lastOrder.order_id}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 11, marginBottom: 8 }}>
+                    <div>TIN: {cfg.tin}</div>
+                    <div>ACCRED NO: {cfg.accredNo}</div>
+                    <div>DATE ISSUED: {cfg.dateIssued}</div>
+                    <div>POS PERMIT: {cfg.posPermit}</div>
+                  </div>
+
+                  <div style={{ borderTop: '1px dashed #333', textAlign: 'center', padding: '6px 0', fontSize: 11, marginTop: 4 }}>
+                    Thank you for your purchase!
+                  </div>
+
+                  {(lastOrder.auto_restocks || []).length > 0 && (
+                    <div style={{ fontSize: 10, color: '#52c41a', marginTop: 4, borderTop: '1px dashed #999', padding: '4px 0' }}>
+                      <div style={{ fontWeight: 600 }}>Auto-Restock:</div>
+                      {lastOrder.auto_restocks.map((r, i) => (
+                        <div key={i}>{r.product_name}: +{qtyLabel(r.quantity)} from {r.from_location}</div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                  <Text style={{ fontSize: 14 }}>Change:</Text>
-                  <Text style={{ color: '#52c41a', fontSize: 14 }}>₱{Math.max(0, (pmt.price || 0) - (lastOrder.total_amount || 0)).toLocaleString()}</Text>
-                </div>
-              </div>
-            ))}
-            {(lastOrder.auto_restocks || []).length > 0 && (
-              <>
-                <Divider style={{ margin: '12px 0' }} />
-                <div style={{ fontSize: 13, color: '#52c41a' }}>
-                  <Text type="secondary" style={{ fontSize: 13 }}>Auto-Restock Triggered:</Text>
-                  {lastOrder.auto_restocks.map((r, i) => (
-                    <div key={i} style={{ fontSize: 13 }}>{r.product_name}: +{qtyLabel(r.quantity)} from {r.from_location}</div>
-                  ))}
-                </div>
-              </>
-            )}
-            <Divider style={{ margin: '12px 0' }} />
-            <div style={{ textAlign: 'center', marginTop: 8 }}>
-              <Text type="secondary" style={{ fontSize: 14 }}>Thank you for your purchase!</Text>
-            </div>
+              );
+            })()}
           </div>
         )}
       </Modal>
