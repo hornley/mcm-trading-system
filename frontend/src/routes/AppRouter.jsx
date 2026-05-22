@@ -8,6 +8,8 @@ import LandingPage from './../pages/LandingPage'
 import AuthLayout from './../layouts/AuthLayout'
 import Login from './../pages/auth/Login'
 import Register from './../pages/auth/Register'
+import ForgotPassword from './../pages/auth/ForgotPassword'
+import ResetPassword from './../pages/auth/ResetPassword'
 
 import DashboardLayout from './../layouts/DashboardLayout'
 import Owner from '../pages/dashboard/Owner'
@@ -23,6 +25,8 @@ import Sales from '../pages/module/Sales'
 import UserAccess from '../pages/module/UserAccess'
 import Report from '../pages/module/Reports'
 import SettingsPage from '../pages/module/Settings'
+import Help from '../pages/module/Help'
+import About from '../pages/module/About'
 //Contains all paths to pages
 
 const router = createBrowserRouter (
@@ -33,6 +37,8 @@ const router = createBrowserRouter (
         <Route index element={<LandingPage />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
+        <Route path="forgot-password" element={<ForgotPassword />} />
+        <Route path="reset-password/:token" element={<ResetPassword />} />
       </Route>
 
       <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "admin"]} />}>
@@ -76,6 +82,12 @@ const router = createBrowserRouter (
           {/* settings - all roles */}
           <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "admin"]} />}>
             <Route path="settings" element={<SettingsPage />} />
+          </Route>
+
+          {/* help and about - all roles */}
+          <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "admin"]} />}>
+            <Route path="help" element={<Help />} />
+            <Route path="about" element={<About />} />
           </Route>
 
         </Route>

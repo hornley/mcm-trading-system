@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from models import db, User
+from werkzeug.security import check_password_hash, generate_password_hash
 
 settings_bp = Blueprint("settings", __name__)
 
@@ -78,3 +79,47 @@ def get_user_manual():
     return jsonify({
         "user_manual_url": "no link yet"
     })
+
+@settings_bp.route("/api/settings/password", methods=["PUT"])
+def change_password():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body is required"}), 400
+    
+    user_id = data.get("user_id")
+    old_password = data.get("old_password")
+    new_password = data.get("new_password")
+    
+    if not user_id or not old_password or not new_password:
+        return jsonify({"error": "user_id, old_password, and new_password are required"}), 400
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    if not check_password_hash(user.password, old_password):
+        return jsonify({"error": "Old password is incorrect"}), 400
+    
+    user.password = generate_password_hash(new_password)
+    db.session.commit()
+    return jsonify({"message": "Password changed successfully"})
+
+@settings_bp.route("/api/settings/verify-password", methods=["POST"])
+def verify_password():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body is required"}), 400
+    
+    user_id = data.get("user_id")
+    password = data.get("password")
+    
+    if not user_id or not password:
+        return jsonify({"error": "user_id and password are required"}), 400
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    if check_password_hash(user.password, password):
+        return jsonify({"valid": True})
+    return jsonify({"valid": False})

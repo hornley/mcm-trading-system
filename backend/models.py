@@ -19,6 +19,16 @@ class User(db.Model):
     # profile_picture = db.Column(db.String, nullable=True)
 
 
+class PasswordResetToken(db.Model):
+    __tablename__ = "Password_Reset_Tokens"
+    token_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
+    token = db.Column(db.String, nullable=False, unique=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False)
+    user = db.relationship("User", backref="reset_tokens")
+
+
 
 class Location(db.Model):
     __tablename__ = "Locations"
@@ -26,6 +36,7 @@ class Location(db.Model):
     name = db.Column(db.String, nullable=False)
     address = db.Column(db.String)
     is_active = db.Column(db.Boolean, default=True)
+    is_storehouse = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
 
@@ -71,7 +82,7 @@ class OrderItem(db.Model):
     order_item_id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey("Orders.order_id"), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
-    quantity = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Float, nullable=False)
     price = db.Column(db.Integer, nullable=False)
     order = db.relationship("Order", backref="items")
     product = db.relationship("Product")
@@ -82,7 +93,7 @@ class Payment(db.Model):
     payment_id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey("Orders.order_id"), nullable=False)
     payment_method = db.Column(db.String, nullable=False)
-    quantity = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Float, nullable=False)
     price = db.Column(db.Integer, nullable=False)
     order = db.relationship("Order", backref="payments")
 
@@ -92,7 +103,7 @@ class Inventory(db.Model):
     inventory_id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
     location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
-    quantity = db.Column(db.Integer, nullable=False, default=0)
+    quantity = db.Column(db.Float, nullable=False, default=0.0)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
     product = db.relationship("Product")
     location = db.relationship("Location")
@@ -105,9 +116,10 @@ class StockTransfer(db.Model):
     from_location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
     to_location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
-    quantity = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Float, nullable=False)
     transfer_date = db.Column(db.DateTime, nullable=False, default=datetime.now)
     status = db.Column(db.String, nullable=False, default="completed")
+    remarks = db.Column(db.String)
     product = db.relationship("Product")
     from_location = db.relationship("Location", foreign_keys=[from_location_id])
     to_location = db.relationship("Location", foreign_keys=[to_location_id])
@@ -120,7 +132,7 @@ class StockAdjustment(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
     location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
-    quantity_change = db.Column(db.Integer, nullable=False)
+    quantity_change = db.Column(db.Float, nullable=False)
     reason = db.Column(db.String)
     date = db.Column(db.DateTime, nullable=False, default=datetime.now)
     product = db.relationship("Product")
@@ -138,3 +150,21 @@ class ActivityLog(db.Model):
     details = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
     user = db.relationship("User")
+
+
+class StoreReport(db.Model):
+    __tablename__ = "Store_Reports"
+    report_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
+    title = db.Column(db.String, nullable=False)
+    issue_type = db.Column(db.String, nullable=False)  # store, materials, software
+    description = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String, nullable=False, default="pending")  # pending, resolved, voided
+    resolved_by = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=True)
+    resolved_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.now)
+    user = db.relationship("User", foreign_keys=[user_id])
+    location = db.relationship("Location")
+    resolver = db.relationship("User", foreign_keys=[resolved_by])

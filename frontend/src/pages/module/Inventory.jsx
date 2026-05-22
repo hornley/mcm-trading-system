@@ -4,8 +4,8 @@ import {
   Tag, Modal, Form, Space, Popconfirm, InputNumber, message, Spin, Radio,
 } from 'antd';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js';
 
-const { Title } = Typography;
 const { Search } = Input;
 const { TextArea } = Input;
 
@@ -200,8 +200,15 @@ const Inventory = () => {
     },
     {
       title: 'Stock Quantity', key: 'stockQuantity',
-      render: (_, record) => record.quantity ?? 0,
+      render: (_, record) => {
+        const isFab = record.category === FABRIC_CATEGORY;
+        return fmtQty(record.quantity, isFab);
+      },
       sorter: (a, b) => (a.quantity ?? 0) - (b.quantity ?? 0),
+    },
+    {
+      title: 'Unit', dataIndex: 'unit', key: 'unit',
+      render: (v, record) => record.category === FABRIC_CATEGORY ? 'yards' : (v || '-'),
     },
     {
       title: 'Base Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}`,
@@ -317,7 +324,6 @@ const Inventory = () => {
 
   return (
     <div>
-      <Title level={4} style={{ marginBottom: 16 }}>Inventory</Title>
       <Card styles={{ body: { padding: '16px 24px' } }}>
         <Tabs items={items} />
       </Card>
@@ -381,8 +387,8 @@ const Inventory = () => {
               <Radio value="remove">Remove Stock</Radio>
             </Radio.Group>
           </Form.Item>
-          <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: 'Please enter quantity' }]}>
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="Enter quantity" />
+          <Form.Item name="quantity" label={`Quantity (${adjustProduct?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} rules={[{ required: true, message: 'Please enter quantity' }]}>
+            <InputNumber min={adjustProduct?.category === FABRIC_CATEGORY ? 0.125 : 1} step={adjustProduct?.category === FABRIC_CATEGORY ? 0.125 : 1} style={{ width: '100%' }} placeholder="Enter quantity" />
           </Form.Item>
           <Form.Item name="reason" label="Reason">
             <Input placeholder="e.g. New shipment, Damaged goods" />

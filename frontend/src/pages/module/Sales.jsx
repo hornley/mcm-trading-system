@@ -1,274 +1,349 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Row, Col, Card, Table, Tag, Typography, Input, Select, Button, Modal,
   Form, InputNumber, DatePicker, Descriptions, Popconfirm, Space, message,
-  Statistic,
+  Statistic, Divider,
 } from 'antd';
-import { SearchOutlined, ShoppingCartOutlined, DollarOutlined, TransactionOutlined } from '@ant-design/icons';
+import {
+  SearchOutlined, ShoppingCartOutlined, DollarOutlined, TransactionOutlined,
+  PlusOutlined, DeleteOutlined, PrinterOutlined,
+} from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
 import dayjs from 'dayjs';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
-const BRANCHES = ['Main Store', 'Storehouse'];
+const PAYMENT_METHODS = ['Cash', 'Card', 'GCash', 'Bank Transfer'];
+import { FABRIC_CATEGORY, qtyLabel, fmtQty } from '../../utils/format.js';
 
-const mockProducts = [
-  { id: 1, name: 'Cotton Fabric', category: 'Textiles', unitPrice: 150 },
-  { id: 2, name: 'Silk Satin', category: 'Textiles', unitPrice: 450 },
-  { id: 3, name: 'Linen Blend', category: 'Textiles', unitPrice: 200 },
-  { id: 4, name: 'Polyester Thread', category: 'Miscellaneous', unitPrice: 35 },
-  { id: 5, name: 'Buttons Pack', category: 'Miscellaneous', unitPrice: 50 },
-  { id: 6, name: 'Zipper Roll', category: 'Miscellaneous', unitPrice: 120 },
-  { id: 7, name: 'Fleece', category: 'Textiles', unitPrice: 180 },
-  { id: 8, name: 'Velvet', category: 'Textiles', unitPrice: 160 },
-];
-
-const now = dayjs();
-const today = now.format('YYYY-MM-DD');
-
-const mockSales = [
-  { key: '1', transactionId: 'TRX-001', productName: 'Cotton Fabric', category: 'Textiles', quantity: 10, unitPrice: 150, totalAmount: 1500, amountPaid: 1500, change: 0, branch: 'Main Store', date: '2025-05-15', status: 'Active' },
-  { key: '2', transactionId: 'TRX-002', productName: 'Silk Satin', category: 'Textiles', quantity: 3, unitPrice: 450, totalAmount: 1350, amountPaid: 1400, change: 50, branch: 'Main Store', date: '2025-05-15', status: 'Active' },
-  { key: '3', transactionId: 'TRX-003', productName: 'Polyester Thread', category: 'Miscellaneous', quantity: 50, unitPrice: 35, totalAmount: 1750, amountPaid: 2000, change: 250, branch: 'Storehouse', date: '2025-05-14', status: 'Active' },
-  { key: '4', transactionId: 'TRX-004', productName: 'Buttons Pack', category: 'Miscellaneous', quantity: 20, unitPrice: 50, totalAmount: 1000, amountPaid: 1000, change: 0, branch: 'Main Store', date: '2025-05-10', status: 'Voided' },
-  { key: '5', transactionId: 'TRX-005', productName: 'Linen Blend', category: 'Textiles', quantity: 5, unitPrice: 200, totalAmount: 1000, amountPaid: 1000, change: 0, branch: 'Storehouse', date: '2025-05-13', status: 'Active' },
-  { key: '6', transactionId: 'TRX-006', productName: 'Zipper Roll', category: 'Miscellaneous', quantity: 8, unitPrice: 120, totalAmount: 960, amountPaid: 1000, change: 40, branch: 'Main Store', date: '2025-05-12', status: 'Active' },
-  { key: '7', transactionId: 'TRX-007', productName: 'Fleece', category: 'Textiles', quantity: 4, unitPrice: 180, totalAmount: 720, amountPaid: 720, change: 0, branch: 'Storehouse', date: '2025-05-11', status: 'Voided' },
-  { key: '8', transactionId: 'TRX-008', productName: 'Velvet', category: 'Textiles', quantity: 6, unitPrice: 160, totalAmount: 960, amountPaid: 1000, change: 40, branch: 'Main Store', date: '2025-05-09', status: 'Active' },
-];
-
-const todaySales = mockSales.filter((s) => s.date === today && s.status === 'Active');
-const monthSales = mockSales.filter((s) => s.date.startsWith('2025-05') && s.status === 'Active');
-
-const todayTotal = todaySales.reduce((sum, s) => sum + s.totalAmount, 0);
-const monthTotal = monthSales.reduce((sum, s) => sum + s.totalAmount, 0);
+const STEP_QTY = 0.25;
+const MIN_QTY = 0.5;
 
 const Sales = () => {
-  const { user } = useAuth();
-  const branch = user?.location || 'Main Store';
+  const { user, selectedLocationId } = useAuth();
+  const branchName = user?.location_name || 'Main Store';
   const isOwner = user?.role === 'owner';
+  const isManager = user?.role === 'manager';
+  const defaultTotalBranch = isOwner || user?.role === 'admin' ? 'All' : branchName;
+
+  const [sales, setSales] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [dashboardStats, setDashboardStats] = useState({ sales_today: 0, month_sales: 0, transactions_today: 0 });
+  const [allSalesFull, setAllSalesFull] = useState([]);
 
   const [searchText, setSearchText] = useState('');
   const [dateRange, setDateRange] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
+  const [branchFilter, setBranchFilter] = useState(null);
+  const [locations, setLocations] = useState([]);
+
   const [saleModalVisible, setSaleModalVisible] = useState(false);
+  const [receiptModalVisible, setReceiptModalVisible] = useState(false);
+  const [lastOrder, setLastOrder] = useState(null);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [totalSalesModalVisible, setTotalSalesModalVisible] = useState(false);
-  const [productHistoryVisible, setProductHistoryVisible] = useState(false);
-  const [selectedHistoryProduct, setSelectedHistoryProduct] = useState(null);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [lockedProduct, setLockedProduct] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
-  const [formValues, setFormValues] = useState({
-    quantity: 1,
-    unitPrice: 0,
-    totalAmount: 0,
-    paymentAmount: 0,
-    change: 0,
-    date: dayjs(),
-    branch: branch,
-    remarks: '',
-  });
   const [totalSalesDateRange, setTotalSalesDateRange] = useState(null);
-  const [totalSalesBranch, setTotalSalesBranch] = useState(branch);
+  const [totalSalesBranch, setTotalSalesBranch] = useState(defaultTotalBranch);
+  const [totalSalesLoading, setTotalSalesLoading] = useState(false);
+
+  const [cart, setCart] = useState([]);
+  const [selectedProductId, setSelectedProductId] = useState(null);
+  const [cartQuantity, setCartQuantity] = useState(1);
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [paymentAmount, setPaymentAmount] = useState(null);
+  const [orderDate, setOrderDate] = useState(dayjs());
+  const [remarks, setRemarks] = useState('');
+  const [expandedRowKeys, setExpandedRowKeys] = useState([]);
+  const [orderDetailsMap, setOrderDetailsMap] = useState({});
   const [form] = Form.useForm();
 
-  const filteredSales = mockSales.filter((s) => {
-    const matchesSearch = !searchText || s.productName.toLowerCase().includes(searchText.toLowerCase()) || s.transactionId.toLowerCase().includes(searchText.toLowerCase());
-    const matchesDate = !dateRange || !dateRange[0] || !dateRange[1] || (s.date >= dateRange[0].format('YYYY-MM-DD') && s.date <= dateRange[1].format('YYYY-MM-DD'));
-    const matchesStatus = !statusFilter || s.status === statusFilter;
-    return matchesSearch && matchesDate && matchesStatus;
-  });
+  const usertype = user?.usertype;
+  const userId = user?.user_id;
+  const locationId = isManager ? user?.location_id : undefined;
 
-  const totalSalesFiltered = useMemo(() => {
-    const data = mockSales.filter((s) => {
-      const matchesBranch = s.branch === totalSalesBranch;
-      const matchesDate = !totalSalesDateRange || !totalSalesDateRange[0] || !totalSalesDateRange[1] || (s.date >= totalSalesDateRange[0].format('YYYY-MM-DD') && s.date <= totalSalesDateRange[1].format('YYYY-MM-DD'));
-      return matchesBranch && matchesDate && s.status === 'Active';
-    });
-    const grouped = {};
-    data.forEach((s) => {
-      if (!grouped[s.productName]) grouped[s.productName] = { productName: s.productName, category: s.category, totalQty: 0, totalAmount: 0 };
-      grouped[s.productName].totalQty += s.quantity;
-      grouped[s.productName].totalAmount += s.totalAmount;
-    });
-    return Object.values(grouped);
-  }, [totalSalesBranch, totalSalesDateRange]);
+  const apiParams = `usertype=${usertype}&user_id=${userId}` + (selectedLocationId && selectedLocationId !== 'all' ? `&location_id=${selectedLocationId}` : '');
 
-  const totalSalesSummary = useMemo(() => {
-    const total = totalSalesFiltered.reduce((sum, s) => sum + s.totalAmount, 0);
-    return () => (
-      <Table.Summary.Row>
-        <Table.Summary.Cell index={0}><Text strong>Total</Text></Table.Summary.Cell>
-        <Table.Summary.Cell index={1} />
-        <Table.Summary.Cell index={2} />
-        <Table.Summary.Cell index={3}><Text strong>₱{total.toLocaleString()}</Text></Table.Summary.Cell>
-      </Table.Summary.Row>
-    );
-  }, [totalSalesFiltered]);
-
-  const handleProductSelect = (productId) => {
-    const product = mockProducts.find((p) => p.id === productId);
-    if (product) {
-      setSelectedProduct(product);
-      setLockedProduct(true);
-      const total = formValues.quantity * product.unitPrice;
-      const change = Math.max(0, formValues.paymentAmount - total);
-      setFormValues((prev) => ({ ...prev, unitPrice: product.unitPrice, totalAmount: total, change }));
-      form.setFieldsValue({ product: productId, unitPrice: product.unitPrice, totalAmount: total, change });
+  const fetchSales = async (page) => {
+    setLoading(true);
+    try {
+      const p = page || currentPage;
+      let url = `/api/orders?${apiParams}&page=${p}&limit=${pageSize}`;
+      if (statusFilter) url += `&status=${statusFilter}`;
+      if (dateRange && dateRange[0]) url += `&date_from=${dateRange[0].toISOString()}`;
+      if (dateRange && dateRange[1]) url += `&date_to=${dateRange[1].toISOString()}`;
+      if (searchText) url += `&q=${searchText}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      if (json.success) {
+        setSales(json.data.orders || []);
+        setTotalCount(json.data.total_count || 0);
+        setCurrentPage(json.data.page || p);
+      }
+    } catch (e) {
+      message.error('Failed to load sales');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleChangeProduct = () => {
-    setSelectedProduct(null);
-    setLockedProduct(false);
-    setConfirmed(false);
-    setFormValues({ quantity: 1, unitPrice: 0, totalAmount: 0, paymentAmount: 0, change: 0, date: dayjs(), branch: branch, remarks: '' });
-    form.resetFields();
+  const fetchProducts = async () => {
+    setProductsLoading(true);
+    try {
+      const res = await fetch(`/api/products?${apiParams}`);
+      const json = await res.json();
+      if (json.success) setProducts(json.data || []);
+    } catch (e) { /* ignore */ }
+    finally { setProductsLoading(false); }
   };
 
-  const handleQuantityChange = (val) => {
-    const qty = val || 0;
-    const total = qty * (selectedProduct?.unitPrice || 0);
-    const change = Math.max(0, formValues.paymentAmount - total);
-    setFormValues((prev) => ({ ...prev, quantity: qty, totalAmount: total, change }));
-    form.setFieldsValue({ totalAmount: total, change });
+  const fetchLocations = async () => {
+    if (!isOwner) return;
+    try {
+      const res = await fetch(`/api/locations?usertype=${usertype}`);
+      const json = await res.json();
+      if (json.success) setLocations(json.data || []);
+    } catch (e) { /* ignore */ }
   };
 
-  const handlePaymentChange = (val) => {
-    const payment = val || 0;
-    const change = Math.max(0, payment - formValues.totalAmount);
-    setFormValues((prev) => ({ ...prev, paymentAmount: payment, change }));
-    form.setFieldsValue({ change });
+  const [orderDetailsLoading, setOrderDetailsLoading] = useState({});
+
+  const fetchOrderDetail = async (orderId) => {
+    if (orderDetailsMap[orderId] || orderDetailsLoading[orderId]) return;
+    setOrderDetailsLoading((prev) => ({ ...prev, [orderId]: true }));
+    try {
+      const res = await fetch(`/api/orders/${orderId}?${apiParams}`);
+      const json = await res.json();
+      if (json.success) {
+        setOrderDetailsMap((prev) => ({ ...prev, [orderId]: json.data }));
+        return json.data;
+      }
+    } catch (e) { /* ignore */ }
+    finally {
+      setOrderDetailsLoading((prev) => ({ ...prev, [orderId]: false }));
+    }
   };
 
-  const handleDateChange = (date) => {
-    setFormValues((prev) => ({ ...prev, date }));
-    form.setFieldsValue({ date });
+  const fetchDashboardStats = async () => {
+    try {
+      const res = await fetch(`/api/dashboard/summary?${apiParams}`);
+      const json = await res.json();
+      if (json.success) setDashboardStats(json.data.stats || {});
+    } catch (e) { /* ignore */ }
   };
 
-  const handleRemarksChange = (e) => {
-    setFormValues((prev) => ({ ...prev, remarks: e.target.value }));
+  useEffect(() => { fetchSales(1); fetchDashboardStats(); }, [searchText, dateRange, statusFilter, selectedLocationId]);
+  useEffect(() => { fetchProducts(); fetchLocations(); }, []);
+
+  const fetchTotalSalesData = useCallback(async (branch, dateFrom, dateTo) => {
+    setTotalSalesLoading(true);
+    try {
+      const loc = branch && branch !== 'All' ? locations.find((l) => l.name === branch)?.location_id : undefined;
+      const params = new URLSearchParams({ usertype, user_id: userId, include_items: 'true', limit: '999' });
+      if (loc) params.set('location_id', loc);
+      if (dateFrom) params.set('date_from', dateFrom.toISOString());
+      if (dateTo) params.set('date_to', dateTo.toISOString());
+      const res = await fetch(`/api/orders?${params}`);
+      const json = await res.json();
+      if (json.success) setAllSalesFull(json.data.orders || []);
+    } catch { /* ignore */ }
+    finally { setTotalSalesLoading(false); }
+  }, [usertype, userId, locations]);
+
+  useEffect(() => {
+    if (totalSalesModalVisible) {
+      const [from, to] = totalSalesDateRange || [];
+      fetchTotalSalesData(totalSalesBranch, from, to);
+    }
+  }, [totalSalesModalVisible, totalSalesBranch, totalSalesDateRange]);
+
+  const grandTotal = useMemo(() =>
+    cart.reduce((sum, item) => sum + item.quantity * item.price, 0),
+    [cart],
+  );
+
+  const change = useMemo(() =>
+    Math.max(0, (paymentAmount || 0) - grandTotal),
+    [paymentAmount, grandTotal],
+  );
+
+  const canAddToCart = selectedProductId && cartQuantity > 0;
+  const canConfirm = cart.length > 0 && (paymentAmount || 0) >= grandTotal && !submitting;
+
+  const handleAddToCart = () => {
+    const product = products.find((p) => p.product_id === selectedProductId);
+    if (!product) return;
+    if (cart.some((c) => c.product_id === product.product_id)) {
+      message.warning('Product already in cart');
+      return;
+    }
+    setCart((prev) => [
+      ...prev,
+      {
+        product_id: product.product_id,
+        product_name: product.name,
+        quantity: cartQuantity,
+        price: product.price,
+        is_fabric: product.category === FABRIC_CATEGORY,
+      },
+    ]);
+    setSelectedProductId(null);
+    setCartQuantity(1);
+  };
+
+  const handleRemoveFromCart = (productId) => {
+    setCart((prev) => prev.filter((c) => c.product_id !== productId));
   };
 
   const handleAdd = () => {
     setSelectedRecord(null);
-    setSelectedProduct(null);
-    setLockedProduct(false);
-    setConfirmed(false);
-    setFormValues({ quantity: 1, unitPrice: 0, totalAmount: 0, paymentAmount: 0, change: 0, date: dayjs(), branch: branch, remarks: '' });
+    setCart([]);
+    setSelectedProductId(null);
+    setCartQuantity(1);
+    setPaymentMethod('Cash');
+    setPaymentAmount(null);
+    setOrderDate(dayjs());
+    setRemarks('');
     form.resetFields();
-    form.setFieldsValue({ branch: branch, date: dayjs() });
+    form.setFieldsValue({ orderDate: dayjs() });
     setSaleModalVisible(true);
   };
 
-  const handleEdit = (record) => {
-    setSelectedRecord(record);
-    const product = mockProducts.find((p) => p.name === record.productName);
-    setSelectedProduct(product);
-    setLockedProduct(true);
-    setConfirmed(true);
-    setFormValues({
-      quantity: record.quantity,
-      unitPrice: record.unitPrice,
-      totalAmount: record.totalAmount,
-      paymentAmount: record.amountPaid,
-      change: record.change,
-      date: dayjs(record.date),
-      branch: record.branch,
-      remarks: '',
-    });
-    form.setFieldsValue({
-      product: product?.id,
-      quantity: record.quantity,
-      unitPrice: record.unitPrice,
-      totalAmount: record.totalAmount,
-      paymentAmount: record.amountPaid,
-      change: record.change,
-      date: dayjs(record.date),
-      branch: record.branch,
-    });
-    setSaleModalVisible(true);
-  };
-
-  const handleVoid = (record) => {
-    message.success(`Transaction ${record.transactionId} voided`);
-  };
-
-  const handleConfirmOrder = () => {
-    form.validateFields().then(() => {
-      const { paymentAmount, totalAmount } = form.getFieldsValue();
-      if (paymentAmount >= totalAmount) {
-        setConfirmed(true);
-        message.success('Order confirmed');
+  const handleConfirmOrder = async () => {
+    if (!canConfirm) return;
+    setSubmitting(true);
+    try {
+      const payload = {
+        usertype,
+        user_id: userId,
+        location_id: isManager ? locationId : undefined,
+        items: cart.map((c) => ({ product_id: c.product_id, quantity: c.quantity })),
+        payment_method: paymentMethod,
+        payment_amount: paymentAmount,
+        order_date: orderDate.toISOString(),
+      };
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.success) {
+        message.success(`Order #${json.data.order_id} created`);
+        if (json.data.auto_restocks?.length > 0) {
+          const names = json.data.auto_restocks.map((r) => r.product_name).join(', ');
+          message.info(`Auto-restock triggered: ${names}`);
+        }
+        setLastOrder(json.data);
+        setSaleModalVisible(false);
+        setReceiptModalVisible(true);
+        form.resetFields();
+        fetchSales();
+        fetchProducts();
       } else {
-        message.error('Payment amount must be at least the total amount');
+        message.error(json.message || 'Failed to create order');
       }
-    }).catch(() => {});
+    } catch (e) {
+      message.error('Failed to create order');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleSaveSale = () => {
-    if (!confirmed && !selectedRecord) return;
-    message.success(selectedRecord ? 'Sale updated' : 'Sale recorded');
-    setSaleModalVisible(false);
-    form.resetFields();
+  const handleVoid = async (record) => {
+    try {
+      const res = await fetch(`/api/orders/${record.order_id}/void`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usertype, user_id: userId }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        message.success(`Order #${record.order_id} voided`);
+        fetchSales();
+      } else {
+        message.error(json.message || 'Failed to void order');
+      }
+    } catch (e) {
+      message.error('Failed to void order');
+    }
   };
 
-  const canConfirm = useMemo(() => {
-    if (!selectedProduct) return false;
-    if (!formValues.quantity || formValues.quantity < 1) return false;
-    if (!formValues.paymentAmount || formValues.paymentAmount < formValues.totalAmount) return false;
-    return true;
-  }, [selectedProduct, formValues]);
+  const handleViewReceipt = async (record) => {
+    const cached = orderDetailsMap[record.order_id];
+    if (cached) {
+      setLastOrder(cached);
+    } else {
+      const detail = await fetchOrderDetail(record.order_id);
+      setLastOrder(detail || record);
+    }
+    setReceiptModalVisible(true);
+  };
 
-  const isVoided = (record) => record.status === 'Voided';
+  const isVoided = (record) => record.status === 'voided';
 
   const columns = [
     {
-      title: 'Transaction ID', dataIndex: 'transactionId', key: 'transactionId',
-      sorter: (a, b) => a.transactionId.localeCompare(b.transactionId),
+      title: 'Transaction ID', dataIndex: 'order_id', key: 'order_id',
+      render: (v) => `#${v}`,
+      sorter: (a, b) => a.order_id - b.order_id,
     },
     {
-      title: 'Product Name', dataIndex: 'productName', key: 'productName',
-      sorter: (a, b) => a.productName.localeCompare(b.productName),
+      title: 'Branch', dataIndex: 'location_name', key: 'location_name',
+      sorter: (a, b) => (a.location_name || '').localeCompare(b.location_name || ''),
     },
     {
-      title: 'Category', dataIndex: 'category', key: 'category',
-      sorter: (a, b) => a.category.localeCompare(b.category),
+      title: 'Date', dataIndex: 'order_date', key: 'order_date',
+      render: (v) => v ? dayjs(v).format('YYYY-MM-DD') : '-',
+      sorter: (a, b) => (a.order_date || '').localeCompare(b.order_date || ''),
     },
     {
-      title: 'Quantity', dataIndex: 'quantity', key: 'quantity',
-      sorter: (a, b) => a.quantity - b.quantity,
+      title: 'Items', key: 'items',
+      render: (_, record) => {
+        const names = record.product_names || [];
+        if (names.length === 0) return '-';
+        const isExpanded = expandedRowKeys.includes(record.order_id);
+        const expandIcon = names.length > 1 ? (isExpanded ? '▼' : '▶') : '  ';
+        return (
+          <span
+            onClick={() => {
+              if (names.length <= 1) return;
+              setExpandedRowKeys((prev) =>
+                prev.includes(record.order_id)
+                  ? prev.filter((id) => id !== record.order_id)
+                  : [...prev, record.order_id]
+              );
+            }}
+            style={{ cursor: names.length > 1 ? 'pointer' : 'default' }}
+          >
+            <span style={{ fontSize: 10, marginRight: 4 }}>{expandIcon}</span>
+            {names[0]}{names.length > 1 ? ` +${names.length - 1} more` : ''}
+          </span>
+        );
+      },
+      sorter: (a, b) => (a.item_count || 0) - (b.item_count || 0),
     },
     {
-      title: 'Unit Price', dataIndex: 'unitPrice', key: 'unitPrice', render: (v) => `₱${v}`,
-      sorter: (a, b) => a.unitPrice - b.unitPrice,
+      title: 'Total Amount', dataIndex: 'total_amount', key: 'total_amount',
+      render: (v) => `₱${v?.toLocaleString() || 0}`,
+      sorter: (a, b) => a.total_amount - b.total_amount,
     },
     {
-      title: 'Total Amount', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => `₱${v}`,
-      sorter: (a, b) => a.totalAmount - b.totalAmount,
-    },
-    {
-      title: 'Amount Paid', dataIndex: 'amountPaid', key: 'amountPaid', render: (v) => `₱${v}`,
-      sorter: (a, b) => a.amountPaid - b.amountPaid,
-    },
-    {
-      title: 'Change', dataIndex: 'change', key: 'change', render: (v) => `₱${v}`,
-      sorter: (a, b) => a.change - b.change,
-    },
-    {
-      title: 'Branch', dataIndex: 'branch', key: 'branch',
-      sorter: (a, b) => a.branch.localeCompare(b.branch),
-    },
-    {
-      title: 'Date', dataIndex: 'date', key: 'date',
-      sorter: (a, b) => a.date.localeCompare(b.date),
+      title: 'Payment', key: 'payment',
+      render: (_, record) => {
+        return record.payment_method ? `${record.payment_method} — ₱${(record.payment_price || 0).toLocaleString()}` : '-';
+      },
     },
     {
       title: 'Status', dataIndex: 'status', key: 'status',
       render: (status) => (
-        <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag>
+        <Tag color={status === 'completed' ? 'green' : 'red'}>{status === 'completed' ? 'Completed' : 'Voided'}</Tag>
       ),
       sorter: (a, b) => a.status.localeCompare(b.status),
     },
@@ -276,9 +351,9 @@ const Sales = () => {
       title: 'Actions', key: 'actions',
       render: (_, record) => (
         <Space>
-          <Button type="link" disabled={isVoided(record)} onClick={() => handleEdit(record)}>Edit</Button>
+          <Button type="link" onClick={() => handleViewReceipt(record)}>View Receipt</Button>
           <Popconfirm
-            title="Are you sure you want to void this transaction?"
+            title="Void this transaction? This will restore inventory."
             onConfirm={() => handleVoid(record)}
             okText="Yes"
             cancelText="No"
@@ -290,74 +365,112 @@ const Sales = () => {
     },
   ];
 
+  const expandedRowRender = (record) => {
+    const detail = orderDetailsMap[record.order_id];
+    const items = detail?.items || [];
+    const pmt = detail?.payments?.[0];
+
+    if (!detail && !orderDetailsLoading[record.order_id]) {
+      fetchOrderDetail(record.order_id);
+    }
+
+    if (!detail) {
+      return <Text type="secondary">Loading items...</Text>;
+    }
+
+    return (
+      <div style={{ padding: '8px 0' }}>
+        <Table
+          dataSource={items}
+          columns={[
+            { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
+            { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty, r) => fmtQty(qty, r.category === FABRIC_CATEGORY) },
+            { title: 'Unit Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}` },
+            { title: 'Line Total', dataIndex: 'line_total', key: 'line_total', render: (v) => `₱${v?.toLocaleString() || 0}` },
+          ]}
+          rowKey="order_item_id"
+          pagination={false}
+          size="small"
+        />
+        {pmt && (
+          <Text style={{ marginTop: 8, display: 'block' }}>
+            Payment: {pmt.payment_method} — ₱{pmt.price?.toLocaleString() || 0}
+          </Text>
+        )}
+      </div>
+    );
+  };
+
+  const totalSalesFiltered = useMemo(() => {
+    const data = allSalesFull.filter((s) => {
+      if (s.status !== 'completed') return false;
+      if (totalSalesBranch && totalSalesBranch !== 'All' && s.location_name !== totalSalesBranch) return false;
+      if (totalSalesDateRange?.[0]) {
+        const d = dayjs(s.order_date);
+        if (d.isBefore(totalSalesDateRange[0].startOf('day'))) return false;
+      }
+      if (totalSalesDateRange?.[1]) {
+        const d = dayjs(s.order_date);
+        if (d.isAfter(totalSalesDateRange[1].endOf('day'))) return false;
+      }
+      return true;
+    });
+    const grouped = {};
+    data.forEach((order) => {
+      (order.items || []).forEach((item) => {
+        const key = item.product_name;
+        if (!grouped[key]) grouped[key] = { product_name: item.product_name, total_qty: 0, total_amount: 0, is_fabric: item.category === FABRIC_CATEGORY };
+        grouped[key].total_qty += Math.floor(item.quantity);
+        grouped[key].total_amount += item.line_total;
+      });
+    });
+    return Object.values(grouped);
+  }, [allSalesFull, totalSalesBranch, totalSalesDateRange]);
+
+  const totalSalesSummary = () => {
+    const total = totalSalesFiltered.reduce((sum, r) => sum + r.total_amount, 0);
+    return (
+      <Table.Summary.Row>
+        <Table.Summary.Cell index={0}><Text strong>Total</Text></Table.Summary.Cell>
+        <Table.Summary.Cell index={1} />
+        <Table.Summary.Cell index={2}><Text strong>₱{total.toLocaleString()}</Text></Table.Summary.Cell>
+      </Table.Summary.Row>
+    );
+  };
+
   const totalSalesColumns = [
     {
-      title: 'Product Name', dataIndex: 'productName', key: 'productName',
-      sorter: (a, b) => a.productName.localeCompare(b.productName),
+      title: 'Product Name', dataIndex: 'product_name', key: 'product_name',
+      sorter: (a, b) => a.product_name.localeCompare(b.product_name),
     },
     {
-      title: 'Category', dataIndex: 'category', key: 'category',
-      sorter: (a, b) => a.category.localeCompare(b.category),
+      title: 'Total Quantity Sold', dataIndex: 'total_qty', key: 'total_qty',
+      render: (qty) => Math.floor(qty).toLocaleString(),
+      sorter: (a, b) => a.total_qty - b.total_qty,
     },
     {
-      title: 'Total Quantity Sold', dataIndex: 'totalQty', key: 'totalQty',
-      sorter: (a, b) => a.totalQty - b.totalQty,
-    },
-    {
-      title: 'Total Amount', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => `₱${v.toLocaleString()}`,
-      sorter: (a, b) => a.totalAmount - b.totalAmount,
-    },
-  ];
-
-  const historyColumns = [
-    {
-      title: 'Transaction ID', dataIndex: 'transactionId', key: 'transactionId',
-      sorter: (a, b) => a.transactionId.localeCompare(b.transactionId),
-    },
-    {
-      title: 'Date', dataIndex: 'date', key: 'date',
-      sorter: (a, b) => a.date.localeCompare(b.date),
-    },
-    {
-      title: 'Quantity', dataIndex: 'quantity', key: 'quantity',
-      sorter: (a, b) => a.quantity - b.quantity,
-    },
-    {
-      title: 'Unit Price', dataIndex: 'unitPrice', key: 'unitPrice', render: (v) => `₱${v}`,
-      sorter: (a, b) => a.unitPrice - b.unitPrice,
-    },
-    {
-      title: 'Total Amount', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => `₱${v}`,
-      sorter: (a, b) => a.totalAmount - b.totalAmount,
-    },
-    {
-      title: 'Status', dataIndex: 'status', key: 'status',
-      render: (status) => (
-        <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag>
-      ),
-      sorter: (a, b) => a.status.localeCompare(b.status),
+      title: 'Total Amount', dataIndex: 'total_amount', key: 'total_amount',
+      render: (v) => `₱${v.toLocaleString()}`,
+      sorter: (a, b) => a.total_amount - b.total_amount,
     },
   ];
 
   return (
     <div>
-      <Title level={4} style={{ marginBottom: 16 }}>Sales</Title>
-      <Text type="secondary" style={{ marginBottom: 24, display: 'block' }}>Branch: {branch}</Text>
-
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={8}>
           <Card>
-            <Statistic title="Total Sales Today" value={`₱${todayTotal.toLocaleString()}`} prefix={<ShoppingCartOutlined />} />
+            <Statistic title="Total Sales Today" value={`₱${(dashboardStats.sales_today || 0).toLocaleString()}`} />
           </Card>
         </Col>
         <Col xs={24} sm={8}>
           <Card>
-            <Statistic title="Total Sales This Month" value={`₱${monthTotal.toLocaleString()}`} prefix={<DollarOutlined />} />
+            <Statistic title="Total Sales This Month" value={`₱${(dashboardStats.month_sales || 0).toLocaleString()}`} />
           </Card>
         </Col>
         <Col xs={24} sm={8}>
           <Card>
-            <Statistic title="Total Transactions Today" value={todaySales.length} prefix={<TransactionOutlined />} />
+            <Statistic title="Total Transactions Today" value={dashboardStats.transactions_today || 0} />
           </Card>
         </Col>
       </Row>
@@ -366,10 +479,11 @@ const Sales = () => {
         <Col xs={24} sm={12} md={16}>
           <Space wrap>
             <Input
-              placeholder="Search by product or transaction ID"
+              placeholder="Search by transaction ID"
               prefix={<SearchOutlined />}
               onChange={(e) => setSearchText(e.target.value)}
               style={{ width: 220 }}
+              allowClear
             />
             <RangePicker onChange={(dates) => setDateRange(dates)} />
             <Select
@@ -379,129 +493,297 @@ const Sales = () => {
               value={statusFilter}
               onChange={setStatusFilter}
             >
-              <Select.Option value="Active">Active</Select.Option>
-              <Select.Option value="Voided">Voided</Select.Option>
+              <Select.Option value="completed">Completed</Select.Option>
+              <Select.Option value="voided">Voided</Select.Option>
             </Select>
           </Space>
         </Col>
         <Col xs={24} sm={12} md={8} style={{ textAlign: 'right' }}>
           <Space>
-            <Button type="primary" onClick={handleAdd}>Add Sale</Button>
-            <Button onClick={() => { setTotalSalesBranch(branch); setTotalSalesModalVisible(true); }}>View Total Sales</Button>
+            {isManager && <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} disabled={productsLoading} loading={productsLoading}>Add Sale</Button>}
+            <Button onClick={() => {
+              const defaultBranch = isOwner || user?.role === 'admin' ? 'All' : branchName;
+              setTotalSalesBranch(defaultBranch);
+              setTotalSalesDateRange(null);
+              setTotalSalesModalVisible(true);
+            }}>View Total Sales</Button>
           </Space>
         </Col>
       </Row>
 
       <Table
-        dataSource={filteredSales}
+        dataSource={sales}
         columns={columns}
-        rowKey="key"
+        rowKey="order_id"
+        loading={loading}
+        expandable={{ expandedRowRender, expandedRowKeys, onExpand: (expanded, record) => {
+          setExpandedRowKeys((prev) =>
+            expanded
+              ? [...prev, record.order_id]
+              : prev.filter((id) => id !== record.order_id)
+          );
+        }, showExpandColumn: false }}
         rowClassName={(record) => isVoided(record) ? 'voided-row' : ''}
-        pagination={{ pageSize: 10 }}
-        scroll={{ y: 400 }}
+        pagination={{ current: currentPage, pageSize, total: totalCount, showSizeChanger: false, onChange: (p) => fetchSales(p) }}
       />
 
       <Modal
-        title={selectedRecord ? 'Edit Sale' : 'Add Sale'}
+        title="Add Sale"
         open={saleModalVisible}
         onCancel={() => { setSaleModalVisible(false); form.resetFields(); }}
-        width={800}
-        styles={{ body: { maxHeight: '60vh', overflowY: 'auto', overflowX: 'hidden' } }}
+        width={900}
+        styles={{ body: { maxHeight: '65vh', overflowY: 'auto', overflowX: 'hidden' } }}
         footer={[
           <Button key="cancel" onClick={() => { setSaleModalVisible(false); form.resetFields(); }}>Cancel</Button>,
-          <Button key="save" type="primary" onClick={handleSaveSale} disabled={!confirmed && !selectedRecord}>Save</Button>,
+          <Button key="confirm" type="primary" onClick={handleConfirmOrder} disabled={!canConfirm} loading={submitting}>
+            Confirm Order
+          </Button>,
         ]}
       >
         <Row gutter={24}>
           <Col xs={24} md={14}>
             <Form form={form} layout="vertical">
-              <Form.Item name="product" label="Product" rules={[{ required: true, message: 'Please select a product' }]}>
-                {!lockedProduct ? (
+              <Text strong>Add Products</Text>
+              <div style={{ marginTop: 8 }}>
+                <div style={{ marginBottom: 8 }}>
                   <Select
                     showSearch
-                    placeholder="Search for a product"
-                    optionFilterProp="children"
-                    onChange={handleProductSelect}
+                    style={{ width: '100%' }}
+                    placeholder="Search product"
+                    optionFilterProp="label"
+                    value={selectedProductId}
+                    onChange={(id) => {
+                      setSelectedProductId(id);
+                      const p = products.find(p => p.product_id === id);
+                      if (p?.category !== FABRIC_CATEGORY) setCartQuantity(1);
+                    }}
                   >
-                    {mockProducts.map((p) => (
-                      <Select.Option key={p.id} value={p.id}>{p.name} — ₱{p.unitPrice}</Select.Option>
+                    {products
+                      .filter((p) => p.is_active !== false)
+                      .slice()
+                      .sort((a, b) => (b.quantity || 0) - (a.quantity || 0))
+                      .map((p) => (
+                      <Select.Option key={p.product_id} value={p.product_id} disabled={!p.quantity} label={p.name}>
+                        <span style={{ opacity: p.quantity ? 1 : 0.45 }}>
+                          {p.name} — ₱{p.price} (stock: {fmtQty(p.quantity, p.category === FABRIC_CATEGORY)})
+                        </span>
+                      </Select.Option>
                     ))}
                   </Select>
-                ) : (
-                  <Space style={{ width: '100%' }}>
-                    <Input value={selectedProduct?.name} disabled />
-                    {!selectedRecord && <Button onClick={handleChangeProduct}>Change Product</Button>}
-                  </Space>
-                )}
-              </Form.Item>
-              <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: 'Please enter quantity' }]}>
-                <InputNumber
-                  min={1}
+                </div>
+                <Space>
+                  {(() => {
+                    const sp = products.find(p => p.product_id === selectedProductId);
+                    const isFab = sp?.category === FABRIC_CATEGORY;
+                    const maxQty = sp?.quantity ?? 1;
+                    if (isFab) {
+                      return (
+                        <div>
+                          <Space.Compact>
+                            <Button onClick={() => setCartQuantity(Math.max(MIN_QTY, cartQuantity - STEP_QTY))}>−</Button>
+                            <InputNumber
+                              min={MIN_QTY}
+                              max={maxQty}
+                              step={STEP_QTY}
+                              value={cartQuantity}
+                              onChange={(v) => setCartQuantity(v ?? MIN_QTY)}
+                              style={{ width: 70, textAlign: 'center' }}
+                            />
+                            <Button onClick={() => setCartQuantity(Math.min(maxQty, cartQuantity + STEP_QTY))}>+</Button>
+                          </Space.Compact>
+                          <div style={{ fontSize: 12, color: '#888', marginTop: 2, textAlign: 'center' }}>
+                            {qtyLabel(cartQuantity)} yd
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <InputNumber
+                        min={1}
+                        max={maxQty}
+                        step={1}
+                        value={cartQuantity}
+                        onChange={(v) => setCartQuantity(v)}
+                        style={{ width: 80 }}
+                      />
+                    );
+                  })()}
+                  <Button type="primary" icon={<PlusOutlined />} disabled={!canAddToCart} onClick={handleAddToCart}>
+                    Add
+                  </Button>
+                </Space>
+              </div>
+
+              <Divider />
+              <Text strong>Cart ({cart.length} item{cart.length !== 1 ? 's' : ''})</Text>
+              <Table
+                dataSource={cart}
+                columns={[
+                  { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
+                  { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty, r) => fmtQty(qty, r.is_fabric) },
+                  { title: 'Unit Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}` },
+                  {
+                    title: 'Total', key: 'line_total',
+                    render: (_, r) => `₱${(r.quantity * r.price).toLocaleString()}`,
+                  },
+                  {
+                    title: '', key: 'action', width: 40,
+                    render: (_, r) => (
+                      <Button type="text" danger icon={<DeleteOutlined />} onClick={() => handleRemoveFromCart(r.product_id)} />
+                    ),
+                  },
+                ]}
+                rowKey="product_id"
+                pagination={false}
+                size="small"
+                locale={{ emptyText: 'No items in cart' }}
+              />
+
+              <Divider />
+              <Form.Item name="orderDate" label="Date">
+                <DatePicker
                   style={{ width: '100%' }}
-                  disabled={!lockedProduct}
-                  value={formValues.quantity}
-                  onChange={handleQuantityChange}
+                  value={orderDate}
+                  onChange={(d) => setOrderDate(d || dayjs())}
                 />
-              </Form.Item>
-              <Form.Item name="unitPrice" label="Unit Price">
-                <InputNumber min={0} style={{ width: '100%' }} disabled value={formValues.unitPrice} prefix="₱" />
-              </Form.Item>
-              <Form.Item name="totalAmount" label="Total Amount">
-                <InputNumber min={0} style={{ width: '100%' }} disabled value={formValues.totalAmount} prefix="₱" />
-              </Form.Item>
-              <Form.Item name="paymentAmount" label="Payment Amount" rules={[{ required: true, message: 'Please enter payment amount' }]}>
-                <InputNumber
-                  min={formValues.totalAmount}
-                  style={{ width: '100%' }}
-                  disabled={!lockedProduct}
-                  value={formValues.paymentAmount}
-                  onChange={handlePaymentChange}
-                  prefix="₱"
-                />
-              </Form.Item>
-              <Form.Item name="change" label="Change">
-                <InputNumber min={0} style={{ width: '100%' }} disabled value={formValues.change} prefix="₱" />
-              </Form.Item>
-              <Form.Item name="branch" label="Branch">
-                <Input disabled value={branch} />
-              </Form.Item>
-              <Form.Item name="date" label="Date" rules={[{ required: true, message: 'Please select date' }]}>
-                <DatePicker style={{ width: '100%' }} value={formValues.date} onChange={handleDateChange} />
               </Form.Item>
               <Form.Item name="remarks" label="Remarks">
                 <Input.TextArea
                   rows={2}
-                  value={formValues.remarks}
-                  onChange={handleRemarksChange}
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
                   placeholder="Optional notes"
                 />
               </Form.Item>
             </Form>
           </Col>
+
           <Col xs={24} md={10}>
             <Card title="Order Summary">
               <Descriptions bordered column={1} size="small">
-                <Descriptions.Item label="Product">{selectedProduct?.name || '—'}</Descriptions.Item>
-                <Descriptions.Item label="Category">{selectedProduct?.category || '—'}</Descriptions.Item>
-                <Descriptions.Item label="Quantity">{formValues.quantity}</Descriptions.Item>
-                <Descriptions.Item label="Unit Price">₱{formValues.unitPrice}</Descriptions.Item>
-                <Descriptions.Item label="Total Amount">₱{formValues.totalAmount}</Descriptions.Item>
-                <Descriptions.Item label="Payment Amount">₱{formValues.paymentAmount}</Descriptions.Item>
-                <Descriptions.Item label="Change">₱{formValues.change}</Descriptions.Item>
+                {cart.map((item, idx) => (
+                  <Descriptions.Item key={idx} label={item.product_name}>
+                    {fmtQty(item.quantity, item.is_fabric)} × ₱{item.price} = ₱{(item.quantity * item.price).toLocaleString()}
+                  </Descriptions.Item>
+                ))}
+                {cart.length === 0 && (
+                  <Descriptions.Item label="—">No items added</Descriptions.Item>
+                )}
               </Descriptions>
-              {!selectedRecord && (
-                <Button
-                  type="primary"
-                  style={{ marginTop: 16, width: '100%' }}
-                  disabled={!canConfirm || confirmed}
-                  onClick={handleConfirmOrder}
-                >
-                  {confirmed ? 'Confirmed ✓' : 'Confirm Order'}
-                </Button>
+              <div style={{ marginTop: 12 }}>
+                <Text strong style={{ fontSize: 16 }}>Grand Total: ₱{grandTotal.toLocaleString()}</Text>
+              </div>
+              <Divider />
+              <Select
+                value={paymentMethod}
+                onChange={setPaymentMethod}
+                style={{ width: '100%', marginBottom: 8 }}
+              >
+                {PAYMENT_METHODS.map((m) => (
+                  <Select.Option key={m} value={m}>{m}</Select.Option>
+                ))}
+              </Select>
+              <InputNumber
+                min={0}
+                style={{ width: '100%', marginBottom: 8 }}
+                placeholder="Payment Amount"
+                prefix="₱"
+                value={paymentAmount}
+                onChange={(v) => setPaymentAmount(v)}
+              />
+              <div style={{ marginBottom: 8 }}>
+                <Text>Change: </Text>
+                <Text strong style={{ color: change > 0 ? '#52c41a' : undefined }}>₱{change.toLocaleString()}</Text>
+              </div>
+              {paymentAmount > 0 && paymentAmount < grandTotal && (
+                <Text type="danger" style={{ display: 'block', marginBottom: 8 }}>Insufficient amount of money</Text>
               )}
+              <Text type="secondary">Branch: {branchName}</Text>
             </Card>
           </Col>
         </Row>
+      </Modal>
+
+      <Modal
+        title="Receipt"
+        open={receiptModalVisible}
+        onCancel={() => setReceiptModalVisible(false)}
+        width={520}
+        footer={[
+          <Button key="print" type="primary" icon={<PrinterOutlined />}
+            onClick={() => window.print()}>
+            Print Receipt
+          </Button>,
+          <Button key="close" onClick={() => setReceiptModalVisible(false)}>Close</Button>,
+        ]}
+        styles={{ body: { padding: 24 } }}
+      >
+        {lastOrder && (
+          <div id="receipt-content">
+            <div style={{ textAlign: 'center', marginBottom: 16 }}>
+              <Text strong style={{ fontSize: 18 }}>MCM Trading System</Text>
+              <br />
+              <Text style={{ fontSize: 14 }}>{lastOrder.location_name || branchName}</Text>
+              <br />
+              <Text type="secondary" style={{ fontSize: 13 }}>Transaction #{lastOrder.order_id}</Text>
+              <br />
+              <Text type="secondary" style={{ fontSize: 13 }}>{dayjs(lastOrder.order_date).format('YYYY-MM-DD hh:mm A')}</Text>
+            </div>
+            <Divider style={{ margin: '8px 0' }} />
+            <table style={{ width: '100%', fontSize: 15 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left' }}>Item</th>
+                  <th style={{ textAlign: 'center' }}>Qty</th>
+                  <th style={{ textAlign: 'right' }}>Price</th>
+                  <th style={{ textAlign: 'right' }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(lastOrder.items || []).map((item) => (
+                  <tr key={item.order_item_id}>
+                    <td>{item.product_name}</td>
+                    <td style={{ textAlign: 'center' }}>{fmtQty(item.quantity, item.category === FABRIC_CATEGORY)}</td>
+                    <td style={{ textAlign: 'right' }}>₱{item.price}</td>
+                    <td style={{ textAlign: 'right' }}>₱{(item.line_total || (item.quantity * item.price)).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <Divider style={{ margin: '12px 0' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16 }}>
+              <Text strong style={{ fontSize: 16 }}>Total:</Text>
+              <Text strong style={{ fontSize: 16 }}>₱{lastOrder.total_amount?.toLocaleString() || 0}</Text>
+            </div>
+            {(lastOrder.payments || []).map((pmt) => (
+              <div key={pmt.payment_id}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginTop: 4 }}>
+                  <Text style={{ fontSize: 14 }}>Payment ({pmt.payment_method}):</Text>
+                  <Text style={{ fontSize: 14 }}>₱{pmt.price?.toLocaleString() || 0}</Text>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                  <Text style={{ fontSize: 14 }}>Change:</Text>
+                  <Text style={{ color: '#52c41a', fontSize: 14 }}>₱{Math.max(0, (pmt.price || 0) - (lastOrder.total_amount || 0)).toLocaleString()}</Text>
+                </div>
+              </div>
+            ))}
+            {(lastOrder.auto_restocks || []).length > 0 && (
+              <>
+                <Divider style={{ margin: '12px 0' }} />
+                <div style={{ fontSize: 13, color: '#52c41a' }}>
+                  <Text type="secondary" style={{ fontSize: 13 }}>Auto-Restock Triggered:</Text>
+                  {lastOrder.auto_restocks.map((r, i) => (
+                    <div key={i} style={{ fontSize: 13 }}>{r.product_name}: +{qtyLabel(r.quantity)} from {r.from_location}</div>
+                  ))}
+                </div>
+              </>
+            )}
+            <Divider style={{ margin: '12px 0' }} />
+            <div style={{ textAlign: 'center', marginTop: 8 }}>
+              <Text type="secondary" style={{ fontSize: 14 }}>Thank you for your purchase!</Text>
+            </div>
+          </div>
+        )}
       </Modal>
 
       <Modal
@@ -518,8 +800,9 @@ const Sales = () => {
               onChange={setTotalSalesBranch}
               style={{ width: 200 }}
             >
-              {BRANCHES.map((b) => (
-                <Select.Option key={b} value={b}>{b}</Select.Option>
+              <Select.Option value="All">All Branches</Select.Option>
+              {locations.map((l) => (
+                <Select.Option key={l.location_id} value={l.name}>{l.name}</Select.Option>
               ))}
             </Select>
           )}
@@ -531,35 +814,14 @@ const Sales = () => {
           <Table
             dataSource={totalSalesFiltered}
             columns={totalSalesColumns}
-            rowKey="productName"
+            rowKey="product_name"
             pagination={false}
             size="small"
+            loading={totalSalesLoading}
             summary={totalSalesSummary}
-            onRow={(record) => ({
-              onClick: () => {
-                setSelectedHistoryProduct(record.productName);
-                setProductHistoryVisible(true);
-              },
-              style: { cursor: 'pointer' },
-            })}
+            locale={{ emptyText: totalSalesLoading ? 'Loading...' : 'No sales data' }}
           />
         </Space>
-      </Modal>
-
-      <Modal
-        title={`Sales History — ${selectedHistoryProduct}`}
-        open={productHistoryVisible}
-        onCancel={() => setProductHistoryVisible(false)}
-        footer={[<Button key="close" onClick={() => setProductHistoryVisible(false)}>Close</Button>]}
-        width={650}
-      >
-        <Table
-          dataSource={mockSales.filter((s) => s.productName === selectedHistoryProduct && s.branch === totalSalesBranch)}
-          columns={historyColumns}
-          rowKey="key"
-          pagination={false}
-          size="small"
-        />
       </Modal>
     </div>
   );

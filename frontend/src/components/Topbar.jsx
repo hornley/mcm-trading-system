@@ -6,8 +6,9 @@ import { useAuth } from '../context/AuthContext.jsx'
 const { Title } = Typography
 
 const Topbar = () => {
-  const { user, selectedLocationId, setSelectedLocationId, logout } = useAuth()
+  const { user, selectedLocationId, setSelectedLocationId, logout, theme } = useAuth()
   const [locations, setLocations] = useState([])
+  const isDark = theme === 'dark'
 
   useEffect(() => {
     if (user && (user.usertype === 1 || user.usertype === 3)) {
@@ -25,7 +26,7 @@ const Topbar = () => {
       <div style={{ width: 240 }}>
         {user && (user.usertype === 1 || user.usertype === 3) && (
           <Space>
-            <span style={{ color: '#8c8c8c', fontSize: 13 }}>Branch:</span>
+            <span style={{ color: isDark ? 'rgba(255,255,255,0.45)' : '#8c8c8c', fontSize: 13 }}>Branch:</span>
             <Select
               value={selectedLocationId}
               onChange={setSelectedLocationId}
@@ -40,12 +41,12 @@ const Topbar = () => {
           </Space>
         )}
         {user && user.usertype === 2 && (
-          <span style={{ color: '#8c8c8c', fontSize: 13 }}>
+          <span style={{ color: isDark ? 'rgba(255,255,255,0.45)' : '#8c8c8c', fontSize: 13 }}>
             Branch: {user.location_name || `Location #${user.location_id}`}
           </span>
         )}
       </div>
-      <Title level={4} style={{ margin: 0, color: '#262626', textAlign: 'center', flex: 1 }}>
+      <Title level={4} style={{ margin: 0, color: isDark ? 'rgba(255,255,255,0.85)' : '#262626', textAlign: 'center', flex: 1 }}>
         Manco (MCM) Trading
       </Title>
       <div style={{ width: 240, textAlign: 'right' }}>
