@@ -11,6 +11,8 @@ supabase: Client = create_client(
 )
 
 from flask_cors import CORS
+from flask_mail import Mail
+mail = Mail()
 from config import Config, FRONTEND_DIST
 from models import db
 from routes.auth import auth_bp
@@ -22,11 +24,18 @@ from routes.locations import locations_bp
 from routes.admin import admin_bp
 from routes.reports import reports_bp
 from routes.dashboard import dashboard_bp
+from routes.orders import orders_bp
 
 def create_app():
-    app = Flask(__name__, static_folder=FRONTEND_DIST, static_url_path="")
+    app = Flask(__name__, static_folder=FRONTEND_DIST)
     app.config.from_object(Config)
+    app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+    app.config['MAIL_PORT'] = 587
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+    app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
     CORS(app)
+    mail.init_app(app)
     db.init_app(app)
     app.register_blueprint(account_bp)
     app.register_blueprint(auth_bp)
@@ -37,17 +46,23 @@ def create_app():
     app.register_blueprint(admin_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(dashboard_bp)
+    app.register_blueprint(orders_bp)
 
     with app.app_context():
         from models import (
             User, Location, Category, Product, Order, OrderItem,
             Payment, Inventory, StockTransfer, StockAdjustment, ActivityLog,
+            PasswordResetToken,
         )
         db.create_all()
 
     @app.route("/api/health")
     def health():
         return {"status": "ok"}
+
+    @app.route("/assets/<path:filename>")
+    def serve_assets(filename):
+        return send_from_directory(os.path.join(FRONTEND_DIST, "assets"), filename)
 
     @app.route("/", defaults={"path": ""})
     @app.route("/<path:path>")
