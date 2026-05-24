@@ -174,11 +174,20 @@ def system_info():
     if not _authorized(usertype):
         return jsonify({"success": False, "error": "Unauthorized"}), 403
     try:
-        result = db.session.execute(text("SELECT version()"))
-        db_version = result.scalar()
+        is_pg = db.engine.url.drivername == "postgresql"
 
-        result = db.session.execute(text("SELECT pg_database_size(current_database())"))
-        db_bytes = result.scalar()
+        if is_pg:
+            result = db.session.execute(text("SELECT version()"))
+            db_version = result.scalar()
+            result = db.session.execute(text("SELECT pg_database_size(current_database())"))
+            db_bytes = result.scalar()
+        else:
+            db_version = "SQLite (local mode)"
+            _db_file = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "..", "db", "database.db"
+            )
+            db_bytes = os.path.getsize(_db_file) if os.path.exists(_db_file) else 0
 
         counts = _table_counts()
         sort_by = request.args.get("sort_by", "name")
@@ -240,6 +249,8 @@ def run_vacuum():
     if not _authorized(usertype):
         return jsonify({"success": False, "error": "Unauthorized"}), 403
     try:
+        if db.engine.url.drivername != "postgresql":
+            return jsonify({"success": False, "error": "VACUUM is only available in PostgreSQL mode"}), 400
         start = time.time()
         db.session.execute(text("VACUUM ANALYZE"))
         db.session.commit()
@@ -260,6 +271,8 @@ def run_reindex():
     if not _authorized(usertype):
         return jsonify({"success": False, "error": "Unauthorized"}), 403
     try:
+        if db.engine.url.drivername != "postgresql":
+            return jsonify({"success": False, "error": "REINDEX is only available in PostgreSQL mode"}), 400
         start = time.time()
         db.session.execute(text("REINDEX SCHEMA public"))
         db.session.commit()

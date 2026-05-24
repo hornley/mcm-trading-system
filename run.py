@@ -28,7 +28,8 @@ from models import db
 
 _temp_app = create_app()
 with _temp_app.app_context():
-    print(f"Connected to {db.engine.url.drivername} — skipping seed (data already in cloud).")
+    db_mode = "local (SQLite offline)" if db.engine.url.drivername == "sqlite" else "remote (Supabase PostgreSQL)"
+    print(f"DB_MODE: {db_mode} — {db.engine.url.drivername}")
 
 print("Starting Flask backend (serving built frontend)...")
 subprocess.run(["python", "app.py"], cwd=os.path.join(BASE_DIR, "backend"))

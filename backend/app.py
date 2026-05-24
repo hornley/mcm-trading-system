@@ -1,14 +1,19 @@
 import os
 from dotenv import load_dotenv
 from flask import Flask, app, send_from_directory
-from supabase import create_client, Client
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 
-supabase: Client = create_client(
-    os.environ.get("SUPABASE_URL"),
-    os.environ.get("SUPABASE_KEY"),
-)
+DB_MODE = os.environ.get("DB_MODE", "remote")
+
+if DB_MODE == "remote":
+    from supabase import create_client, Client
+    supabase: Client = create_client(
+        os.environ.get("SUPABASE_URL"),
+        os.environ.get("SUPABASE_KEY"),
+    )
+else:
+    supabase = None
 
 from flask_cors import CORS
 from flask_mail import Mail
