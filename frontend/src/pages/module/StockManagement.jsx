@@ -726,104 +726,121 @@ const StockManagement = () => {
         title="Select Items to Restock"
         open={selectRestockVisible}
         onCancel={() => { setSelectRestockVisible(false); setOrderSummaryVisible(false); }}
-        width={800}
-        footer={[
-          <Button key="cancel" onClick={() => { setSelectRestockVisible(false); setOrderSummaryVisible(false); }}>Cancel</Button>,
-          <Button key="order" type="primary" onClick={handleOrderRestock}>Order</Button>,
-        ]}
+        width={orderSummaryVisible ? 1100 : 800}
+        styles={{ body: orderSummaryVisible ? { padding: '16px 24px', minHeight: '50vh' } : { padding: '16px 24px' } }}
+        footer={
+          orderSummaryVisible
+            ? null
+            : [
+              <Button key="cancel" onClick={() => { setSelectRestockVisible(false); setOrderSummaryVisible(false); }}>Cancel</Button>,
+              <Button key="order" type="primary" onClick={handleOrderRestock}>Order</Button>,
+            ]
+        }
       >
-        <div style={{ marginBottom: 12 }}>
-          <Checkbox
-            checked={selectedRestockIds.size > 0 && selectedRestockIds.size === lowStockItems.length}
-            indeterminate={selectedRestockIds.size > 0 && selectedRestockIds.size < lowStockItems.length}
-            onChange={(e) => handleSelectAllRestock(e.target.checked)}
-          >
-            Select All
-          </Checkbox>
-        </div>
-        <Table
-          dataSource={lowStockItems}
-          rowKey="product_id"
-          pagination={false}
-          size="small"
-          bordered
-          columns={[
-            {
-              title: 'Select', key: 'select', width: 60,
-              render: (_, record) => (
-                <Checkbox
-                  checked={selectedRestockIds.has(record.product_id)}
-                  onChange={() => handleToggleRestockItem(record.product_id)}
-                />
-              ),
-            },
-            { title: 'Product Name', dataIndex: 'product_name', key: 'product_name' },
-            { title: 'Category', dataIndex: 'category', key: 'category' },
-            {
-              title: 'Low Stock Status', key: 'status', width: 130,
-              render: (_, record) => getStockStatus(record.quantity).tag,
-            },
-            {
-              title: 'Current Quantity', dataIndex: 'quantity', key: 'quantity', width: 130,
-              render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
-            },
-            {
-              title: 'Restock Quantity', key: 'restockQty', width: 140,
-              render: (_, record) => (
-                <InputNumber
-                  min={0}
-                  step={record.category === FABRIC_CATEGORY ? 0.125 : 1}
-                  value={restockQuantities[record.product_id] || 0}
-                  onChange={(val) => handleRestockQtyChange(record.product_id, val || 0)}
-                  style={{ width: '100%' }}
-                  disabled={!selectedRestockIds.has(record.product_id)}
-                />
-              ),
-            },
-          ]}
-        />
-      </Modal>
-
-      <Modal
-        title="Restock Order Summary"
-        open={orderSummaryVisible}
-        onCancel={() => setOrderSummaryVisible(false)}
-        width={500}
-        styles={{ body: { maxHeight: '60vh', overflowY: 'auto' } }}
-        footer={[
-          <Button key="print" style={{ background: '#1677ff', borderColor: '#1677ff', color: '#fff' }} onClick={handlePrintSummary}>
-            Print
-          </Button>,
-          <Button key="cancel" danger onClick={() => setOrderSummaryVisible(false)}>
-            Cancel
-          </Button>,
-          <Button key="confirm" type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} loading={restockSubmitting} onClick={handleConfirmRestock}>
-            Confirm
-          </Button>,
-        ]}
-      >
-        <div id="restock-summary-content">
-          <Typography.Title level={5} style={{ marginTop: 0 }}>Items to Restock</Typography.Title>
-          <Table
-            dataSource={lowStockItems.filter((i) => selectedRestockIds.has(i.product_id) && (restockQuantities[i.product_id] || 0) > 0)}
-            rowKey="product_id"
-            pagination={false}
-            size="small"
-            bordered
-            columns={[
-              { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
-              { title: 'Category', dataIndex: 'category', key: 'category' },
-              {
-                title: 'Current Qty', dataIndex: 'quantity', key: 'quantity', width: 100,
-                render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
-              },
-              {
-                title: 'Restock Qty', key: 'restockQty', width: 100,
-                render: (_, record) => fmtQty(restockQuantities[record.product_id] || 0, record.category === FABRIC_CATEGORY),
-              },
-            ]}
-          />
-        </div>
+        <Row gutter={16} style={{ minHeight: '100%' }}>
+          <Col xs={24} lg={orderSummaryVisible ? 14 : 24}>
+            <div style={{ marginBottom: 12 }}>
+              <Checkbox
+                checked={selectedRestockIds.size > 0 && selectedRestockIds.size === lowStockItems.length}
+                indeterminate={selectedRestockIds.size > 0 && selectedRestockIds.size < lowStockItems.length}
+                onChange={(e) => handleSelectAllRestock(e.target.checked)}
+              >
+                Select All
+              </Checkbox>
+            </div>
+            <div style={{ overflowY: 'auto', maxHeight: '45vh' }}>
+              <Table
+                dataSource={lowStockItems}
+                rowKey="product_id"
+                pagination={false}
+                size="small"
+                bordered
+                columns={[
+                  {
+                    title: 'Select', key: 'select', width: 60,
+                    render: (_, record) => (
+                      <Checkbox
+                        checked={selectedRestockIds.has(record.product_id)}
+                        onChange={() => handleToggleRestockItem(record.product_id)}
+                      />
+                    ),
+                  },
+                  { title: 'Product Name', dataIndex: 'product_name', key: 'product_name' },
+                  { title: 'Category', dataIndex: 'category', key: 'category' },
+                  {
+                    title: 'Low Stock Status', key: 'status', width: 130,
+                    render: (_, record) => getStockStatus(record.quantity).tag,
+                  },
+                  {
+                    title: 'Current Quantity', dataIndex: 'quantity', key: 'quantity', width: 130,
+                    render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
+                  },
+                  {
+                    title: 'Restock Quantity', key: 'restockQty', width: 140,
+                    render: (_, record) => (
+                      <InputNumber
+                        min={0}
+                        step={record.category === FABRIC_CATEGORY ? 0.125 : 1}
+                        value={restockQuantities[record.product_id] || 0}
+                        onChange={(val) => handleRestockQtyChange(record.product_id, val || 0)}
+                        style={{ width: '100%' }}
+                        disabled={!selectedRestockIds.has(record.product_id)}
+                      />
+                    ),
+                  },
+                ]}
+              />
+            </div>
+          </Col>
+          {orderSummaryVisible && (
+            <Col xs={24} lg={10}>
+              <div
+                id="restock-summary-content"
+                style={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  borderLeft: '1px solid #f0f0f0',
+                  paddingLeft: 16,
+                }}
+              >
+                <Typography.Title level={5} style={{ marginTop: 0 }}>Order Summary</Typography.Title>
+                <div style={{ flex: 1, overflowY: 'auto', maxHeight: '35vh' }}>
+                  <Table
+                    dataSource={lowStockItems.filter((i) => selectedRestockIds.has(i.product_id) && (restockQuantities[i.product_id] || 0) > 0)}
+                    rowKey="product_id"
+                    pagination={false}
+                    size="small"
+                    bordered
+                    columns={[
+                      { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
+                      { title: 'Category', dataIndex: 'category', key: 'category' },
+                      {
+                        title: 'Current Qty', dataIndex: 'quantity', key: 'quantity', width: 80,
+                        render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
+                      },
+                      {
+                        title: 'Restock Qty', key: 'restockQty', width: 80,
+                        render: (_, record) => fmtQty(restockQuantities[record.product_id] || 0, record.category === FABRIC_CATEGORY),
+                      },
+                    ]}
+                  />
+                </div>
+                <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <Button style={{ background: '#1677ff', borderColor: '#1677ff', color: '#fff' }} onClick={handlePrintSummary}>
+                    Print
+                  </Button>
+                  <Button danger onClick={() => { setOrderSummaryVisible(false); }}>
+                    Cancel
+                  </Button>
+                  <Button type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} loading={restockSubmitting} onClick={handleConfirmRestock}>
+                    Confirm
+                  </Button>
+                </div>
+              </div>
+            </Col>
+          )}
+        </Row>
       </Modal>
 
       <style>{`
