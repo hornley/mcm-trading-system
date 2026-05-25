@@ -727,7 +727,7 @@ const StockManagement = () => {
         open={selectRestockVisible}
         onCancel={() => { setSelectRestockVisible(false); setOrderSummaryVisible(false); }}
         width={orderSummaryVisible ? 1100 : 800}
-        styles={{ body: orderSummaryVisible ? { padding: '16px 24px', minHeight: '50vh' } : { padding: '16px 24px' } }}
+        styles={{ body: { padding: '16px 24px', minHeight: '65vh' } }}
         footer={
           orderSummaryVisible
             ? null
@@ -748,7 +748,7 @@ const StockManagement = () => {
                 Select All
               </Checkbox>
             </div>
-            <div style={{ overflowY: 'auto', maxHeight: '45vh' }}>
+            <div style={{ overflowY: 'auto' }}>
               <Table
                 dataSource={lowStockItems}
                 rowKey="product_id"
@@ -807,7 +807,7 @@ const StockManagement = () => {
                 }}
               >
                 <Typography.Title level={5} style={{ marginTop: 0 }}>Order Summary</Typography.Title>
-                <div style={{ flex: 1, overflowY: 'auto', maxHeight: '35vh' }}>
+                <div style={{ flex: 1, overflowY: 'auto' }}>
                   <Table
                     dataSource={lowStockItems.filter((i) => selectedRestockIds.has(i.product_id) && (restockQuantities[i.product_id] || 0) > 0)}
                     rowKey="product_id"
