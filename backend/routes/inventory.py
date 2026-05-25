@@ -722,6 +722,114 @@ def restock_below_reorder():
     return success_response({"restocked": restocked, "count": len(restocked)}, message)
 
 
+@inventory_bp.route("/api/inventory/restock-selected", methods=["POST"])
+def restock_selected():
+    data = request.get_json()
+    if not data:
+        return error_response("Request body is required", "MISSING_BODY", 400)
+
+    usertype = data.get("usertype")
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+
+    if not _can_update(usertype):
+        return error_response("You don't have permission to restock", "FORBIDDEN", 403)
+
+    location_id = data.get("location_id")
+    user_id = data.get("user_id")
+    items = data.get("items", [])
+
+    if not items:
+        return error_response("No items provided", "MISSING_ITEMS", 400)
+
+    if usertype == 2:
+        manager = User.query.get(user_id)
+        if not manager:
+            return error_response("User not found", "NOT_FOUND", 404)
+        if manager.location_id != location_id:
+            return error_response("You can only restock your assigned location", "FORBIDDEN", 403)
+
+    storehouse = Location.query.filter_by(is_storehouse=True, is_active=True).first()
+    if not storehouse:
+        return error_response("No storehouse branch configured. Mark a location as storehouse first.", "NO_STOREHOUSE", 400)
+
+    location = Location.query.get(location_id)
+    if not location:
+        return error_response("Location not found", "NOT_FOUND", 404)
+
+    restocked = []
+
+    for item in items:
+        product_id = item.get("product_id")
+        requested_qty = item.get("quantity", 0)
+
+        if not product_id or requested_qty <= 0:
+            continue
+
+        product = Product.query.get(product_id)
+        if not product:
+            continue
+
+        inv = Inventory.query.filter_by(
+            product_id=product_id,
+            location_id=location_id,
+        ).first()
+        if not inv:
+            continue
+
+        store_inv = Inventory.query.filter_by(
+            product_id=product_id,
+            location_id=storehouse.location_id,
+        ).first()
+        if not store_inv or store_inv.quantity <= 0:
+            continue
+
+        transfer_qty = min(requested_qty, store_inv.quantity)
+        if transfer_qty <= 0:
+            continue
+
+        store_inv.quantity -= transfer_qty
+        inv.quantity += transfer_qty
+
+        transfer = StockTransfer(
+            product_id=product_id,
+            from_location_id=storehouse.location_id,
+            to_location_id=location_id,
+            user_id=user_id,
+            quantity=transfer_qty,
+            status="completed",
+            remarks="Selected restock",
+        )
+        db.session.add(transfer)
+
+        log_activity(
+            user_id=user_id,
+            module="inventory",
+            action_type="restock",
+            action=f"Selected restock: {transfer_qty} {product.name} from {storehouse.name} to {location.name}",
+            details={
+                "product_id": product_id,
+                "from_location_id": storehouse.location_id,
+                "to_location_id": location_id,
+                "quantity": transfer_qty,
+            },
+        )
+
+        restocked.append({
+            "product_id": product_id,
+            "product_name": product.name,
+            "previous_quantity": inv.quantity - transfer_qty,
+            "new_quantity": inv.quantity,
+            "quantity_added": transfer_qty,
+            "from_location": storehouse.name,
+        })
+
+    if restocked:
+        db.session.commit()
+
+    return success_response({"restocked": restocked, "count": len(restocked)}, f"Restocked {len(restocked)} product(s)")
+
+
 @inventory_bp.route("/api/inventory/low-stock", methods=["GET"])
 def get_low_stock():
     usertype = request.args.get("usertype", type=int)
