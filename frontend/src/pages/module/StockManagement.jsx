@@ -765,14 +765,16 @@ const StockManagement = () => {
                       />
                     ),
                   },
-                  { title: 'Product Name', dataIndex: 'product_name', key: 'product_name' },
-                  { title: 'Category', dataIndex: 'category', key: 'category' },
+                  { title: 'Product Name', dataIndex: 'product_name', key: 'product_name', sorter: (a, b) => a.product_name.localeCompare(b.product_name) },
+                  { title: 'Category', dataIndex: 'category', key: 'category', sorter: (a, b) => (a.category || '').localeCompare(b.category || '') },
                   {
                     title: 'Low Stock Status', key: 'status', width: 130,
+                    sorter: (a, b) => a.quantity - b.quantity,
                     render: (_, record) => getStockStatus(record.quantity).tag,
                   },
                   {
                     title: 'Current Quantity', dataIndex: 'quantity', key: 'quantity', width: 130,
+                    sorter: (a, b) => a.quantity - b.quantity,
                     render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
                   },
                   {
