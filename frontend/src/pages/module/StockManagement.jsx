@@ -758,6 +758,7 @@ const StockManagement = () => {
               ),
             },
             { title: 'Product Name', dataIndex: 'product_name', key: 'product_name' },
+            { title: 'Category', dataIndex: 'category', key: 'category' },
             {
               title: 'Low Stock Status', key: 'status', width: 130,
               render: (_, record) => getStockStatus(record.quantity).tag,
@@ -811,6 +812,7 @@ const StockManagement = () => {
             bordered
             columns={[
               { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
+              { title: 'Category', dataIndex: 'category', key: 'category' },
               {
                 title: 'Current Qty', dataIndex: 'quantity', key: 'quantity', width: 100,
                 render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
