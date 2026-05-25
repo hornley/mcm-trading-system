@@ -727,7 +727,7 @@ const StockManagement = () => {
         open={selectRestockVisible}
         onCancel={() => { setSelectRestockVisible(false); setOrderSummaryVisible(false); }}
         width={orderSummaryVisible ? 1100 : 800}
-        styles={{ body: { padding: '16px 24px', minHeight: '59vh' } }}
+        styles={{ body: { padding: '16px 24px', minHeight: '55vh' } }}
         footer={
           orderSummaryVisible
             ? null
