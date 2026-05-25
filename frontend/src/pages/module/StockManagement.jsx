@@ -748,7 +748,7 @@ const StockManagement = () => {
                 Select All
               </Checkbox>
             </div>
-            <div style={{ overflowY: 'auto' }}>
+            <div style={{ overflowY: 'auto', maxHeight: '45vh' }}>
               <Table
                 dataSource={lowStockItems}
                 rowKey="product_id"
@@ -807,7 +807,7 @@ const StockManagement = () => {
                 }}
               >
                 <Typography.Title level={5} style={{ marginTop: 0 }}>Order Summary</Typography.Title>
-                <div style={{ flex: 1, overflowY: 'auto' }}>
+                <div style={{ flex: 1, overflowY: 'auto', maxHeight: '35vh' }}>
                   <Table
                     dataSource={lowStockItems.filter((i) => selectedRestockIds.has(i.product_id) && (restockQuantities[i.product_id] || 0) > 0)}
                     rowKey="product_id"
