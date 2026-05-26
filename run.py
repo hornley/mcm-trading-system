@@ -30,6 +30,9 @@ _temp_app = create_app()
 with _temp_app.app_context():
     db_mode = "local (SQLite offline)" if db.engine.url.drivername == "sqlite" else "remote (Supabase PostgreSQL)"
     print(f"DB_MODE: {db_mode} — {db.engine.url.drivername}")
+    if db.engine.url.drivername != "sqlite":
+        from createDatabase import seed_if_empty
+        seed_if_empty()
 
 print("Starting Flask backend (serving built frontend)...")
 subprocess.run(["python", "app.py"], cwd=os.path.join(BASE_DIR, "backend"))

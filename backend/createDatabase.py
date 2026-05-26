@@ -11,17 +11,21 @@ from models import Payment, Inventory, StockTransfer, StockAdjustment, ActivityL
 from werkzeug.security import generate_password_hash
 
 
-def seed():
+def seed(skip_drop=False):
     app = create_app()
     with app.app_context():
-        print(f"WARNING: This will DROP all tables and recreate them on {db.engine.url.drivername}")
-        confirm = input("Type 'yes' to continue: ")
-        if confirm.lower() != "yes":
-            print("Aborted.")
-            return
-        print("Dropping all tables and recreating...")
-        db.drop_all()
-        db.create_all()
+        if not skip_drop:
+            print(f"WARNING: This will DROP all tables and recreate them on {db.engine.url.drivername}")
+            confirm = input("Type 'yes' to continue: ")
+            if confirm.lower() != "yes":
+                print("Aborted.")
+                return
+            print("Dropping all tables and recreating...")
+            db.drop_all()
+            db.create_all()
+        else:
+            print(f"Seeding without dropping tables on {db.engine.url.drivername}")
+            db.create_all()
 
         # ── 1. LOCATIONS ──
         print("Seeding Locations...")
@@ -245,6 +249,17 @@ def seed():
         print(f"  Transfers:       50")
         print(f"  Adjustments:     50")
         print(f"  Activity Logs:   200")
+
+
+def seed_if_empty():
+    app = create_app()
+    with app.app_context():
+        existing = db.session.query(User.user_id).limit(1).first()
+        if existing:
+            print("[OK] Remote DB already has data. Skipping seed.")
+            return
+    print("[OK] Remote DB empty. Seeding without dropping tables.")
+    seed(skip_drop=True)
 
 
 if __name__ == "__main__":

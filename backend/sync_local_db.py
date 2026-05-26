@@ -15,6 +15,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 
+os.environ["DB_MODE"] = "remote"
+
+from flask import Flask
 from app import create_app
 from models import db
 from models import (
@@ -76,16 +79,20 @@ def sync():
             print(f"  Read {model.__tablename__}: {len(rows)} rows")
 
     local_uri = f"sqlite:///{DB_PATH}"
-    app.config["SQLALCHEMY_DATABASE_URI"] = local_uri
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {}
+    local_app = Flask("local_sync")
+    local_app.config["SQLALCHEMY_DATABASE_URI"] = local_uri
+    local_app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    local_app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {}
+    db.init_app(local_app)
 
-    with app.app_context():
+    with local_app.app_context():
         db.session.close()
         db.drop_all()
         db.create_all()
 
         from sqlalchemy import text as _text
-        db.session.execute(_text("PRAGMA foreign_keys = OFF"))
+        if db.engine.url.drivername == "sqlite":
+            db.session.execute(_text("PRAGMA foreign_keys = OFF"))
 
         for model in ALL_MODELS:
             rows = data.get(model.__tablename__, [])
@@ -94,7 +101,8 @@ def sync():
             db.session.commit()
             print(f"  Wrote {model.__tablename__}: {len(rows)} rows")
 
-        db.session.execute(_text("PRAGMA foreign_keys = ON"))
+        if db.engine.url.drivername == "sqlite":
+            db.session.execute(_text("PRAGMA foreign_keys = ON"))
         db.session.commit()
 
     print("\nDone! Set DB_MODE=local in .env and run the app.")
