@@ -549,7 +549,7 @@ const StockManagement = () => {
                 Restock Below Reorder
               </Button>
             )}
-            {can('update') && storehouse && (
+            {can('update') && (
               <Button type="primary" onClick={handleOpenSelectRestock} disabled={selectedLocationId === "all"}>
                 Select Restock
               </Button>
