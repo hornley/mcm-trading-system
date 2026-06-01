@@ -8,7 +8,7 @@ const LandingPage = () => {
   const navigate = useNavigate()
 
   return (
-    <div style={{ textAlign: 'center', padding: '40px 0', maxWidth: 600, width: '100%' }}>
+    <div style={{ textAlign: 'center', maxWidth: 600, width: '100%' }}>
       <Card
         style={{ borderRadius: 16, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
         styles={{ body: { padding: '48px 32px' } }}
@@ -49,9 +49,6 @@ const LandingPage = () => {
         <Space size={16}>
           <Button type="primary" size="large" onClick={() => navigate('/login')} style={{ borderRadius: 8, paddingInline: 32 }}>
             Login
-          </Button>
-          <Button size="large" onClick={() => navigate('/register')} style={{ borderRadius: 8, paddingInline: 32 }}>
-            Sign Up
           </Button>
         </Space>
       </Card>
