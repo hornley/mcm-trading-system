@@ -1,10 +1,11 @@
-import { Card, Button, Input, message, Typography, Form } from 'antd'
+import { useState } from 'react'
+import { Button, Input, message, Typography, Form } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext.jsx'
+import bgImage from '../../../images/mancoImage.png'
 
-const { Title } = Typography
+const { Title, Text } = Typography
 
 const Login = () => {
   const { login } = useAuth()
@@ -34,29 +35,80 @@ const Login = () => {
   }
 
   return (
-    <Card
-      style={{ width: 400, borderRadius: 16, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
-      styles={{ body: { padding: '40px 32px' } }}
-    >
-      <div style={{ textAlign: 'center', marginBottom: 32 }}>
-        <Title level={3} style={{ margin: 0 }}>Welcome Back</Title>
-        <Typography.Text type="secondary">Sign in to your account</Typography.Text>
-      </div>
-      <Form layout="vertical" onFinish={handleLogin} autoComplete="off">
-        <Form.Item name="username" rules={[{ required: true, message: 'Please enter your username' }]}>
-          <Input prefix={<UserOutlined />} placeholder="Username" size="large" />
-        </Form.Item>
-        <Form.Item name="password" rules={[{ required: true, message: 'Please enter your password' }]}>
-          <Input.Password prefix={<LockOutlined />} placeholder="Password" size="large" />
-        </Form.Item>
-        <Form.Item style={{ marginBottom: 12 }}>
-          <Button type="primary" htmlType="submit" loading={loading} block size="large" style={{ borderRadius: 8 }}>
-            Login
-          </Button>
-        </Form.Item>
-      </Form>
+    <div style={{ display: 'flex', height: '100vh', width: '100vw' }}>
+      <div style={{
+        flex: 3,
+        backgroundImage: `url(${bgImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }} />
 
-    </Card>
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        background: '#fff',
+      }}>
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '40px',
+        }}>
+          <div style={{ width: '100%', maxWidth: 360 }}>
+            <div style={{ textAlign: 'center', marginBottom: 40 }}>
+              <Title level={2} style={{ margin: 0, fontWeight: 700 }}>Sign In</Title>
+              <Text type="secondary" style={{ fontSize: 14 }}>Welcome back! Please enter your details.</Text>
+            </div>
+
+            <Form layout="vertical" onFinish={handleLogin} autoComplete="off">
+              <Form.Item name="username" rules={[{ required: true, message: 'Please enter your username' }]}>
+                <Input
+                  prefix={<UserOutlined style={{ color: '#bfbfbf' }} />}
+                  placeholder="Username"
+                  size="large"
+                  style={{ borderRadius: 10, height: 48 }}
+                />
+              </Form.Item>
+
+              <Form.Item name="password" rules={[{ required: true, message: 'Please enter your password' }]}>
+                <Input.Password
+                  prefix={<LockOutlined style={{ color: '#bfbfbf' }} />}
+                  placeholder="Password"
+                  size="large"
+                  style={{ borderRadius: 10, height: 48 }}
+                />
+              </Form.Item>
+
+              <Form.Item style={{ marginBottom: 12 }}>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={loading}
+                  block
+                  size="large"
+                  style={{ borderRadius: 10, height: 48, fontWeight: 600, fontSize: 15 }}
+                >
+                  Sign in
+                </Button>
+              </Form.Item>
+            </Form>
+          </div>
+        </div>
+
+        <div style={{
+          padding: '16px 40px',
+          textAlign: 'center',
+          borderTop: '1px solid #f0f0f0',
+        }}>
+          <Text style={{ color: '#8c8c8c', fontSize: 12 }}>
+            &copy; {new Date().getFullYear()} Manco (MCM) Trading. All rights reserved.
+          </Text>
+        </div>
+      </div>
+    </div>
   )
 }
 
