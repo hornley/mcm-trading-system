@@ -4,7 +4,6 @@ import { Route,
   RouterProvider 
 } from 'react-router-dom'
 
-import LandingPage from './../pages/LandingPage'
 import AuthLayout from './../layouts/AuthLayout'
 import Login from './../pages/auth/Login'
 
@@ -34,7 +33,7 @@ const router = createBrowserRouter (
         <Route>
 
       <Route path="/" element={<AuthLayout />}>
-        <Route index element={<LandingPage />} />
+        <Route index element={<Login />} />
         <Route path="login" element={<Login />} />
 
         <Route path="forgot-password" element={<ForgotPassword />} />

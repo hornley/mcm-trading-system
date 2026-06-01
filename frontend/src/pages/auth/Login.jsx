@@ -1,5 +1,5 @@
-import { Card, Button, Input, Space, message, Typography, Form } from 'antd'
-import { UserOutlined, LockOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { Card, Button, Input, message, Typography, Form } from 'antd'
+import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext.jsx'
@@ -55,11 +55,7 @@ const Login = () => {
           </Button>
         </Form.Item>
       </Form>
-      <Space style={{ width: '100%', justifyContent: 'center' }}>
-        <Button type="link" icon={<ArrowLeftOutlined />} onClick={() => navigate('/')}>
-          Back to Home
-        </Button>
-      </Space>
+
     </Card>
   )
 }

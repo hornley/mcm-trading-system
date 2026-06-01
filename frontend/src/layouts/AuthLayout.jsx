@@ -11,12 +11,12 @@ const AuthLayout = () => {
   const location = useLocation()
   const { theme } = useAuth()
   const isDark = theme === 'dark'
-  const isLanding = location.pathname === '/'
+  const isLogin = location.pathname === '/' || location.pathname === '/login'
 
   return (
     <Layout style={{
       minHeight: '100vh',
-      background: isLanding
+      background: isLogin
         ? `url(${bgImage}) center/cover no-repeat`
         : isDark
           ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
