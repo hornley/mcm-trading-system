@@ -37,14 +37,6 @@ const Login = () => {
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw' }}>
       <div style={{
-        flex: 3,
-        backgroundImage: `url(${bgImage})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-      }} />
-
-      <div style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
@@ -108,6 +100,14 @@ const Login = () => {
           </Text>
         </div>
       </div>
+
+      <div style={{
+        flex: 3,
+        backgroundImage: `url(${bgImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }} />
     </div>
   )
 }
