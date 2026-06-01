@@ -49,7 +49,7 @@ const Login = () => {
           justifyContent: 'center',
           padding: '48px 44px',
         }}>
-          <div style={{ marginBottom: 48 }}>
+          <div style={{ marginBottom: 48, textAlign: 'center' }}>
             <Title level={1} style={{ margin: 0, fontWeight: 700, fontSize: 34, lineHeight: 1.2 }}>Sign In</Title>
             <Text style={{ color: '#8c8c8c', fontSize: 16, display: 'block', marginTop: 8 }}>
               Welcome back! Please enter your details.
