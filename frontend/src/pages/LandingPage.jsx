@@ -50,9 +50,6 @@ const LandingPage = () => {
           <Button type="primary" size="large" onClick={() => navigate('/login')} style={{ borderRadius: 8, paddingInline: 32 }}>
             Login
           </Button>
-          <Button size="large" onClick={() => navigate('/register')} style={{ borderRadius: 8, paddingInline: 32 }}>
-            Sign Up
-          </Button>
         </Space>
       </Card>
     </div>
