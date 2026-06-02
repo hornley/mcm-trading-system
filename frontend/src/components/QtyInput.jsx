@@ -12,9 +12,11 @@ const ALLOWED_KEYS = new Set([
 const QtyInput = ({ value, onChange, isFabric, min, max, disabled }) => {
   const [hasError, setHasError] = useState(false);
   const timerRef = useRef(null);
+  const valueRef = useRef(value);
   const step = isFabric ? 0.25 : 1;
   const resolvedMin = min ?? (isFabric ? 0.25 : 1);
-  const current = value ?? resolvedMin;
+
+  useEffect(() => { valueRef.current = value; }, [value]);
 
   useEffect(() => {
     return () => clearTimeout(timerRef.current);
@@ -28,6 +30,7 @@ const QtyInput = ({ value, onChange, isFabric, min, max, disabled }) => {
   };
 
   const handleDelta = (delta) => {
+    const current = valueRef.current ?? resolvedMin;
     const raw = current + delta;
     const clamped = max != null ? Math.min(max, raw) : raw;
     const newVal = Math.max(resolvedMin, +((clamped).toFixed(2)));
@@ -63,6 +66,7 @@ const QtyInput = ({ value, onChange, isFabric, min, max, disabled }) => {
           disabled={disabled}
           status={hasError ? 'error' : undefined}
           onKeyDown={handleKeyDown}
+          onChange={(val) => onChange?.(val)}
           formatter={(v) => qtyLabel(Number(v))}
           parser={(display) => {
             const fracMap = { '¼': 0.25, '½': 0.5, '¾': 0.75 };
