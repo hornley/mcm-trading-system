@@ -8,7 +8,7 @@ from flask_mail import Message
 
 auth_bp = Blueprint("auth", __name__)
 
-ROLE_MAP = {1: "owner", 2: "manager", 3: "admin", 4: "staff"}
+ROLE_MAP = {1: "owner", 2: "manager", 3: "admin"}
 
 
 @auth_bp.route("/api/auth/login", methods=["POST"])
@@ -36,7 +36,7 @@ def login():
         "user_id": user.user_id,
         "username": user.username,
         "email": user.email,
-        "role": ROLE_MAP.get(user.usertype, "staff"),
+        "role": ROLE_MAP.get(user.usertype, "admin"),
         "usertype": user.usertype,
         "location_id": user.location_id,
         "location_name": location.name if location else None,
@@ -66,7 +66,9 @@ def register():
         username=username,
         email=email,
         password=generate_password_hash(password),
-        usertype=data.get("usertype", 4),
+        usertype=data.get("usertype", 3),
+        phone=data.get("phone"),
+        location_id=data.get("location_id", 0),
         employee_code=str(random.randint(100000000, 999999999)),
     )
     db.session.add(user)
@@ -77,7 +79,7 @@ def register():
         "user_id": user.user_id,
         "username": user.username,
         "email": user.email,
-        "role": ROLE_MAP.get(user.usertype, "staff"),
+        "role": ROLE_MAP.get(user.usertype, "admin"),
     }), 201
 
 
