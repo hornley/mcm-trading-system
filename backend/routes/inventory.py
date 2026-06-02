@@ -1135,3 +1135,90 @@ def get_inventory_movements():
     movements.sort(key=lambda m: m["date"] or "", reverse=True)
 
     return success_response(movements)
+
+
+@inventory_bp.route("/api/inventory/request-stock/<int:request_id>/accept", methods=["PUT"])
+def accept_request(request_id):
+    data = request.get_json() or {}
+    usertype = data.get("usertype")
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+    if not _can_update(usertype):
+        return error_response("Forbidden", "FORBIDDEN", 403)
+
+    stock_request = StockRequest.query.get(request_id)
+    if not stock_request:
+        return error_response("Request not found", "NOT_FOUND", 404)
+    if stock_request.status != "pending":
+        return error_response("Request already processed", "ALREADY_PROCESSED", 400)
+
+    inventory = Inventory.query.filter_by(
+        product_id=stock_request.product_id,
+        location_id=stock_request.from_location_id,
+    ).first()
+    if not inventory or inventory.quantity < stock_request.quantity:
+        return error_response("Insufficient stock at source location", "INSUFFICIENT_STOCK", 400)
+
+    inventory.quantity -= stock_request.quantity
+
+    dest_inv = Inventory.query.filter_by(
+        product_id=stock_request.product_id,
+        location_id=stock_request.to_location_id,
+    ).first()
+    if dest_inv:
+        dest_inv.quantity = (dest_inv.quantity or 0) + stock_request.quantity
+    else:
+        dest_inv = Inventory(
+            product_id=stock_request.product_id,
+            location_id=stock_request.to_location_id,
+            quantity=stock_request.quantity,
+        )
+        db.session.add(dest_inv)
+
+    stock_request.status = "accepted"
+    db.session.commit()
+    return success_response({"message": "Request accepted"})
+
+
+@inventory_bp.route("/api/inventory/request-stock/<int:request_id>/decline", methods=["PUT"])
+def decline_request(request_id):
+    data = request.get_json() or {}
+    usertype = data.get("usertype")
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+    if not _can_update(usertype):
+        return error_response("Forbidden", "FORBIDDEN", 403)
+
+    stock_request = StockRequest.query.get(request_id)
+    if not stock_request:
+        return error_response("Request not found", "NOT_FOUND", 404)
+    if stock_request.status != "pending":
+        return error_response("Request already processed", "ALREADY_PROCESSED", 400)
+
+    stock_request.status = "declined"
+    db.session.commit()
+    return success_response({"message": "Request declined"})
+
+
+@inventory_bp.route("/api/inventory/pending-requests", methods=["GET"])
+def list_pending_requests():
+    from_location_id = request.args.get("location_id", type=int)
+    query = StockRequest.query.filter_by(status="pending").order_by(StockRequest.created_at.desc())
+    if from_location_id:
+        query = query.filter_by(to_location_id=from_location_id)
+    requests = query.limit(50).all()
+    return success_response([{
+        "request_id": r.request_id,
+        "product_id": r.product_id,
+        "product_name": r.product.name if r.product else "Unknown",
+        "quantity": r.quantity,
+        "description": r.description,
+        "from_location_id": r.from_location_id,
+        "from_location_name": r.from_location.name if r.from_location else "Unknown",
+        "to_location_id": r.to_location_id,
+        "to_location_name": r.to_location.name if r.to_location else "Unknown",
+        "requested_by": r.requested_by,
+        "requester_name": r.requester.username if r.requester else "Unknown",
+        "status": r.status,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+    } for r in requests])

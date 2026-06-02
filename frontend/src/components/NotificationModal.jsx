@@ -1,0 +1,159 @@
+import { useState, useEffect } from 'react'
+import { Avatar, Button } from 'antd'
+import {
+  CloseOutlined,
+  CheckOutlined,
+  CloseCircleOutlined,
+  InboxOutlined,
+} from '@ant-design/icons'
+import { useAuth } from '../context/AuthContext.jsx'
+
+const NotificationModal = ({ open, onClose }) => {
+  const { user } = useAuth()
+  const [requests, setRequests] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!open || !user) return
+    setLoading(true)
+    const params = new URLSearchParams({ usertype: user.usertype })
+    if (user.location_id) params.append('location_id', user.location_id)
+    fetch(`/api/inventory/pending-requests?${params}`)
+      .then((r) => r.json())
+      .then((data) => setRequests(data.success ? data.data : []))
+      .catch(() => setRequests([]))
+      .finally(() => setLoading(false))
+  }, [open, user])
+
+  const handleAction = async (requestId, action) => {
+    try {
+      const res = await fetch(`/api/inventory/request-stock/${requestId}/${action}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usertype: user.usertype }),
+      })
+      const data = await res.json()
+      if (!res.ok) { return }
+      setRequests((prev) => prev.filter((r) => r.request_id !== requestId))
+    } catch {}
+  }
+
+  const timeAgo = (iso) => {
+    if (!iso) return ''
+    const diff = Date.now() - new Date(iso).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return 'Just now'
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h ago`
+    const days = Math.floor(hrs / 24)
+    return `${days}d ago`
+  }
+
+  if (!open) return null
+
+  return (
+    <>
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 1049,
+          background: 'rgba(0,0,0,0.15)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+        }}
+      />
+      <div
+        style={{
+          position: 'fixed', top: '50%', right: 40,
+          transform: 'translateY(-50%)', zIndex: 1050,
+          width: 440, maxHeight: '90vh',
+          background: '#fff', borderRadius: 18,
+          boxShadow: '0 25px 60px rgba(0,0,0,0.15), 0 8px 24px rgba(0,0,0,0.08)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif',
+        }}
+      >
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #f0f0f0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 18, fontWeight: 600, color: '#0a0a0a' }}>Stock Requests</span>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+              {loading ? '...' : `${requests.length} pending`}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {requests.length === 0 && !loading && (
+            <div style={{ padding: '60px 24px', textAlign: 'center' }}>
+              <InboxOutlined style={{ fontSize: 40, color: '#d9d9d9', marginBottom: 12 }} />
+              <div style={{ fontSize: 14, color: '#8c8c8c' }}>No pending requests</div>
+            </div>
+          )}
+          {requests.map((r) => (
+            <div
+              key={r.request_id}
+              style={{ padding: '16px 24px', borderBottom: '1px solid #f5f5f5' }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#fafafa'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            >
+              <div style={{ display: 'flex', gap: 12 }}>
+                <Avatar size={40} style={{ background: '#1677ff', fontSize: 15, fontWeight: 600, flexShrink: 0 }}>
+                  {r.requester_name?.[0]?.toUpperCase() || '?'}
+                </Avatar>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: '#333', lineHeight: 1.4 }}>
+                    <strong>{r.requester_name}</strong> requested{' '}
+                    <strong>{r.quantity} {r.product_name}</strong>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 4 }}>
+                    {r.from_location_name} → {r.to_location_name} · {timeAgo(r.created_at)}
+                  </div>
+                  {r.description && (
+                    <div style={{ fontSize: 12, color: '#666', marginTop: 6, fontStyle: 'italic' }}>
+                      "{r.description}"
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    <Button
+                      size="small"
+                      icon={<CloseCircleOutlined />}
+                      onClick={() => handleAction(r.request_id, 'decline')}
+                      style={{
+                        borderRadius: 8, fontSize: 12, height: 30,
+                        border: '1px solid #d9d9d9', color: '#555',
+                        background: '#fff', padding: '0 14px',
+                      }}
+                    >
+                      Decline
+                    </Button>
+                    <Button
+                      size="small"
+                      icon={<CheckOutlined />}
+                      onClick={() => handleAction(r.request_id, 'accept')}
+                      style={{
+                        borderRadius: 8, fontSize: 12, height: 30,
+                        background: '#0a0a0a', borderColor: '#0a0a0a',
+                        color: '#fff', boxShadow: 'none', padding: '0 14px',
+                      }}
+                    >
+                      Accept
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ padding: '12px 24px', borderTop: '1px solid #f0f0f0', textAlign: 'center' }}>
+          <Button type="text" onClick={onClose} icon={<CloseOutlined />} style={{ fontSize: 12, color: '#999' }}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+export default NotificationModal
