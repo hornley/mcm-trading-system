@@ -434,7 +434,7 @@ const Sales = () => {
         </Col>
         <Col xs={24} sm={12} md={8} style={{ textAlign: 'right' }}>
           <Space>
-            {isManager && <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} disabled={productsLoading} loading={productsLoading}>Add Sale</Button>}
+            {(isManager || isOwner) && <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} disabled={productsLoading} loading={productsLoading}>Add Sale</Button>}
             <Button onClick={() => {
               const defaultBranch = isOwner || user?.role === 'admin' ? 'All' : branchName;
               setTotalSalesBranch(defaultBranch);

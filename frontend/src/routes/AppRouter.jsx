@@ -26,6 +26,7 @@ import Report from '../pages/module/Reports'
 import SettingsPage from '../pages/module/Settings'
 import Help from '../pages/module/Help'
 import About from '../pages/module/About'
+import Manual from '../pages/module/Manual'
 //Contains all paths to pages
 
 const router = createBrowserRouter (
@@ -87,6 +88,7 @@ const router = createBrowserRouter (
           <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "admin"]} />}>
             <Route path="help" element={<Help />} />
             <Route path="about" element={<About />} />
+            <Route path="manual" element={<Manual />} />
           </Route>
 
         </Route>

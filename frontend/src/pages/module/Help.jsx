@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Typography, Input, Row, Col, Card, Collapse, Modal, Button, Steps, Space } from 'antd'
+import { Typography, Input, Row, Col, Card, Collapse, Button, Steps, Space } from 'antd'
+import { useNavigate } from 'react-router-dom'
 import {
   QuestionCircleOutlined, LoginOutlined, AppstoreOutlined,
   CheckCircleOutlined, LogoutOutlined,
@@ -7,7 +8,6 @@ import {
 
 const { Title, Text, Paragraph } = Typography
 const { Search } = Input
-const { Panel } = Collapse
 
 const faqData = [
   {
@@ -46,7 +46,7 @@ const faqData = [
 
 const Help = () => {
   const [searchText, setSearchText] = useState('')
-  const [manualVisible, setManualVisible] = useState(false)
+  const navigate = useNavigate()
 
   const filteredFaq = faqData.filter(
     (faq) =>
@@ -87,7 +87,7 @@ const Help = () => {
               The user manual contains full documentation on how to use each module of the system,
               including step-by-step instructions, screenshots, and best practices.
             </Paragraph>
-            <Button type="primary" icon={<QuestionCircleOutlined />} onClick={() => setManualVisible(true)}>
+            <Button type="primary" icon={<QuestionCircleOutlined />} onClick={() => navigate('/dashboard/manual')}>
               View User Manual
             </Button>
           </Card>
@@ -107,16 +107,7 @@ const Help = () => {
         />
       </Card>
 
-      <Modal
-        title="User Manual"
-        open={manualVisible}
-        onCancel={() => setManualVisible(false)}
-        footer={[<Button key="close" type="primary" onClick={() => setManualVisible(false)}>Close</Button>]}
-      >
-        <Paragraph>
-          The user manual is not yet available and will be updated once the system is completed.
-        </Paragraph>
-      </Modal>
+
     </div>
   )
 }

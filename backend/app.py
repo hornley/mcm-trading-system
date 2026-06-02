@@ -30,6 +30,7 @@ from routes.admin import admin_bp
 from routes.reports import reports_bp
 from routes.dashboard import dashboard_bp
 from routes.orders import orders_bp
+from routes.manual import manual_bp
 
 def create_app():
     app = Flask(__name__, static_folder=FRONTEND_DIST)
@@ -52,12 +53,13 @@ def create_app():
     app.register_blueprint(reports_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(orders_bp)
+    app.register_blueprint(manual_bp)
 
     with app.app_context():
         from models import (
             User, Location, Category, Product, Order, OrderItem,
             Payment, Inventory, StockTransfer, StockAdjustment, ActivityLog,
-            PasswordResetToken, StockRequest,
+            PasswordResetToken, StockRequest, ManualSection,
         )
         db.create_all()
 
