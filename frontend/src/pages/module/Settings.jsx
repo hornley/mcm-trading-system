@@ -365,6 +365,7 @@ const Settings = () => {
                 <Select.Option value="small">Small</Select.Option>
                 <Select.Option value="medium">Medium</Select.Option>
                 <Select.Option value="large">Large</Select.Option>
+                <Select.Option value="xlarge">Extra Large</Select.Option>
               </Select>
             </Form.Item>
             <Form.Item>
