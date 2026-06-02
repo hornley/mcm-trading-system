@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Avatar, Button } from 'antd'
 import {
   CloseOutlined,
@@ -13,6 +13,23 @@ const NotificationModal = ({ open, onClose }) => {
   const { user } = useAuth()
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    if (open) {
+      setClosing(false)
+      setMounted(true)
+    } else if (mounted) {
+      setClosing(true)
+      timerRef.current = setTimeout(() => {
+        setMounted(false)
+        setClosing(false)
+      }, 200)
+    }
+    return () => clearTimeout(timerRef.current)
+  }, [open])
 
   useEffect(() => {
     if (!open || !user) return
@@ -56,11 +73,34 @@ const NotificationModal = ({ open, onClose }) => {
     return qty
   }
 
-  if (!open) return null
+  if (!mounted) return null
 
   return (
     <>
+      <style>{`
+        @keyframes nm-drop {
+          from { opacity: 0; transform: translateY(-16px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes nm-fade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .nm-backdrop {
+          animation: nm-fade 0.2s ease-out both;
+        }
+        .nm-backdrop.closing {
+          animation: nm-fade 0.15s ease-in reverse both;
+        }
+        .nm-panel {
+          animation: nm-drop 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+        .nm-panel.closing {
+          animation: nm-drop 0.15s ease-in reverse both;
+        }
+      `}</style>
       <div
+        className={'nm-backdrop' + (closing ? ' closing' : '')}
         onClick={onClose}
         style={{
           position: 'fixed', inset: 0, zIndex: 1049,
@@ -70,6 +110,7 @@ const NotificationModal = ({ open, onClose }) => {
         }}
       />
       <div
+        className={'nm-panel' + (closing ? ' closing' : '')}
         style={{
           position: 'fixed', top: 64, right: 40, zIndex: 1050,
           width: 440, maxHeight: 'calc(100vh - 80px)',
@@ -81,8 +122,8 @@ const NotificationModal = ({ open, onClose }) => {
       >
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #f0f0f0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 18, fontWeight: 600, color: '#0a0a0a' }}>Stock Requests</span>
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+            <span style={{ fontSize: 22, fontWeight: 600, color: '#0a0a0a' }}>Stock Requests</span>
+            <span style={{ fontSize: 15, color: '#8c8c8c' }}>
               {loading ? '...' : `${requests.length} pending`}
             </span>
           </div>
@@ -91,8 +132,8 @@ const NotificationModal = ({ open, onClose }) => {
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {requests.length === 0 && !loading && (
             <div style={{ padding: '60px 24px', textAlign: 'center' }}>
-              <InboxOutlined style={{ fontSize: 40, color: '#d9d9d9', marginBottom: 12 }} />
-              <div style={{ fontSize: 14, color: '#8c8c8c' }}>No pending requests</div>
+              <InboxOutlined style={{ fontSize: 50, color: '#d9d9d9', marginBottom: 12 }} />
+              <div style={{ fontSize: 17, color: '#8c8c8c' }}>No pending requests</div>
             </div>
           )}
           {requests.map((r) => (
@@ -103,31 +144,31 @@ const NotificationModal = ({ open, onClose }) => {
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
               <div style={{ display: 'flex', gap: 12 }}>
-                <Avatar size={40} style={{ background: '#1677ff', fontSize: 15, fontWeight: 600, flexShrink: 0 }}>
+                <Avatar size={44} style={{ background: '#1677ff', fontSize: 19, fontWeight: 600, flexShrink: 0 }}>
                   {r.requester_name?.[0]?.toUpperCase() || '?'}
                 </Avatar>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: '#333', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 16, color: '#333', lineHeight: 1.4 }}>
                     <strong>{r.requester_name}</strong> requested{' '}
                     <strong>{fmtQty(r.quantity, r.is_fabric)} {r.product_name}</strong>
                   </div>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 4 }}>
+                  <div style={{ fontSize: 15, color: '#8c8c8c', marginTop: 4 }}>
                     {r.from_location_name} → {r.to_location_name} · {timeAgo(r.created_at)}
                   </div>
                   {r.description && (
-                    <div style={{ fontSize: 12, color: '#666', marginTop: 6, fontStyle: 'italic' }}>
+                    <div style={{ fontSize: 15, color: '#666', marginTop: 6, fontStyle: 'italic' }}>
                       "{r.description}"
                     </div>
                   )}
-                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                     <Button
                       size="small"
                       icon={<CloseCircleOutlined />}
                       onClick={() => handleAction(r.request_id, 'decline')}
                       style={{
-                        borderRadius: 8, fontSize: 12, height: 30,
-                        border: '1px solid #d9d9d9', color: '#555',
-                        background: '#fff', padding: '0 14px',
+                        borderRadius: 8, fontSize: 15, height: 36,
+                        border: '1px solid #ff4d4f', color: '#ff4d4f',
+                        background: '#fff', padding: '0 18px',
                       }}
                     >
                       Decline
@@ -137,9 +178,9 @@ const NotificationModal = ({ open, onClose }) => {
                       icon={<CheckOutlined />}
                       onClick={() => handleAction(r.request_id, 'accept')}
                       style={{
-                        borderRadius: 8, fontSize: 12, height: 30,
-                        background: '#0a0a0a', borderColor: '#0a0a0a',
-                        color: '#fff', boxShadow: 'none', padding: '0 14px',
+                        borderRadius: 8, fontSize: 15, height: 36,
+                        background: '#52c41a', borderColor: '#52c41a',
+                        color: '#fff', boxShadow: 'none', padding: '0 18px',
                       }}
                     >
                       Accept
@@ -152,7 +193,7 @@ const NotificationModal = ({ open, onClose }) => {
         </div>
 
         <div style={{ padding: '12px 24px', borderTop: '1px solid #f0f0f0', textAlign: 'center' }}>
-          <Button type="text" onClick={onClose} icon={<CloseOutlined />} style={{ fontSize: 12, color: '#999' }}>
+          <Button type="text" onClick={onClose} icon={<CloseOutlined />} style={{ fontSize: 15, color: '#999' }}>
             Close
           </Button>
         </div>
