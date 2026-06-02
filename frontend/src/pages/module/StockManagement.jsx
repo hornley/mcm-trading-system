@@ -6,7 +6,7 @@ import {
 } from 'antd';
 import { PlusOutlined, MinusOutlined } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js';
+import { FABRIC_CATEGORY, fmtQty, qtyLabel } from '../../utils/format.js';
 
 const { Search, TextArea } = Input;
 
@@ -740,6 +740,19 @@ const StockManagement = () => {
                     min={selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1}
                     step={selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1}
                     precision={selectedRecord?.category === FABRIC_CATEGORY ? undefined : 0}
+                    formatter={(value) => qtyLabel(Number(value))}
+                    parser={(display) => {
+                      const fracMap = { '¼': 0.25, '½': 0.5, '¾': 0.75 };
+                      for (const [char, val] of Object.entries(fracMap)) {
+                        if (display.includes(char)) {
+                          const before = display.split(char)[0].trim();
+                          const whole = before ? parseInt(before) || 0 : 0;
+                          return whole + val;
+                        }
+                      }
+                      const num = parseFloat(display.replace(/[^\d.]/g, ''));
+                      return isNaN(num) ? 0 : num;
+                    }}
                     style={{ width: '100%', textAlign: 'center' }}
                   />
                 </Form.Item>
