@@ -869,16 +869,56 @@ const StockManagement = () => {
                   },
                   {
                     title: 'Restock Quantity', key: 'restockQty', width: 140,
-                    render: (_, record) => (
-                      <InputNumber
-                        min={0}
-                        step={record.category === FABRIC_CATEGORY ? 0.125 : 1}
-                        value={restockQuantities[record.product_id] || 0}
-                        onChange={(val) => handleRestockQtyChange(record.product_id, val || 0)}
-                        style={{ width: '100%' }}
-                        disabled={!selectedRestockIds.has(record.product_id)}
-                      />
-                    ),
+                    render: (_, record) => {
+                      const isFab = record.category === FABRIC_CATEGORY;
+                      const step = isFab ? 0.25 : 1;
+                      const qty = restockQuantities[record.product_id] || 0;
+                      const disabled = !selectedRestockIds.has(record.product_id);
+                      return (
+                        <Row align="middle" gutter={2} wrap={false}>
+                          <Col>
+                            <Button
+                              size="small"
+                              icon={<MinusOutlined />}
+                              disabled={disabled}
+                              onClick={() => handleRestockQtyChange(record.product_id, Math.max(0, +((qty - step).toFixed(2))))}
+                            />
+                          </Col>
+                          <Col flex="auto">
+                            <InputNumber
+                              controls={false}
+                              min={0}
+                              step={step}
+                              value={qty}
+                              disabled={disabled}
+                              formatter={(value) => qtyLabel(Number(value))}
+                              parser={(display) => {
+                                const fracMap = { '¼': 0.25, '½': 0.5, '¾': 0.75 };
+                                for (const [char, val] of Object.entries(fracMap)) {
+                                  if (display.includes(char)) {
+                                    const before = display.split(char)[0].trim();
+                                    const whole = before ? parseInt(before) || 0 : 0;
+                                    return whole + val;
+                                  }
+                                }
+                                const num = parseFloat(display.replace(/[^\d.]/g, ''));
+                                return isNaN(num) ? 0 : num;
+                              }}
+                              onChange={(val) => handleRestockQtyChange(record.product_id, val || 0)}
+                              style={{ width: '100%', textAlign: 'center' }}
+                            />
+                          </Col>
+                          <Col>
+                            <Button
+                              size="small"
+                              icon={<PlusOutlined />}
+                              disabled={disabled}
+                              onClick={() => handleRestockQtyChange(record.product_id, +((qty + step).toFixed(2)))}
+                            />
+                          </Col>
+                        </Row>
+                      );
+                    },
                   },
                 ]}
               />
