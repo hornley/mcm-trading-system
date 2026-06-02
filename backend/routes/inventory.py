@@ -1212,6 +1212,7 @@ def list_pending_requests():
         "product_id": r.product_id,
         "product_name": r.product.name if r.product else "Unknown",
         "quantity": r.quantity,
+        "is_fabric": is_fabric_category(r.product.category_id) if r.product else False,
         "description": r.description,
         "from_location_id": r.from_location_id,
         "from_location_name": r.from_location.name if r.from_location else "Unknown",

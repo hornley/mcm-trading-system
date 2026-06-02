@@ -7,6 +7,7 @@ import {
   InboxOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../context/AuthContext.jsx'
+import { qtyLabel } from '../utils/format.js'
 
 const NotificationModal = ({ open, onClose }) => {
   const { user } = useAuth()
@@ -50,6 +51,11 @@ const NotificationModal = ({ open, onClose }) => {
     return `${days}d ago`
   }
 
+  const fmtQty = (qty, isFabric) => {
+    if (isFabric) return qtyLabel(qty)
+    return qty
+  }
+
   if (!open) return null
 
   return (
@@ -65,9 +71,8 @@ const NotificationModal = ({ open, onClose }) => {
       />
       <div
         style={{
-          position: 'fixed', top: '50%', right: 40,
-          transform: 'translateY(-50%)', zIndex: 1050,
-          width: 440, maxHeight: '90vh',
+          position: 'fixed', top: 64, right: 40, zIndex: 1050,
+          width: 440, maxHeight: 'calc(100vh - 80px)',
           background: '#fff', borderRadius: 18,
           boxShadow: '0 25px 60px rgba(0,0,0,0.15), 0 8px 24px rgba(0,0,0,0.08)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
@@ -104,7 +109,7 @@ const NotificationModal = ({ open, onClose }) => {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, color: '#333', lineHeight: 1.4 }}>
                     <strong>{r.requester_name}</strong> requested{' '}
-                    <strong>{r.quantity} {r.product_name}</strong>
+                    <strong>{fmtQty(r.quantity, r.is_fabric)} {r.product_name}</strong>
                   </div>
                   <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 4 }}>
                     {r.from_location_name} → {r.to_location_name} · {timeAgo(r.created_at)}
