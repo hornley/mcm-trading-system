@@ -34,7 +34,7 @@ const LandingPage = () => {
             <div style={{ textAlign: 'center' }}>
               <TeamOutlined style={{ fontSize: 28, color: '#5b7ff0', marginBottom: 8 }} />
               <br />
-              <Text type="secondary" style={{ fontSize: 12 }}>Staff</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>Users</Text>
             </div>
           </Col>
           <Col span={8}>
