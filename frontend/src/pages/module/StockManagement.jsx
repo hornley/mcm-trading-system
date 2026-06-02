@@ -6,6 +6,7 @@ import {
 } from 'antd';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js';
+import QtyInput from '../../components/QtyInput.jsx';
 
 const { Search, TextArea } = Input;
 
@@ -41,7 +42,7 @@ const StockManagement = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [pageSize] = useState(10);
   const [movementsCache, setMovementsCache] = useState({});
-  const [stats, setStats] = useState({ total_items: 0, low_stock_count: 0, out_of_stock_count: 0 });
+  const [stats, setStats] = useState({ total_items: 0, low_stock_count: 0, out_of_stock_count: 0, pending_request_count: 0 });
   const [sortBy, setSortBy] = useState('product_name');
   const [sortOrder, setSortOrder] = useState('asc');
   const [statusFilter, setStatusFilter] = useState('');
@@ -131,7 +132,7 @@ const StockManagement = () => {
 
   const handleRequestStock = (record) => {
     if (selectedLocationId === "all") {
-      message.warning('Select a specific branch from the top bar to adjust stock');
+      message.warning('Select a specific branch from the top bar to request stock');
       return;
     }
     setSelectedRecord(record);
@@ -184,35 +185,61 @@ const StockManagement = () => {
   const handleAdjustSave = async () => {
     try {
       const values = await adjustForm.validateFields();
-      const adjType = values.adjustmentType || (requestPreset ? 'in' : null);
-      const reason = values.reason || (requestPreset ? 'Restock' : null);
-      const quantityChange = adjType === 'in'
-        ? Math.abs(values.quantity)
-        : -Math.abs(values.quantity);
 
-      const res = await fetch('/api/inventory/adjust', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          usertype: user.usertype,
-          user_id: user.user_id,
-          product_id: selectedRecord.product_id,
-          location_id: selectedLocationId,
-          quantity_change: quantityChange,
-          reason,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        message.success('Stock adjusted');
-        setAdjustVisible(false);
-        adjustForm.resetFields();
-        fetchData();
+      if (requestPreset) {
+        const res = await fetch('/api/inventory/request-stock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            usertype: user.usertype,
+            user_id: user.user_id,
+            product_id: selectedRecord.product_id,
+            from_location_id: values.from_location_id,
+            to_location_id: selectedLocationId,
+            quantity: values.quantity,
+            description: values.remarks || null,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          message.success('Stock request submitted');
+          setAdjustVisible(false);
+          adjustForm.resetFields();
+        } else {
+          message.error(data.message);
+        }
       } else {
-        message.error(data.message);
+        const adjType = values.adjustmentType;
+        const reason = values.reason;
+        const quantityChange = adjType === 'in'
+          ? Math.abs(values.quantity)
+          : -Math.abs(values.quantity);
+
+        const res = await fetch('/api/inventory/adjust', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            usertype: user.usertype,
+            user_id: user.user_id,
+            product_id: selectedRecord.product_id,
+            location_id: selectedLocationId,
+            quantity_change: quantityChange,
+            reason,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          message.success('Stock adjusted');
+          setAdjustVisible(false);
+          adjustForm.resetFields();
+          fetchData();
+        } else {
+          message.error(data.message);
+        }
       }
-    } catch {
-      message.error('Failed to adjust stock');
+    } catch (err) {
+      if (err?.errorFields) return;
+      message.error(requestPreset ? 'Failed to submit stock request' : 'Failed to adjust stock');
     }
   };
 
@@ -392,7 +419,7 @@ const StockManagement = () => {
     window.print();
   };
 
-  const { total_items: totalItems, low_stock_count: lowStockCount, out_of_stock_count: outOfStockCount } = stats;
+  const { total_items: totalItems, low_stock_count: lowStockCount, out_of_stock_count: outOfStockCount, pending_request_count: pendingRequestCount } = stats;
 
   const columns = [
     {
@@ -508,17 +535,22 @@ const StockManagement = () => {
     <div>
       <Card styles={{ body: { padding: '16px 24px' } }}>
         <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col xs={24} sm={8}>
+          <Col xs={12} sm={6}>
             <Card styles={{ body: { padding: '20px 24px' } }}><Statistic title="Total Stock Items" value={totalItems} /></Card>
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={12} sm={6}>
           <Card>
             <Statistic title="Low Stock Items" value={lowStockCount} valueStyle={{ color: '#fa8c16' }} />
           </Card>
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={12} sm={6}>
           <Card>
             <Statistic title="Out of Stock Items" value={outOfStockCount} valueStyle={{ color: '#cf1322' }} />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card>
+            <Statistic title="Current Requested" value={pendingRequestCount} valueStyle={{ color: '#1677ff' }} />
           </Card>
         </Col>
       </Row>
@@ -647,38 +679,53 @@ const StockManagement = () => {
         onCancel={() => setAdjustVisible(false)}
         footer={[
           <Button key="cancel" onClick={() => setAdjustVisible(false)}>Cancel</Button>,
-          <Button key="save" type="primary" onClick={handleAdjustSave}>Save</Button>,
+          <Button key="save" type="primary" onClick={handleAdjustSave}>{requestPreset ? 'Submit Request' : 'Save'}</Button>,
         ]}
       >
         <Form form={adjustForm} layout="vertical">
-          <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-            Adjusting stock at selected branch
-          </Typography.Text>
-          <Typography.Text style={{ display: 'block', marginBottom: 16 }}>
-            Current stock: <strong>{fmtQty(selectedRecord?.quantity, selectedRecord?.category === FABRIC_CATEGORY)} {selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'}</strong>
-          </Typography.Text>
-          {!requestPreset && (
-            <Form.Item name="adjustmentType" label="Adjustment Type" rules={[{ required: true, message: 'Please select adjustment type' }]}>
-              <Select placeholder="Select type">
-                <Select.Option value="in">Stock In (+)</Select.Option>
-                <Select.Option value="out">Stock Out (-)</Select.Option>
-              </Select>
-            </Form.Item>
+          {requestPreset ? (
+            <>
+              <Typography.Text style={{ display: 'block', marginBottom: 16 }}>
+                Request stock from another branch to your current location.
+              </Typography.Text>
+              <Form.Item name="from_location_id" label="Source Branch" rules={[{ required: true, message: 'Please select source branch' }]}>
+                <Select placeholder="Select branch to request from">
+                  {locations.filter((loc) => loc.location_id !== selectedLocationId).map((loc) => (
+                    <Select.Option key={loc.location_id} value={loc.location_id}>{loc.name}</Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </>
+          ) : (
+            <>
+              <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+                Adjusting stock at selected branch
+              </Typography.Text>
+              <Typography.Text style={{ display: 'block', marginBottom: 16 }}>
+                Current stock: <strong>{fmtQty(selectedRecord?.quantity, selectedRecord?.category === FABRIC_CATEGORY)} {selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'}</strong>
+              </Typography.Text>
+              <Form.Item name="adjustmentType" label="Adjustment Type" rules={[{ required: true, message: 'Please select adjustment type' }]}>
+                <Select placeholder="Select type">
+                  <Select.Option value="in">Stock In (+)</Select.Option>
+                  <Select.Option value="out">Stock Out (-)</Select.Option>
+                </Select>
+              </Form.Item>
+              <Form.Item name="reason" label="Reason" rules={[{ required: true, message: 'Please select a reason' }]}>
+                <Select placeholder="Select reason">
+                  {adjustmentReasons.map((r) => (
+                    <Select.Option key={r} value={r}>{r}</Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </>
           )}
-          <Form.Item name="quantity" label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} rules={[{ required: true, message: 'Please enter quantity' }]}>
-            <InputNumber min={selectedRecord?.category === FABRIC_CATEGORY ? 0.125 : 1} step={selectedRecord?.category === FABRIC_CATEGORY ? 0.125 : 1} style={{ width: '100%' }} placeholder="Enter quantity" />
+          <Form.Item label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} required>
+            <Form.Item name="quantity" noStyle rules={[{ required: true, message: 'Please enter quantity' }]}>
+              <QtyInput isFabric={selectedRecord?.category === FABRIC_CATEGORY} />
+            </Form.Item>
           </Form.Item>
-          {!requestPreset && (
-            <Form.Item name="reason" label="Reason" rules={[{ required: true, message: 'Please select a reason' }]}>
-              <Select placeholder="Select reason">
-                {adjustmentReasons.map((r) => (
-                  <Select.Option key={r} value={r}>{r}</Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-          )}
-          <Form.Item name="remarks" label="Remarks (optional)">
-            <TextArea rows={2} placeholder="Additional notes" />
+          <Form.Item name="remarks" label={requestPreset ? 'Description (optional)' : 'Remarks (optional)'}>
+            <TextArea rows={2} placeholder={requestPreset ? 'Additional notes for the request' : 'Additional notes'} />
           </Form.Item>
         </Form>
       </Modal>
@@ -707,8 +754,10 @@ const StockManagement = () => {
               ))}
             </Select>
           </Form.Item>
-          <Form.Item name="quantity" label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} rules={[{ required: true, message: 'Please enter quantity' }]}>
-            <InputNumber min={selectedRecord?.category === FABRIC_CATEGORY ? 0.125 : 1} max={selectedRecord?.quantity || 1} step={selectedRecord?.category === FABRIC_CATEGORY ? 0.125 : 1} style={{ width: '100%' }} placeholder="Enter quantity" />
+          <Form.Item label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} required>
+            <Form.Item name="quantity" noStyle rules={[{ required: true, message: 'Please enter quantity' }]}>
+              <QtyInput isFabric={selectedRecord?.category === FABRIC_CATEGORY} max={selectedRecord?.quantity || 1} />
+            </Form.Item>
           </Form.Item>
           <Typography.Text type="secondary" style={{ fontSize: 12, marginTop: -16, marginBottom: 16, display: 'block' }}>
             Available: {fmtQty(selectedRecord?.quantity, selectedRecord?.category === FABRIC_CATEGORY)} {selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'}
@@ -780,13 +829,12 @@ const StockManagement = () => {
                   {
                     title: 'Restock Quantity', key: 'restockQty', width: 140,
                     render: (_, record) => (
-                      <InputNumber
-                        min={0}
-                        step={record.category === FABRIC_CATEGORY ? 0.125 : 1}
+                      <QtyInput
+                        isFabric={record.category === FABRIC_CATEGORY}
                         value={restockQuantities[record.product_id] || 0}
-                        onChange={(val) => handleRestockQtyChange(record.product_id, val || 0)}
-                        style={{ width: '100%' }}
                         disabled={!selectedRestockIds.has(record.product_id)}
+                        min={0}
+                        onChange={(val) => handleRestockQtyChange(record.product_id, val || 0)}
                       />
                     ),
                   },

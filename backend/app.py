@@ -57,7 +57,7 @@ def create_app():
         from models import (
             User, Location, Category, Product, Order, OrderItem,
             Payment, Inventory, StockTransfer, StockAdjustment, ActivityLog,
-            PasswordResetToken,
+            PasswordResetToken, StockRequest,
         )
         db.create_all()
 

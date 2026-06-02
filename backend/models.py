@@ -152,6 +152,24 @@ class ActivityLog(db.Model):
     user = db.relationship("User")
 
 
+class StockRequest(db.Model):
+    __tablename__ = "Stock_Requests"
+    request_id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
+    from_location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
+    to_location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
+    requested_by = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
+    quantity = db.Column(db.Float, nullable=False)
+    description = db.Column(db.String)
+    status = db.Column(db.String, nullable=False, default="pending")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.now)
+    product = db.relationship("Product")
+    from_location = db.relationship("Location", foreign_keys=[from_location_id])
+    to_location = db.relationship("Location", foreign_keys=[to_location_id])
+    requester = db.relationship("User", foreign_keys=[requested_by])
+
+
 class StoreReport(db.Model):
     __tablename__ = "Store_Reports"
     report_id = db.Column(db.Integer, primary_key=True)
