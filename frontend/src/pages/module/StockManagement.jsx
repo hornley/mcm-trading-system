@@ -530,6 +530,7 @@ const StockManagement = () => {
   ];
 
   const qtyValue = Form.useWatch('quantity', adjustForm);
+  const transferQtyValue = Form.useWatch('quantity', transferForm);
 
   const handleQtyChange = (delta) => {
     const isFab = selectedRecord?.category === FABRIC_CATEGORY;
@@ -538,6 +539,16 @@ const StockManagement = () => {
     const current = qtyValue ?? min;
     const newVal = Math.max(min, +((current + delta).toFixed(2)));
     adjustForm.setFieldsValue({ quantity: newVal });
+  };
+
+  const handleTransferQtyChange = (delta) => {
+    const isFab = selectedRecord?.category === FABRIC_CATEGORY;
+    const step = isFab ? 0.25 : 1;
+    const min = isFab ? 0.25 : 1;
+    const max = selectedRecord?.quantity || Infinity;
+    const current = transferQtyValue ?? min;
+    const newVal = Math.min(max, Math.max(min, +((current + delta).toFixed(2))));
+    transferForm.setFieldsValue({ quantity: newVal });
   };
 
   if (loading && inventory.length === 0) return <Card style={{ textAlign: 'center' }}><Spin size="large" /></Card>;
@@ -797,8 +808,48 @@ const StockManagement = () => {
               ))}
             </Select>
           </Form.Item>
-          <Form.Item name="quantity" label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} rules={[{ required: true, message: 'Please enter quantity' }]}>
-            <InputNumber min={selectedRecord?.category === FABRIC_CATEGORY ? 0.125 : 1} max={selectedRecord?.quantity || 1} step={selectedRecord?.category === FABRIC_CATEGORY ? 0.125 : 1} style={{ width: '100%' }} placeholder="Enter quantity" />
+          <Form.Item label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} required>
+            <Row align="middle" gutter={4} wrap={false}>
+              <Col>
+                <Button
+                  size="small"
+                  icon={<MinusOutlined />}
+                  onClick={() => handleTransferQtyChange(-(selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1))}
+                />
+              </Col>
+              <Col flex="auto">
+                <Form.Item name="quantity" noStyle rules={[{ required: true, message: 'Please enter quantity' }]}>
+                  <InputNumber
+                    controls={false}
+                    min={selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1}
+                    max={selectedRecord?.quantity || 1}
+                    step={selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1}
+                    precision={selectedRecord?.category === FABRIC_CATEGORY ? undefined : 0}
+                    formatter={(value) => qtyLabel(Number(value))}
+                    parser={(display) => {
+                      const fracMap = { '¼': 0.25, '½': 0.5, '¾': 0.75 };
+                      for (const [char, val] of Object.entries(fracMap)) {
+                        if (display.includes(char)) {
+                          const before = display.split(char)[0].trim();
+                          const whole = before ? parseInt(before) || 0 : 0;
+                          return whole + val;
+                        }
+                      }
+                      const num = parseFloat(display.replace(/[^\d.]/g, ''));
+                      return isNaN(num) ? 0 : num;
+                    }}
+                    style={{ width: '100%', textAlign: 'center' }}
+                  />
+                </Form.Item>
+              </Col>
+              <Col>
+                <Button
+                  size="small"
+                  icon={<PlusOutlined />}
+                  onClick={() => handleTransferQtyChange(selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1)}
+                />
+              </Col>
+            </Row>
           </Form.Item>
           <Typography.Text type="secondary" style={{ fontSize: 12, marginTop: -16, marginBottom: 16, display: 'block' }}>
             Available: {fmtQty(selectedRecord?.quantity, selectedRecord?.category === FABRIC_CATEGORY)} {selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'}
