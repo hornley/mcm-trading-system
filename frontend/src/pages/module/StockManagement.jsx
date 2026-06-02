@@ -4,9 +4,9 @@ import {
   Tag, Modal, Statistic, Space, Descriptions, Form, InputNumber,
   DatePicker, message, Spin, Segmented, Checkbox,
 } from 'antd';
-import { PlusOutlined, MinusOutlined } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { FABRIC_CATEGORY, fmtQty, qtyLabel } from '../../utils/format.js';
+import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js';
+import QtyInput from '../../components/QtyInput.jsx';
 
 const { Search, TextArea } = Input;
 
@@ -529,28 +529,6 @@ const StockManagement = () => {
     },
   ];
 
-  const qtyValue = Form.useWatch('quantity', adjustForm);
-  const transferQtyValue = Form.useWatch('quantity', transferForm);
-
-  const handleQtyChange = (delta) => {
-    const isFab = selectedRecord?.category === FABRIC_CATEGORY;
-    const step = isFab ? 0.25 : 1;
-    const min = isFab ? 0.25 : 1;
-    const current = qtyValue ?? min;
-    const newVal = Math.max(min, +((current + delta).toFixed(2)));
-    adjustForm.setFieldsValue({ quantity: newVal });
-  };
-
-  const handleTransferQtyChange = (delta) => {
-    const isFab = selectedRecord?.category === FABRIC_CATEGORY;
-    const step = isFab ? 0.25 : 1;
-    const min = isFab ? 0.25 : 1;
-    const max = selectedRecord?.quantity || Infinity;
-    const current = transferQtyValue ?? min;
-    const newVal = Math.min(max, Math.max(min, +((current + delta).toFixed(2))));
-    transferForm.setFieldsValue({ quantity: newVal });
-  };
-
   if (loading && inventory.length === 0) return <Card style={{ textAlign: 'center' }}><Spin size="large" /></Card>;
 
   return (
@@ -737,46 +715,9 @@ const StockManagement = () => {
             </>
           )}
           <Form.Item label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} required>
-            <Row align="middle" gutter={4} wrap={false}>
-              <Col>
-                <Button
-                  size="small"
-                  icon={<MinusOutlined />}
-                  onClick={() => handleQtyChange(-(selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1))}
-                />
-              </Col>
-              <Col flex="auto">
-                <Form.Item name="quantity" noStyle rules={[{ required: true, message: 'Please enter quantity' }]}>
-                  <InputNumber
-                    controls={false}
-                    min={selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1}
-                    step={selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1}
-                    precision={selectedRecord?.category === FABRIC_CATEGORY ? undefined : 0}
-                    formatter={(value) => qtyLabel(Number(value))}
-                    parser={(display) => {
-                      const fracMap = { '¼': 0.25, '½': 0.5, '¾': 0.75 };
-                      for (const [char, val] of Object.entries(fracMap)) {
-                        if (display.includes(char)) {
-                          const before = display.split(char)[0].trim();
-                          const whole = before ? parseInt(before) || 0 : 0;
-                          return whole + val;
-                        }
-                      }
-                      const num = parseFloat(display.replace(/[^\d.]/g, ''));
-                      return isNaN(num) ? 0 : num;
-                    }}
-                    style={{ width: '100%', textAlign: 'center' }}
-                  />
-                </Form.Item>
-              </Col>
-              <Col>
-                <Button
-                  size="small"
-                  icon={<PlusOutlined />}
-                  onClick={() => handleQtyChange(selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1)}
-                />
-              </Col>
-            </Row>
+            <Form.Item name="quantity" noStyle rules={[{ required: true, message: 'Please enter quantity' }]}>
+              <QtyInput isFabric={selectedRecord?.category === FABRIC_CATEGORY} />
+            </Form.Item>
           </Form.Item>
           <Form.Item name="remarks" label={requestPreset ? 'Description (optional)' : 'Remarks (optional)'}>
             <TextArea rows={2} placeholder={requestPreset ? 'Additional notes for the request' : 'Additional notes'} />
@@ -809,47 +750,9 @@ const StockManagement = () => {
             </Select>
           </Form.Item>
           <Form.Item label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} required>
-            <Row align="middle" gutter={4} wrap={false}>
-              <Col>
-                <Button
-                  size="small"
-                  icon={<MinusOutlined />}
-                  onClick={() => handleTransferQtyChange(-(selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1))}
-                />
-              </Col>
-              <Col flex="auto">
-                <Form.Item name="quantity" noStyle rules={[{ required: true, message: 'Please enter quantity' }]}>
-                  <InputNumber
-                    controls={false}
-                    min={selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1}
-                    max={selectedRecord?.quantity || 1}
-                    step={selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1}
-                    precision={selectedRecord?.category === FABRIC_CATEGORY ? undefined : 0}
-                    formatter={(value) => qtyLabel(Number(value))}
-                    parser={(display) => {
-                      const fracMap = { '¼': 0.25, '½': 0.5, '¾': 0.75 };
-                      for (const [char, val] of Object.entries(fracMap)) {
-                        if (display.includes(char)) {
-                          const before = display.split(char)[0].trim();
-                          const whole = before ? parseInt(before) || 0 : 0;
-                          return whole + val;
-                        }
-                      }
-                      const num = parseFloat(display.replace(/[^\d.]/g, ''));
-                      return isNaN(num) ? 0 : num;
-                    }}
-                    style={{ width: '100%', textAlign: 'center' }}
-                  />
-                </Form.Item>
-              </Col>
-              <Col>
-                <Button
-                  size="small"
-                  icon={<PlusOutlined />}
-                  onClick={() => handleTransferQtyChange(selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1)}
-                />
-              </Col>
-            </Row>
+            <Form.Item name="quantity" noStyle rules={[{ required: true, message: 'Please enter quantity' }]}>
+              <QtyInput isFabric={selectedRecord?.category === FABRIC_CATEGORY} max={selectedRecord?.quantity || 1} />
+            </Form.Item>
           </Form.Item>
           <Typography.Text type="secondary" style={{ fontSize: 12, marginTop: -16, marginBottom: 16, display: 'block' }}>
             Available: {fmtQty(selectedRecord?.quantity, selectedRecord?.category === FABRIC_CATEGORY)} {selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'}
@@ -920,56 +823,15 @@ const StockManagement = () => {
                   },
                   {
                     title: 'Restock Quantity', key: 'restockQty', width: 140,
-                    render: (_, record) => {
-                      const isFab = record.category === FABRIC_CATEGORY;
-                      const step = isFab ? 0.25 : 1;
-                      const qty = restockQuantities[record.product_id] || 0;
-                      const disabled = !selectedRestockIds.has(record.product_id);
-                      return (
-                        <Row align="middle" gutter={2} wrap={false}>
-                          <Col>
-                            <Button
-                              size="small"
-                              icon={<MinusOutlined />}
-                              disabled={disabled}
-                              onClick={() => handleRestockQtyChange(record.product_id, Math.max(0, +((qty - step).toFixed(2))))}
-                            />
-                          </Col>
-                          <Col flex="auto">
-                            <InputNumber
-                              controls={false}
-                              min={0}
-                              step={step}
-                              value={qty}
-                              disabled={disabled}
-                              formatter={(value) => qtyLabel(Number(value))}
-                              parser={(display) => {
-                                const fracMap = { '¼': 0.25, '½': 0.5, '¾': 0.75 };
-                                for (const [char, val] of Object.entries(fracMap)) {
-                                  if (display.includes(char)) {
-                                    const before = display.split(char)[0].trim();
-                                    const whole = before ? parseInt(before) || 0 : 0;
-                                    return whole + val;
-                                  }
-                                }
-                                const num = parseFloat(display.replace(/[^\d.]/g, ''));
-                                return isNaN(num) ? 0 : num;
-                              }}
-                              onChange={(val) => handleRestockQtyChange(record.product_id, val || 0)}
-                              style={{ width: '100%', textAlign: 'center' }}
-                            />
-                          </Col>
-                          <Col>
-                            <Button
-                              size="small"
-                              icon={<PlusOutlined />}
-                              disabled={disabled}
-                              onClick={() => handleRestockQtyChange(record.product_id, +((qty + step).toFixed(2)))}
-                            />
-                          </Col>
-                        </Row>
-                      );
-                    },
+                    render: (_, record) => (
+                      <QtyInput
+                        isFabric={record.category === FABRIC_CATEGORY}
+                        value={restockQuantities[record.product_id] || 0}
+                        disabled={!selectedRestockIds.has(record.product_id)}
+                        min={0}
+                        onChange={(val) => handleRestockQtyChange(record.product_id, val || 0)}
+                      />
+                    ),
                   },
                 ]}
               />
