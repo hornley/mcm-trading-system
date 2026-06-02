@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app import create_app
 from models import db, User, Location, Category, Product, Order, OrderItem
-from models import Payment, Inventory, StockTransfer, StockAdjustment, ActivityLog
+from models import Payment, Inventory, StockTransfer, StockAdjustment, ActivityLog, ManualSection
 from werkzeug.security import generate_password_hash
 
 
@@ -238,6 +238,10 @@ def seed(skip_drop=False):
             ))
         db.session.flush()
 
+        # ── 10. MANUAL SECTIONS (Owner) ──
+        seed_manual_sections()
+        db.session.flush()
+
         db.session.commit()
         print("\n[OK] Database seeded successfully!")
         print(f"  Locations:       {len(locs)}")
@@ -249,6 +253,1182 @@ def seed(skip_drop=False):
         print(f"  Transfers:       50")
         print(f"  Adjustments:     50")
         print(f"  Activity Logs:   200")
+        print(f"  Manual Sections: {len(owner_sections)}")
+
+
+def seed_manual_sections():
+    print("Seeding Owner Manual...")
+    if ManualSection.query.first():
+        print("[OK] Manual sections already exist. Skipping.")
+        return
+    global owner_sections
+    owner_sections = [
+        # --- 1. Getting Started ---
+        ManualSection(role="owner", parent_id=None, sort_order=1, title="Getting Started",
+            content="""### System Overview
+
+Manco (MCM) Trading is a full-featured inventory, stock, and sales management system. As the **Owner**, you have unrestricted access to all modules and features, including full create, read, update, and delete permissions.
+
+### Logging In
+
+1. Open your browser and navigate to the system URL.
+2. Enter your **Username** and **Password** on the login page.
+3. Click **Sign In**.
+4. You will be redirected to the **Owner Dashboard**.
+
+> **Tip:** If you forget your password, click the **Forgot Password?** link on the login page to receive a reset link via email.
+
+### Dashboard Layout
+
+After logging in, the main interface consists of four areas:
+
+- **Sidebar** (left) — Navigation menu for all modules. Click any item to switch pages. The sidebar can be collapsed using the hamburger icon at the top.
+- **Topbar** (top) — Branch selector (to scope data to a specific location), notification bell, and Logout button.
+- **Content Area** (center) — The main workspace where the selected module is displayed.
+- **Footer** (bottom) — System copyright information.
+
+### Branch Selector
+
+Use the **Branch** dropdown in the topbar to filter data by location:
+
+- **All Branches** — Shows data across every location.
+- **Specific Branch** — Shows data for that location only.
+
+> **Note:** Some actions (e.g., Adjust Stock) require a specific branch to be selected — they are disabled when "All Branches" is active.
+
+### Dark Mode & Font Size
+
+1. Go to **Settings** → **Personalization**.
+2. Choose **Light** or **Dark** theme.
+3. Choose your preferred **Font Size** (Small, Medium, Large, Extra Large).
+4. Click **Save Preferences**. The change applies immediately across the entire system."""),
+
+            # --- 2. Owner Dashboard ---
+            ManualSection(role="owner", parent_id=None, sort_order=2, title="Owner Dashboard",
+                content="""The Owner Dashboard provides a high-level overview of the entire business. It is the first page you see after logging in and is located at **Dashboard** in the sidebar.
+
+### Stat Cards
+
+Four stat cards appear at the top:
+
+| Card | Description |
+|---|---|
+| **Total Inventory Items** | Sum of all stock quantities across all branches |
+| **Sales Today** | Total revenue generated today |
+| **Low Stock Alerts** | Number of products below their reorder level |
+| **Active Users** | Number of users who have logged in recently |
+
+Each card shows:
+- The current value
+- A **trend indicator** (up/down arrow with percentage change compared to last week)
+- A **View** button to drill down into detailed data
+
+### Stock Health Bar
+
+Below the stat cards, a horizontal bar visualizes the overall health of your inventory:
+- **Green** segment — Items that are adequately stocked
+- **Orange** segment — Items that are low stock
+
+### Stock Movement Chart
+
+This 7-day composed chart shows:
+- **Green bars** — Stock received (in)
+- **Red bars** — Stock sold or removed (out)
+- **Blue line** — 3-day moving average of stock-in, smoothing daily fluctuations
+
+Below the chart:
+- **Net change** — Total in minus total out for the week
+- **Stock runway** — Estimated number of days until stock runs out at the current outflow rate
+
+### Stock by Category (Donut Chart)
+
+A visual breakdown of inventory distribution across product categories. Hover over each segment to see exact quantities.
+
+### Recent Transactions
+
+A table showing the most recent sales transactions with product, quantity, amount, branch, and status. Click any row or the **View All Sales** button to open a detailed modal.
+
+### Low Stock Items
+
+A table listing products that need attention. Items are highlighted:
+- **Red row** — Out of stock (quantity = 0)
+- **Orange row** — Low stock (quantity ≤ 5)
+
+Click **View All** to open the Stock Alerts modal with full details."""),
+
+            # --- 3. Inventory Management ---
+            ManualSection(role="owner", parent_id=None, sort_order=3, title="Inventory Management",
+                content="""The Inventory module allows you to manage the product catalog. Access it via **Inventory** in the sidebar.
+
+### Viewing Products
+
+The products table displays:
+- **Product Name** — Click column header to sort alphabetically
+- **Category** — Sorted by category name
+- **Stock Quantity** — Current stock across the selected branch
+- **Unit** — Measurement unit (piece, meter, yard, etc.)
+- **Base Price** — Selling price in Philippine Pesos
+- **Reorder Level** — Minimum stock threshold
+- **Status** — Active (green) or Voided (red)
+
+**Filters:**
+- **Search** — Type a product name to filter the list
+- **Category Filter** — Select a category from the dropdown
+
+### Adding a Product
+
+1. Click the **Add Product** button.
+2. Fill in the form:
+   - **Product Name** (required)
+   - **Category** (required — select from the dropdown)
+   - **SKU** (auto-generated if left blank)
+   - **Base Price** (required — enter amount in ₱)
+   - **Unit** (e.g., piece, meter, yard)
+   - **Reorder Level** (when stock drops below this, the system flags it as low)
+   - **Description** (optional notes)
+3. Click **Save**.
+
+### Editing a Product
+
+1. Click **Edit** on the desired product row.
+2. Modify any fields in the form.
+3. Click **Save**.
+
+> **Note:** The SKU field is only shown when creating a new product, not during editing.
+
+### Adjusting Stock
+
+1. Select a **specific branch** from the Topbar (not "All Branches").
+2. Click **Adjust** on the product row.
+3. Choose **Add Stock** (increase) or **Remove Stock** (decrease).
+4. Enter the quantity and a reason (e.g., "New shipment", "Damaged goods").
+5. Click **Save**.
+
+### Voiding a Product
+
+1. Click **Void** on an active product.
+2. Confirm the action in the popup dialog.
+3. The product's status changes to **Voided** (red tag).
+4. Voided products no longer appear in POS or stock operations but remain in the database.
+
+### Deleting a Voided Product
+
+1. After voiding, the **Delete** button appears.
+2. Click **Delete** and confirm to permanently remove the product.
+3. This action **cannot be undone**."""),
+
+            # --- 4. Sales Module ---
+            ManualSection(role="owner", parent_id=None, sort_order=4, title="Sales Module",
+                content="""The Sales module handles transaction creation, viewing, and management. Access it via **Sales** in the sidebar.
+
+### Sales Overview Stats
+
+Three stat cards at the top provide a quick snapshot:
+- **Total Sales Today** — Revenue generated today
+- **Total Sales This Month** — Revenue generated this month
+- **Total Transactions Today** — Number of orders placed today
+
+### Viewing Transactions
+
+The transactions table includes:
+- **Transaction ID** — Unique order number (click to sort)
+- **Branch** — Where the sale occurred
+- **Date** — Order date
+- **Items** — Product names (expand by clicking on items with multiple products)
+- **Total Amount** — Order total in ₱
+- **Payment** — Payment method and amount received
+- **Status** — Completed (green) or Voided (red)
+- **Actions** — View Receipt and Void buttons
+
+**Filters:**
+- **Search** — Type a transaction ID
+- **Date Range** — Filter by order date
+- **Status** — Show only Completed or Voided transactions
+
+### Creating a Sale (POS)
+
+Click **Add Sale** to open the Point-of-Sale modal:
+
+**Step 1 — Select Category:**
+- Browse available categories displayed as cards.
+- Click a category to view its products.
+
+**Step 2 — Add Products:**
+- **Quick Add** — Tap a product card to add one unit to cart.
+- **Custom Quantity** — Long-press (hold for 500ms) a product card to open a quantity selector.
+- Products already in cart show a red border and "In cart" label.
+
+**Step 3 — Review Cart:**
+The right panel shows your cart with:
+- Product name and per-item total
+- **+ / -** buttons to adjust quantities
+- **Delete** button to remove an item
+- **Grand Total** displayed at the bottom
+
+**Step 4 — Process Payment:**
+- Click **Confirm Order** to proceed to payment.
+- Select the **Order Date** (defaults to today).
+- Choose a **Payment Method** (Cash, Card, GCash, Bank Transfer).
+- Enter the **Payment Amount** (must be at least the grand total).
+- The **Change** is computed automatically.
+- Click **Confirm Payment** to finalize.
+
+### Receipt
+
+After confirming, a receipt modal appears with:
+- Company information (name, address, VAT TIN)
+- Line items with quantities and amounts
+- Total amount, payment received, and change
+- VAT breakdown (Vatable Sales, VAT 12%)
+- BIR-mandated fields (MIN No., Sales Invoice No., POS Permit)
+
+Click **Print Receipt** or **Close**.
+
+### Viewing Receipts
+
+Click **View Receipt** on any past transaction to re-open the receipt modal with full details.
+
+### Voiding a Transaction
+
+1. Click **Void** on the transaction row.
+2. Confirm by clicking **Yes** in the popup.
+3. The transaction status changes to **Voided**.
+4. The system automatically restores the inventory quantities.
+
+> **Important:** Voiding a transaction reverses the stock deduction. If auto-restock was triggered during the original sale, the receipt will note this.
+
+### Viewing Total Sales
+
+Click **View Total Sales** to open an aggregated view:
+- **Branch Filter** (Owner only) — Select a specific branch or "All Branches".
+- **Date Range** — Filter the period.
+- **Aggregated Table** — Shows each product with:
+  - Total Quantity Sold
+  - Total Amount
+  - A **Summary Row** at the bottom with the grand total.
+
+### Auto-Restock
+
+When a sale causes stock to drop below the reorder level, the system automatically transfers stock from the **Storehouse** location. This is noted on the receipt with the product name and quantity transferred."""),
+
+            # --- 5. Stock Management ---
+            ManualSection(role="owner", parent_id=None, sort_order=5, title="Stock Management",
+                content="""The Stock Management module provides detailed control over inventory quantities across all branches. Access it via **Stock Management** in the sidebar.
+
+### Stock Overview Stats
+
+Three cards at the top:
+- **Total Items** — Sum of all inventory quantities
+- **Low Stock** — Products below their reorder level (≤ reorder_level)
+- **Out of Stock** — Products with zero quantity
+
+### Inventory Table
+
+The main table shows stock levels per product per branch with:
+- **Product Name** and **SKU**
+- **Branch** — Location name
+- **Quantity** — Current stock
+- **Status** tag — Green (In Stock), Orange (Low Stock, ≤10), Red (Out of Stock, =0)
+- **Actions** — Adjust, Transfer, Request Stock, View Details, Set Reorder
+
+**Filters & Sort:**
+- **Search** by product name
+- **Sort by** dropdown (Product Name, Category, Quantity, Status)
+- **Sort order** (Ascending / Descending)
+- **Status filter** (In Stock / Low Stock / Out of Stock)
+
+### Adjusting Stock
+
+1. Select a **specific branch** (not "All Branches").
+2. Click **Adjust** on the desired row.
+3. Choose **Add Stock** or **Remove Stock**.
+4. Select a **Reason** (Restock, Damaged, Correction, Sample, Sales Return).
+5. Enter quantity and optional remarks.
+6. Click **Save**.
+
+### Stock Transfers
+
+Move stock between branches:
+1. Click **Transfer** on a product row.
+2. The **From Location** is pre-set to the current branch.
+3. Select the **To Location** (destination branch).
+4. Enter the **Quantity** and optional **Remarks**.
+5. Optionally set a **Transfer Date** (defaults to now).
+6. Click **Save**.
+
+### Stock Requests
+
+Request stock from the storehouse:
+1. Click **Request Stock** on a product row.
+2. Select the **From Location** (usually the storehouse).
+3. Enter the **Quantity** needed.
+4. Add a **Description** explaining why.
+5. Click **Submit**.
+6. The request appears in the Owner's notification panel for approval.
+
+### Movement History
+
+Click **View Details** on any product to see:
+- Product information (name, SKU, category, unit)
+- A **Movement History** table showing each stock change:
+  - Date and time
+  - Type (Adjustment, Transfer In, Transfer Out, Sale, Restock)
+  - Quantity change (+/-)
+  - Location
+  - Reason
+
+### Setting Reorder Levels
+
+1. Click **Set Reorder** on a product row.
+2. Enter the new reorder level.
+3. Click **Save**.
+4. The product will now trigger low-stock alerts when quantity drops below this level.
+
+### Bulk Restock
+
+Restock multiple low-stock items at once:
+1. Click **Bulk Restock Below Reorder**.
+2. A checklist appears showing all products below their reorder level, with the storehouse as source.
+3. For each product, you can override the default quantity.
+4. Click **Generate Order Summary** to review.
+5. Confirm to execute all restocks simultaneously.
+
+### Restock All Below Threshold
+
+Click **Restock All Below Threshold** to automatically restock every product whose current quantity is below its reorder level. The system restocks up to the reorder level from the storehouse."""),
+
+            # --- 6. User Access ---
+            ManualSection(role="owner", parent_id=None, sort_order=6, title="User Access Management",
+                content="""The User Access module lets you manage system users and their permissions. Access it via **Manage Users** in the sidebar (Owner only).
+
+### Viewing Users
+
+The table lists all registered users with:
+- **Username** — Login name
+- **Email** — User's email address
+- **Role** — Owner, Manager, or Admin
+- **Location** — Assigned branch
+- **Status** — Active or Inactive
+
+### Editing User Roles
+
+1. Click **Edit** on the desired user row.
+2. The Role field becomes a dropdown. Select the new role:
+   - **Owner** — Full access to everything
+   - **Manager** — Read/update access, branch-scoped. Cannot create or delete.
+   - **Admin** — Full access, limited to maintenance and settings modules.
+3. Changes take effect immediately.
+
+### Assigning Locations
+
+1. In edit mode, the **Location** field becomes a dropdown.
+2. Select the branch the user should be associated with.
+3. Managers are automatically scoped to their assigned location in all modules.
+
+### Restrictions
+
+- **Owner accounts** cannot have their **Location** changed (the dropdown is disabled).
+- Only the **Owner** role can access the User Access page.
+- Managers attempting to navigate to this URL will see a 403 error message.
+
+### Permission Matrix
+
+| Action | Owner | Manager | Admin |
+|---|---|---|---|
+| Create products | ✓ | ✗ | — |
+| Edit products | ✓ | ✓ | — |
+| Delete products | ✓ | ✗ | — |
+| Create sales | ✓ | ✓ | — |
+| Void transactions | ✓ | ✓ | — |
+| Manage users | ✓ | ✗ | — |
+| Maintenance | ✓ | ✗ | ✓ |
+| Settings | ✓ | ✓ | ✓ |
+| Reports | ✓ | ✓ | ✓ |"""),
+
+            # --- 7. Reports ---
+            ManualSection(role="owner", parent_id=None, sort_order=7, title="Reports",
+                content="""The Reports module provides data analysis and reporting tools. Access it via **Reports** in the sidebar.
+
+### Inventory Reports
+
+**Stock Levels by Branch:**
+- Table view: Branch name, total items, total quantity.
+- Chart view: Bar chart visual comparison. Toggle between table/chart with the button in the card header.
+
+**Stock Distribution:**
+- Pie chart showing the proportion of stock across branches.
+- Use the **Filter by Product** dropdown to see distribution for a specific product.
+
+**Low Stock Items:**
+- Table listing all low-stock products with product name, SKU, branch, current stock, and reorder level.
+
+### Sales Reports
+
+- **Period Selector** — Choose 7, 30, or 90 days.
+- **Stats Cards** — Total Orders, Total Revenue, Avg Order Value.
+- **Daily Sales Trend** — Bar chart of revenue per day.
+- **Top Products** — Table of best-selling products by quantity and revenue.
+
+### Financial Reports
+
+- **Period Selector** — 30, 90, or 365 days.
+- **Stats Cards** — Total Revenue and Total Orders.
+- **Revenue by Date** — Table with date, order count, and revenue.
+- **Payment Methods** — Breakdown of transactions and amounts by payment method (Cash, Card, GCash, Bank Transfer).
+
+### Activity Reports
+
+- **Period Selector** — 7, 30, or 90 days.
+- **Stats Cards** — Total Actions and Unique Users.
+- **Per-User Activity** — Table of actions performed by each user.
+- **Per-Module Activity** — Table of actions grouped by module.
+
+**Store Reports:**
+- Create, edit, and view issue reports.
+- **Issue Types:** Store Issue, Materials Issue, Software Issue.
+- **Statuses:** Pending (orange), Resolved (green), Voided (red).
+- Click **Resolve** to mark a pending report as resolved (shows who resolved it and when).
+- Only the report creator can edit or void their own pending reports.
+
+### System Reports
+
+- **Stats Cards** — Backups count, Activity in last 7 days, Activity in last 30 days.
+- **Backup History** — Table of backup files with filename, size, and creation date."""),
+
+            # --- 8. System Maintenance ---
+            ManualSection(role="owner", parent_id=None, sort_order=8, title="System Maintenance",
+                content="""The Maintenance module provides database administration tools. Access it via **Maintenance** in the sidebar.
+
+### System Information
+
+View key database metrics:
+- **Database Size** — Current size on disk
+- **SQLite Version** — Database engine version
+- **Backups** — Number of existing backups
+- **Application** — App name and version
+- **Table Records** — Count of records in each table
+
+### Backup & Restore
+
+**Create Backup:**
+1. Go to the **Backup & Restore** tab.
+2. Click **Create Backup**.
+3. The system creates a JSON dump of all tables.
+4. The backup appears in the list with filename, size, and timestamp.
+
+**Restore from Backup:**
+1. Find the backup file in the list.
+2. Click **Restore**.
+3. Confirm the action. **This will replace the current database** with the backup.
+4. The system restarts with the restored data.
+
+**Delete Backup:**
+1. Click **Delete** on a backup file.
+2. Confirm to permanently remove it.
+
+### Integrity Check
+
+1. Go to the **Maintenance** tab.
+2. Click **Run Integrity Check**.
+3. Results show:
+   - **Passed / Failed** status
+   - **FK Violations** count
+   - Detailed list of any issues found
+
+### Database Optimization
+
+**VACUUM Database:**
+- Reclaims unused space in the database file.
+- Shows size before, size after, space saved, and duration.
+
+**REINDEX:**
+- Rebuilds all database indexes for better query performance.
+- Shows duration and confirms indexes rebuilt.
+
+### Data Cleanup
+
+1. Go to the **Cleanup** tab.
+2. Configure the **Retention Period** (days). Default: 90.
+3. Select categories to clean:
+   - **Purge old activity logs**
+   - **Permanently delete voided products**
+   - **Clean old/cancelled transfers**
+4. Click **Run Cleanup**.
+5. Confirm the action. Results show how many records were deleted per category."""),
+
+            # --- 9. Notifications ---
+            ManualSection(role="owner", parent_id=None, sort_order=9, title="Notifications",
+                content="""The notification system keeps you informed of pending stock requests from managers.
+
+### Bell Icon
+
+- Located in the **Topbar** next to the Logout button.
+- A badge shows the number of **pending stock requests**.
+- The counter updates automatically every 30 seconds.
+
+### Pending Requests Panel
+
+Click the bell icon to open the notification panel. Each request shows:
+- **Requester** — The manager who submitted the request (with avatar initial)
+- **Product** — Name and requested quantity
+- **Route** — Source branch → Destination branch
+- **Time** — How long ago the request was made (e.g., "5m ago", "2h ago")
+- **Description** — Optional note from the requester
+
+### Accepting a Request
+
+1. Click **Accept** on a pending request.
+2. The system transfers the requested stock from the source to the destination branch.
+3. The request is removed from the pending list.
+
+### Declining a Request
+
+1. Click **Decline** on a pending request.
+2. The request is rejected and removed from the list.
+3. The requester is notified (via the request status change)."""),
+
+            # --- 10. Settings ---
+            ManualSection(role="owner", parent_id=None, sort_order=10, title="Settings",
+                content="""Manage your account and system preferences. Access it via **Settings** in the sidebar.
+
+### Account Information
+
+- **Username** — Read-only, displayed for reference.
+- **Role** — Read-only, shows your current role.
+- **Email** — Update your email address.
+- **Phone** — Update your phone number (Philippine format: 63+ without the leading 0).
+
+Click **Save Profile** to apply changes.
+
+### Changing Password
+
+1. Go to the **Change Password** tab.
+2. Enter your **Old Password** — it is verified against the server on blur.
+3. Enter a **New Password** that meets the requirements:
+   - Minimum 6 characters
+   - At least one uppercase letter
+   - At least one lowercase letter
+   - At least one special character
+   - At least one number
+4. **Confirm** the new password.
+5. Click **Change Password**.
+
+If you forget your password, click the **Forgot Password?** link to receive a reset link via email.
+
+### Personalization
+
+**Theme:**
+- Choose **Light** (default) or **Dark** mode.
+- The change applies immediately across all pages.
+
+**Font Size:**
+- Options: Small (12px), Medium (14px, default), Large (16px), Extra Large (32px).
+- Affects all text throughout the system.
+
+Click **Save Preferences** to persist your choices."""),
+        ]
+
+    db.session.add_all(owner_sections)
+    db.session.commit()
+    print(f"  Manual Sections: {len(owner_sections)}")
+
+
+def seed_manager_manual():
+    print("Seeding Manager Manual...")
+    if ManualSection.query.filter_by(role="manager").first():
+        print("[OK] Manager manual already exists. Skipping.")
+        return
+    sections = [
+        ManualSection(role="manager", parent_id=None, sort_order=1, title="Getting Started",
+            content="""### System Overview
+
+Manco (MCM) Trading is a full-featured inventory, stock, and sales management system. As a **Manager**, you have read and update access to your assigned branch. You can view data, edit existing records, and process sales, but you cannot create or delete products or manage other users.
+
+### Logging In
+
+1. Open your browser and navigate to the system URL.
+2. Enter your **Username** and **Password** on the login page.
+3. Click **Sign In**.
+4. You will be redirected to the **Manager Dashboard**.
+
+> **Tip:** If you forget your password, click the **Forgot Password?** link on the login page to receive a reset link via email.
+
+### Dashboard Layout
+
+After logging in, the main interface consists of four areas:
+
+- **Sidebar** (left) — Navigation menu for your available modules. The sidebar can be collapsed using the hamburger icon at the top.
+- **Topbar** (top) — Shows your assigned branch name (you cannot switch branches), notification bell, and Logout button.
+- **Content Area** (center) — The main workspace where the selected module is displayed.
+- **Footer** (bottom) — System copyright information.
+
+### Your Branch Scope
+
+As a Manager, you are assigned to a **specific branch**. All data you see is scoped to that branch:
+- You can only view and edit inventory for your branch.
+- Sales transactions shown are only those from your branch.
+- Stock adjustments and transfers are limited to your branch.
+
+### Permissions Summary
+
+| Action | You Can Do? |
+|---|---|
+| View products & inventory | ✓ |
+| Edit product details | ✓ |
+| Add / Delete / Void products | ✗ |
+| Create sales transactions | ✓ |
+| Void transactions | ✓ |
+| Adjust stock (add/remove) | ✓ |
+| Transfer stock (from your branch) | ✓ |
+| Request stock from storehouse | ✓ |
+| Access Settings | ✓ |
+| Access Reports (Store Reports only) | ✓ |
+| Manage Users / Maintenance | ✗ |
+
+### Dark Mode & Font Size
+
+1. Go to **Settings** → **Personalization**.
+2. Choose **Light** or **Dark** theme.
+3. Choose your preferred **Font Size**.
+4. Click **Save Preferences**."""),
+
+        ManualSection(role="manager", parent_id=None, sort_order=2, title="Manager Dashboard",
+            content="""The Manager Dashboard provides an overview of your branch's performance. It is the first page you see after logging in and is located at **Dashboard** in the sidebar.
+
+Your branch name is displayed below the page title.
+
+### Stat Cards
+
+Three stat cards appear at the top:
+
+| Card | Description |
+|---|---|
+| **Total Inventory Items** | Sum of all stock quantities in your branch |
+| **Sales Today** | Total revenue generated at your branch today |
+| **Low Stock Alerts** | Number of products in your branch below their reorder level |
+
+Each card shows:
+- The current value with an icon
+- A **trend indicator** (up/down arrow with percentage change compared to last week)
+- A **Navigate** button that takes you to the relevant module (Inventory, Sales, or Stock Management)
+
+### Stock Health Bar
+
+A horizontal bar visualizes the overall health of your branch's inventory:
+- **Green** segment — Items that are adequately stocked
+- **Orange** segment — Items that are low stock
+
+### Stock Movement Chart
+
+This 7-day composed chart shows stock activity for your branch:
+- **Green bars** — Stock received (in)
+- **Red bars** — Stock sold or removed (out)
+- **Blue line** — 3-day moving average of stock-in
+
+Below the chart:
+- **Net change** — Total in minus total out for the week
+- **Stock runway** — Estimated days until stock runs out at current outflow
+
+### Stock by Category (Donut Chart)
+
+A visual breakdown of your branch's inventory distribution across product categories.
+
+### Recent Sales
+
+A table showing the most recent sales at your branch. Click any row or the **View All** button to go to the Sales module.
+
+### Low Stock Items
+
+A table listing products in your branch that need attention. Items are highlighted:
+- **Red row** — Out of stock (quantity = 0)
+- **Orange row** — Low stock (quantity ≤ 5)
+
+Click **View All** to go to Stock Management."""),
+
+        ManualSection(role="manager", parent_id=None, sort_order=3, title="Inventory Management",
+            content="""The Inventory module allows you to view and edit your branch's product catalog. Access it via **Inventory** in the sidebar.
+
+> **Note:** You can **view and edit** products but cannot add new products, delete, void, or adjust stock from this module. Use Stock Management for quantity changes.
+
+### Viewing Products
+
+The products table displays:
+- **Product Name** — Click column header to sort
+- **Category** — Sorted by category name
+- **Stock Quantity** — Current stock in your branch
+- **Unit** — Measurement unit
+- **Base Price** — Selling price in Philippine Pesos
+- **Reorder Level** — Minimum stock threshold
+- **Status** — Active (green) or Voided (red)
+
+**Filters:**
+- **Search** — Type a product name
+- **Category Filter** — Select a category from the dropdown
+
+### Editing a Product
+
+1. Click **Edit** on the desired product row.
+2. Modify any of the following fields:
+   - **Product Name**
+   - **Base Price**
+   - **Unit**
+   - **Reorder Level**
+   - **Description**
+3. Click **Save**.
+
+> **Note:** You cannot change the product's **Category** or **SKU**.
+
+### What You Cannot Do
+
+The following actions are not available to Managers in Inventory:
+- **Add Product** — Contact the Owner to add new products.
+- **Void Product** — Only the Owner can void products.
+- **Delete Product** — Only the Owner can permanently delete voided products.
+- **Adjust Stock** — Use the Stock Management module for quantity changes."""),
+
+        ManualSection(role="manager", parent_id=None, sort_order=4, title="Sales Module",
+            content="""The Sales module lets you create and manage transactions for your branch. Access it via **Sales** in the sidebar.
+
+### Sales Overview Stats
+
+Three stat cards scoped to your branch:
+- **Total Sales Today** — Revenue generated today at your branch
+- **Total Sales This Month** — Revenue this month
+- **Total Transactions Today** — Number of orders placed today
+
+### Viewing Transactions
+
+The transactions table shows only your branch's sales:
+- **Transaction ID** — Unique order number
+- **Date** — Order date
+- **Items** — Product names (expand by clicking on items with multiple products)
+- **Total Amount** — Order total in ₱
+- **Payment** — Payment method and amount received
+- **Status** — Completed (green) or Voided (red)
+- **Actions** — View Receipt and Void buttons
+
+**Filters:**
+- **Search** — Type a transaction ID
+- **Date Range** — Filter by order date
+- **Status** — Show only Completed or Voided
+
+### Creating a Sale (POS)
+
+Click **Add Sale** to open the Point-of-Sale modal:
+
+**Step 1 — Select Category:**
+- Browse available categories displayed as cards.
+- Click a category to view its products.
+
+**Step 2 — Add Products:**
+- **Quick Add** — Tap a product card to add one unit.
+- **Custom Quantity** — Long-press (hold for 500ms) to open a quantity selector.
+- Products in cart show a red border.
+
+**Step 3 — Review Cart:**
+The right panel shows:
+- Product name and line total
+- **+ / -** buttons to adjust quantities
+- **Delete** button to remove items
+- **Grand Total** at the bottom
+
+**Step 4 — Process Payment:**
+- Click **Confirm Order**.
+- Select **Order Date** (defaults to today).
+- Choose a **Payment Method** (Cash, Card, GCash, Bank Transfer).
+- Enter the **Payment Amount** (must be at least the total).
+- Click **Confirm Payment**.
+
+### Receipt
+
+After confirming, a receipt modal appears with company info, line items, VAT breakdown, and change. Click **Print Receipt** or **Close**.
+
+### Voiding a Transaction
+
+1. Click **Void** on the transaction row.
+2. Confirm in the popup.
+3. The transaction status changes to **Voided** and inventory is restored.
+
+> **Important:** Voiding reverses stock deduction. If auto-restock was triggered during the sale, it will be noted on the receipt.
+
+### Viewing Total Sales
+
+Click **View Total Sales** to see an aggregated view:
+- The branch is locked to your assigned location (no branch selector).
+- Filter by **Date Range**.
+- Each product shows Total Quantity Sold and Total Amount.
+- A **Summary Row** at the bottom shows the grand total.
+
+### Auto-Restock
+
+When a sale drops stock below the reorder level, the system automatically transfers stock from the **Storehouse** to your branch. This is noted on the receipt."""),
+
+        ManualSection(role="manager", parent_id=None, sort_order=5, title="Stock Management",
+            content="""The Stock Management module lets you control inventory levels for your branch. Access it via **Stock Management** in the sidebar.
+
+### Stock Overview Stats
+
+Three cards scoped to your branch:
+- **Total Items** — Sum of all inventory quantities
+- **Low Stock** — Products below reorder level
+- **Out of Stock** — Products with zero quantity
+
+### Inventory Table
+
+Shows stock levels for products in your branch with:
+- **Product Name** and **SKU**
+- **Quantity** — Current stock
+- **Status** tag — Green (In Stock), Orange (Low Stock, ≤10), Red (Out of Stock, =0)
+- **Actions** — Adjust, Transfer, Request Stock, View Details, Set Reorder
+
+### Adjusting Stock
+
+1. Click **Adjust** on a product row.
+2. Choose **Add Stock** or **Remove Stock**.
+3. Select a **Reason** (Restock, Damaged, Correction, Sample, Sales Return).
+4. Enter the quantity and optional remarks.
+5. Click **Save**.
+
+### Stock Transfers
+
+Move stock from your branch to another:
+1. Click **Transfer** on a product row.
+2. The **From Location** is pre-set to your branch.
+3. Select the **To Location** (destination branch).
+4. Enter the **Quantity** and optional **Remarks**.
+5. Click **Save**.
+
+### Requesting Stock from Storehouse
+
+If you need more stock, submit a request to the Owner:
+1. Click **Request Stock** on a product row.
+2. Select the **From Location** (usually the Storehouse).
+3. Enter the **Quantity** needed.
+4. Add a **Description** explaining why.
+5. Click **Submit**.
+6. The Owner receives a notification and can Accept or Decline.
+7. If accepted, the stock is automatically transferred to your branch.
+
+### Movement History
+
+Click **View Details** to see a product's full movement history:
+- Date and time of each change
+- Type (Adjustment, Transfer In, Transfer Out, Sale, Restock)
+- Quantity change (+/-)
+- Location and reason
+
+### Setting Reorder Levels
+
+1. Click **Set Reorder** on a product row.
+2. Enter the new reorder level.
+3. Click **Save**.
+4. The product will trigger low-stock alerts when quantity drops below this level.
+
+### What You Cannot Do
+
+- **Bulk Restock** — This feature is only available to the Owner.
+- **Restock All Below Threshold** — Owner-only."""),
+
+        ManualSection(role="manager", parent_id=None, sort_order=6, title="Reports (Store Reports)",
+            content="""As a Manager, your Reports access is limited to **Store Reports** — a tool for reporting issues at your branch. Access it via **Reports** in the sidebar.
+
+### Store Reports Overview
+
+The Store Reports page has a split-pane layout:
+- **Left pane** — A list of all your submitted reports.
+- **Right pane** — Details of the selected report, or a form to create a new one.
+
+### Creating a New Report
+
+1. Click the **New Report** button.
+2. Fill in the form:
+   - **Title** (required) — A brief summary of the issue.
+   - **Issue Type** (required) — Select from: Store Issue, Materials Issue, Software Issue.
+   - **Description** (required) — Explain the issue in detail.
+3. Click **Submit**.
+
+### Viewing a Report
+
+Click any report in the left list to view its details on the right pane, including:
+- Title, issue type, and status
+- Branch where the report was filed
+- Description and submission date
+
+### Editing a Pending Report
+
+1. Select the report in the left list.
+2. Click **Edit** in the right pane.
+3. Update the title, issue type, or description.
+4. Click **Update**.
+
+### Voiding a Report
+
+1. Select the report you want to void.
+2. Click **Void**.
+3. Confirm the action. The report status changes to **voided**.
+
+### Marking a Report as Resolved
+
+If the issue is resolved, you can mark it yourself:
+1. Select the report.
+2. Click **Mark Resolved**.
+3. The status changes to **resolved** with a timestamp.
+
+### Status Colors
+
+- **Pending** — Orange. The report is awaiting action.
+- **Resolved** — Green. The issue has been addressed.
+- **Voided** — Red. The report was cancelled."""),
+
+        ManualSection(role="manager", parent_id=None, sort_order=7, title="Settings",
+            content="""Manage your account and preferences. Access it via **Settings** in the sidebar.
+
+### Account Information
+
+- **Username** — Read-only, for reference.
+- **Role** — Read-only, shows **Manager**.
+- **Email** — Update your email address.
+- **Phone** — Update your phone number (Philippine format: 63+ without leading 0).
+
+Click **Save Profile** to apply changes.
+
+### Changing Password
+
+1. Go to the **Change Password** tab.
+2. Enter your **Old Password** — verified on blur.
+3. Enter a **New Password** meeting requirements:
+   - Minimum 6 characters
+   - At least one uppercase letter
+   - At least one lowercase letter
+   - At least one special character
+   - At least one number
+4. **Confirm** the new password.
+5. Click **Change Password**.
+
+Forgot your password? Click **Forgot Password?** to receive a reset link via email.
+
+### Personalization
+
+**Theme:**
+- Choose **Light** (default) or **Dark** mode.
+- Changes apply immediately.
+
+**Font Size:**
+- Options: Small (12px), Medium (14px, default), Large (16px), Extra Large (32px).
+
+Click **Save Preferences** to persist your choices."""),
+    ]
+    db.session.add_all(sections)
+    db.session.commit()
+    print(f"  Manager Manual Sections: {len(sections)}")
+
+
+def seed_admin_manual():
+    print("Seeding Admin Manual...")
+    if ManualSection.query.filter_by(role="admin").first():
+        print("[OK] Admin manual already exists. Skipping.")
+        return
+    sections = [
+        ManualSection(role="admin", parent_id=None, sort_order=1, title="Getting Started",
+            content="""### System Overview
+
+Manco (MCM) Trading is a full-featured inventory, stock, and sales management system. As an **Admin**, you have full create, read, update, and delete permissions on the modules you can access. Your focus is on system administration, maintenance, and reporting.
+
+### Logging In
+
+1. Open your browser and navigate to the system URL.
+2. Enter your **Username** and **Password** on the login page.
+3. Click **Sign In**.
+4. You will be redirected to the **Admin Dashboard**.
+
+> **Tip:** If you forget your password, click the **Forgot Password?** link on the login page.
+
+### Dashboard Layout
+
+After logging in:
+- **Sidebar** — Navigation for your available modules (Dashboard, Maintenance, Reports, Settings, Help, About).
+- **Topbar** — Branch selector and Logout button.
+- **Content Area** — The main workspace.
+
+### Modules You Can Access
+
+| Module | Purpose |
+|---|---|
+| **Dashboard** | System overview and configuration |
+| **Maintenance** | Database backups, integrity checks, optimization, cleanup |
+| **Reports** | Activity reports, store reports, system reports |
+| **Settings** | Profile, password, personalization |
+
+### Modules You Cannot Access
+
+The following modules are **not available** to Admins:
+- **Inventory** — Product and stock management (Owner/Manager only)
+- **Sales** — Transaction processing (Owner/Manager only)
+- **Stock Management** — Stock adjustments and transfers (Owner/Manager only)
+- **User Access** — User role management (Owner only)
+
+### Dark Mode & Font Size
+
+1. Go to **Settings** → **Personalization**.
+2. Choose **Light** or **Dark** theme.
+3. Choose your preferred **Font Size**.
+4. Click **Save Preferences**."""),
+
+        ManualSection(role="admin", parent_id=None, sort_order=2, title="Admin Dashboard",
+            content="""The Admin Dashboard provides a system-level overview. Access it via **Dashboard** in the sidebar.
+
+### Stat Cards
+
+Four stat cards at the top:
+- **Total Users** — Number of registered user accounts
+- **Inventory Items** — Total stock quantity across all branches
+- **7-Day Activity** — Number of system actions logged in the last 7 days
+- **System Status** — Always shows "Operational" when the system is running
+
+### System Configuration Panel
+
+Below the stat cards, a detailed descriptions panel shows:
+- **Total Registered Users**
+- **Database Status** — Tag showing "Connected" (green)
+- **Active Inventory Items** — Total items across all branches
+- **Low Stock Alerts** — Count with color tag (orange if > 0)
+- **7-Day Activity Logs** — Total actions logged
+- **Sales Today** — Total revenue across all branches"""),
+
+        ManualSection(role="admin", parent_id=None, sort_order=3, title="System Maintenance",
+            content="""The Maintenance module provides database administration tools. Access it via **Maintenance** in the sidebar.
+
+### System Information
+
+View key database metrics:
+- **Database Size** — Current size on disk
+- **SQLite Version** — Database engine version
+- **Backups** — Number of existing backups
+- **Application** — App name and version
+- **Table Records** — Count of records in each database table
+
+### Backup & Restore
+
+**Create Backup:**
+1. Go to the **Backup & Restore** tab.
+2. Click **Create Backup**.
+3. The system creates a JSON dump of all tables.
+4. The backup appears in the list with filename, size, and timestamp.
+
+**Restore from Backup:**
+1. Find the backup file in the list.
+2. Click **Restore**.
+3. Confirm. **This will replace the current database** with the backup.
+
+**Delete Backup:**
+1. Click **Delete** on a backup file.
+2. Confirm to permanently remove it.
+
+### Integrity Check
+
+1. Go to the **Maintenance** tab.
+2. Click **Run Integrity Check**.
+3. Results show passed/failed status, FK violation count, and any issues found.
+
+### Database Optimization
+
+**VACUUM Database:**
+- Reclaims unused space in the database file.
+- Shows size before, size after, space saved, and duration.
+
+**REINDEX:**
+- Rebuilds all database indexes for better query performance.
+
+### Data Cleanup
+
+1. Go to the **Cleanup** tab.
+2. Set the **Retention Period** in days (default: 90).
+3. Select categories to clean:
+   - **Purge old activity logs**
+   - **Permanently delete voided products**
+   - **Clean old / cancelled transfers**
+4. Click **Run Cleanup** and confirm.
+5. Results show how many records were deleted per category."""),
+
+        ManualSection(role="admin", parent_id=None, sort_order=4, title="Reports",
+            content="""The Reports module gives you access to activity monitoring and system information. Access it via **Reports** in the sidebar.
+
+### Activity Reports
+
+View user and module activity for a selected period (7, 30, or 90 days):
+
+**Stats Cards:**
+- **Total Actions** — Number of actions logged
+- **Unique Users** — Distinct users who performed actions
+
+**Per-User Activity:**
+- A table showing each user's username and the number of actions they performed.
+
+**Per-Module Activity:**
+- A table showing each module name and the number of actions logged in it.
+
+**Store Reports:**
+
+This section lets you manage issue reports submitted by managers and owners:
+- Browse all reports in a table with user, branch, issue type, status, and date.
+- **View** any report by clicking the eye icon.
+- **Resolve** pending reports by clicking the Resolve button (records who resolved it and when).
+- Only the report creator can **Edit** or **Void** their own pending reports.
+
+**Issue Types:**
+- **Store Issue** — Problems related to the physical store.
+- **Materials Issue** — Problems with materials or supplies.
+- **Software Issue** — Problems with the system software.
+
+**Status Lifecycle:**
+- **Pending** (orange) → **Resolved** (green) by clicking Resolve
+- **Pending** → **Voided** (red) by the creator
+
+### System Reports
+
+View system-level information:
+- **Stats Cards** — Backups count, 7-day activity, 30-day activity
+- **Backup History** — Table listing all backup files with filename, size, and creation date"""),
+
+        ManualSection(role="admin", parent_id=None, sort_order=5, title="Settings",
+            content="""Manage your account and preferences. Access it via **Settings** in the sidebar.
+
+### Account Information
+
+- **Username** — Read-only, for reference.
+- **Role** — Read-only, shows **Admin**.
+- **Email** — Update your email address.
+- **Phone** — Update your phone number (63+ format).
+
+Click **Save Profile** to apply changes.
+
+### Changing Password
+
+1. Go to the **Change Password** tab.
+2. Enter your **Old Password** — verified on blur.
+3. Enter a **New Password** meeting requirements:
+   - Minimum 6 characters
+   - At least one uppercase letter
+   - At least one lowercase letter
+   - At least one special character
+   - At least one number
+4. **Confirm** the new password.
+5. Click **Change Password**.
+
+### Personalization
+
+**Theme:**
+- Choose **Light** (default) or **Dark** mode.
+- Changes apply immediately.
+
+**Font Size:**
+- Options: Small (12px), Medium (14px, default), Large (16px), Extra Large (32px).
+
+Click **Save Preferences** to persist your choices."""),
+    ]
+    db.session.add_all(sections)
+    db.session.commit()
+    print(f"  Admin Manual Sections: {len(sections)}")
 
 
 def seed_if_empty():
@@ -256,7 +1436,10 @@ def seed_if_empty():
     with app.app_context():
         existing = db.session.query(User.user_id).limit(1).first()
         if existing:
-            print("[OK] Remote DB already has data. Skipping seed.")
+            print("[OK] Remote DB already has data. Skipping main seed.")
+            seed_manual_sections()
+            seed_manager_manual()
+            seed_admin_manual()
             return
     print("[OK] Remote DB empty. Seeding without dropping tables.")
     seed(skip_drop=True)

@@ -186,3 +186,14 @@ class StoreReport(db.Model):
     user = db.relationship("User", foreign_keys=[user_id])
     location = db.relationship("Location")
     resolver = db.relationship("User", foreign_keys=[resolved_by])
+
+
+class ManualSection(db.Model):
+    __tablename__ = "Manual_Sections"
+    section_id = db.Column(db.Integer, primary_key=True)
+    role = db.Column(db.String(16), nullable=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey("Manual_Sections.section_id"), nullable=True)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    title = db.Column(db.String(255), nullable=False)
+    content = db.Column(db.Text, nullable=False, default="")
+    children = db.relationship("ManualSection", backref=db.backref("parent", remote_side=[section_id]), lazy="joined", join_depth=1)
