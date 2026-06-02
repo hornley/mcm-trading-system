@@ -1,7 +1,7 @@
 import math
 from flask import Blueprint, request
 from datetime import datetime
-from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer
+from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer, StockRequest
 from utils.response import success_response, error_response
 from utils.validation import validate_required, validate_quantity, is_fabric_category
 from utils.activity_logger import log_activity
@@ -988,6 +988,85 @@ def transfer_stock():
             "quantity": quantity,
         },
         "Stock transferred successfully"
+    )
+
+
+@inventory_bp.route("/api/inventory/request-stock", methods=["POST"])
+def request_stock():
+    data = request.get_json()
+    if not data:
+        return error_response("Request body is required", "MISSING_BODY", 400)
+
+    usertype = data.get("usertype")
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+
+    if not _can_update(usertype):
+        return error_response("You don't have permission to request stock", "FORBIDDEN", 403)
+
+    error = validate_required(data, ["product_id", "from_location_id", "to_location_id", "quantity"])
+    if error:
+        return error
+
+    product = Product.query.get(data["product_id"])
+    if not product:
+        return error_response("Product not found", "NOT_FOUND", 404)
+
+    from_location = Location.query.get(data["from_location_id"])
+    if not from_location:
+        return error_response("Source location not found", "NOT_FOUND", 404)
+
+    to_location = Location.query.get(data["to_location_id"])
+    if not to_location:
+        return error_response("Destination location not found", "NOT_FOUND", 404)
+
+    if data["from_location_id"] == data["to_location_id"]:
+        return error_response("Source and destination locations must be different", "SAME_LOCATION", 400)
+
+    qty_error = validate_quantity(data["quantity"], "quantity", product.category_id)
+    if qty_error:
+        return qty_error
+    quantity = float(data["quantity"])
+
+    stock_request = StockRequest(
+        product_id=data["product_id"],
+        from_location_id=data["from_location_id"],
+        to_location_id=data["to_location_id"],
+        requested_by=data.get("user_id"),
+        quantity=quantity,
+        description=data.get("description"),
+        status="pending",
+    )
+    db.session.add(stock_request)
+    db.session.commit()
+
+    log_activity(
+        user_id=data.get("user_id"),
+        module="inventory",
+        action_type="request",
+        action=f"Stock request: {quantity} {product.name} from {from_location.name} to {to_location.name}",
+        details={
+            "product_id": product.product_id,
+            "from_location_id": from_location.location_id,
+            "to_location_id": to_location.location_id,
+            "quantity": quantity,
+        }
+    )
+
+    return success_response(
+        {
+            "request_id": stock_request.request_id,
+            "product_id": product.product_id,
+            "product_name": product.name,
+            "from_location_id": from_location.location_id,
+            "from_location_name": from_location.name,
+            "to_location_id": to_location.location_id,
+            "to_location_name": to_location.name,
+            "quantity": quantity,
+            "description": stock_request.description,
+            "status": stock_request.status,
+        },
+        "Stock request submitted"
     )
 
 
