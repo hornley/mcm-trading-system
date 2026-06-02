@@ -42,7 +42,7 @@ const StockManagement = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [pageSize] = useState(10);
   const [movementsCache, setMovementsCache] = useState({});
-  const [stats, setStats] = useState({ total_items: 0, low_stock_count: 0, out_of_stock_count: 0 });
+  const [stats, setStats] = useState({ total_items: 0, low_stock_count: 0, out_of_stock_count: 0, pending_request_count: 0 });
   const [sortBy, setSortBy] = useState('product_name');
   const [sortOrder, setSortOrder] = useState('asc');
   const [statusFilter, setStatusFilter] = useState('');
@@ -419,7 +419,7 @@ const StockManagement = () => {
     window.print();
   };
 
-  const { total_items: totalItems, low_stock_count: lowStockCount, out_of_stock_count: outOfStockCount } = stats;
+  const { total_items: totalItems, low_stock_count: lowStockCount, out_of_stock_count: outOfStockCount, pending_request_count: pendingRequestCount } = stats;
 
   const columns = [
     {
@@ -535,17 +535,22 @@ const StockManagement = () => {
     <div>
       <Card styles={{ body: { padding: '16px 24px' } }}>
         <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col xs={24} sm={8}>
+          <Col xs={12} sm={6}>
             <Card styles={{ body: { padding: '20px 24px' } }}><Statistic title="Total Stock Items" value={totalItems} /></Card>
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={12} sm={6}>
           <Card>
             <Statistic title="Low Stock Items" value={lowStockCount} valueStyle={{ color: '#fa8c16' }} />
           </Card>
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={12} sm={6}>
           <Card>
             <Statistic title="Out of Stock Items" value={outOfStockCount} valueStyle={{ color: '#cf1322' }} />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card>
+            <Statistic title="Current Requested" value={pendingRequestCount} valueStyle={{ color: '#1677ff' }} />
           </Card>
         </Col>
       </Row>

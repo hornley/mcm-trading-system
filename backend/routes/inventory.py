@@ -362,10 +362,16 @@ def inventory_counts():
     low_stock_count = sum(1 for i in all_inv if i.quantity > 0 and i.quantity <= 10)
     out_of_stock_count = sum(1 for i in all_inv if i.quantity == 0)
 
+    request_query = StockRequest.query.filter_by(status="pending")
+    if resolved_location_id and resolved_location_id != "all":
+        request_query = request_query.filter_by(to_location_id=resolved_location_id)
+    pending_request_count = request_query.count()
+
     return success_response({
         "total_items": total_items,
         "low_stock_count": low_stock_count,
         "out_of_stock_count": out_of_stock_count,
+        "pending_request_count": pending_request_count,
     })
 
 
