@@ -6,7 +6,7 @@ import {
 } from 'antd';
 import { PlusOutlined, MinusOutlined } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { FABRIC_CATEGORY, fmtQty, qtyLabel } from '../../utils/format.js';
+import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js';
 
 const { Search, TextArea } = Input;
 
@@ -725,7 +725,7 @@ const StockManagement = () => {
               </Form.Item>
             </>
           )}
-          <Form.Item name="quantity" label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} rules={[{ required: true, message: 'Please enter quantity' }]}>
+          <Form.Item label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} required>
             <Row align="middle" gutter={4} wrap={false}>
               <Col>
                 <Button
@@ -735,17 +735,14 @@ const StockManagement = () => {
                 />
               </Col>
               <Col flex="auto">
-                <div style={{
-                  textAlign: 'center',
-                  padding: '5px 0',
-                  border: '1px solid #d9d9d9',
-                  borderRadius: 6,
-                  fontSize: 16,
-                  fontWeight: 500,
-                  background: '#fff',
-                }}>
-                  {fmtQty(qtyValue ?? 0, selectedRecord?.category === FABRIC_CATEGORY)}
-                </div>
+                <Form.Item name="quantity" noStyle rules={[{ required: true, message: 'Please enter quantity' }]}>
+                  <InputNumber
+                    min={selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1}
+                    step={selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1}
+                    precision={selectedRecord?.category === FABRIC_CATEGORY ? undefined : 0}
+                    style={{ width: '100%', textAlign: 'center' }}
+                  />
+                </Form.Item>
               </Col>
               <Col>
                 <Button
@@ -755,11 +752,6 @@ const StockManagement = () => {
                 />
               </Col>
             </Row>
-            {selectedRecord?.category === FABRIC_CATEGORY && qtyValue != null && (
-              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-                {qtyLabel(qtyValue)} yards
-              </div>
-            )}
           </Form.Item>
           <Form.Item name="remarks" label={requestPreset ? 'Description (optional)' : 'Remarks (optional)'}>
             <TextArea rows={2} placeholder={requestPreset ? 'Additional notes for the request' : 'Additional notes'} />
