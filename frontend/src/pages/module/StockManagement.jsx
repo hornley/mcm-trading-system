@@ -737,6 +737,7 @@ const StockManagement = () => {
               <Col flex="auto">
                 <Form.Item name="quantity" noStyle rules={[{ required: true, message: 'Please enter quantity' }]}>
                   <InputNumber
+                    controls={false}
                     min={selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1}
                     step={selectedRecord?.category === FABRIC_CATEGORY ? 0.25 : 1}
                     precision={selectedRecord?.category === FABRIC_CATEGORY ? undefined : 0}
