@@ -2,7 +2,7 @@ import os
 import json
 import time
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_from_directory
 from sqlalchemy import text
 from models import db, User, Product, Location, Category, Inventory
 from models import StockTransfer, StockAdjustment, ActivityLog, Order, OrderItem, Payment
@@ -164,6 +164,20 @@ def delete_backup(filename):
         return jsonify({"success": True, "message": "Backup deleted"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route("/api/admin/backups/<filename>/download", methods=["GET"])
+def download_backup(filename):
+    usertype = request.args.get("usertype", type=int)
+    if not _authorized(usertype):
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    if ".." in filename or "/" in filename:
+        return jsonify({"success": False, "error": "Invalid filename"}), 400
+    if not os.path.exists(os.path.join(BACKUP_DIR, filename)):
+        return jsonify({"success": False, "error": "Backup file not found"}), 404
+    return send_from_directory(
+        BACKUP_DIR, filename, as_attachment=True, download_name=filename
+    )
 
 
 # ── SYSTEM INFO ──

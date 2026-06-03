@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import {
   DatabaseOutlined, CloudUploadOutlined, CloudDownloadOutlined,
-  DeleteOutlined, ToolOutlined, ClearOutlined, BarChartOutlined,
+  DownloadOutlined, DeleteOutlined, ToolOutlined, ClearOutlined, BarChartOutlined,
   CheckCircleOutlined, ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -113,6 +113,16 @@ const Maintenance = () => {
         setConfirmModal(null);
       },
     });
+  };
+
+  const handleDownloadBackup = (filename) => {
+    const url = `/api/admin/backups/${filename}/download?usertype=${user.usertype}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   const handleDeleteBackup = (filename) => {
@@ -261,6 +271,9 @@ const Maintenance = () => {
       title: 'Actions', key: 'actions',
       render: (_, record) => (
         <Space>
+          <Button type="link" icon={<DownloadOutlined />} onClick={() => handleDownloadBackup(record.filename)}>
+            Download
+          </Button>
           <Button type="link" icon={<CloudDownloadOutlined />} onClick={() => handleRestoreBackup(record.filename)}>
             Restore
           </Button>

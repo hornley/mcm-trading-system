@@ -379,7 +379,7 @@ def system_summary():
         backups = []
         os.makedirs(BACKUP_DIR, exist_ok=True)
         for f in os.listdir(BACKUP_DIR):
-            if f.endswith(".db"):
+            if f.endswith(".json"):
                 fpath = os.path.join(BACKUP_DIR, f)
                 stat = os.stat(fpath)
                 backups.append({
