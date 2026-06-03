@@ -199,29 +199,40 @@ const POSModal = ({
           <Col xs={24} lg={17}>
             <div style={{ marginBottom: 16 }}>
               <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 8 }}>Categories</Text>
-              <Row gutter={[8, 8]}>
+              <Row gutter={[16, 16]}>
                 {categories.length === 0 && (
                   <Col span={24}><Text type="secondary">Loading categories...</Text></Col>
                 )}
-                {categories.map((cat) => (
-                  <Col key={cat.category_id}>
-                    <Card
-                      hoverable
-                      size="small"
-                      onClick={() => setSelectedCategoryId(cat.category_id)}
-                      style={{
-                        cursor: 'pointer',
-                        minWidth: 110,
-                        textAlign: 'center',
-                        background: selectedCategoryId === cat.category_id ? '#e6f4ff' : undefined,
-                        borderColor: selectedCategoryId === cat.category_id ? '#5b7ff0' : undefined,
-                        borderWidth: selectedCategoryId === cat.category_id ? 2 : 1,
-                      }}
+                {categories.map((cat) => {
+                  const isSelected = selectedCategoryId === cat.category_id;
+                  const expanded = !selectedCategoryId;
+                  return (
+                    <Col
+                      key={cat.category_id}
+                      xs={expanded ? 12 : undefined}
+                      md={expanded ? 8 : undefined}
                     >
-                      <Text strong style={{ fontSize: 14 }}>{cat.name}</Text>
-                    </Card>
-                  </Col>
-                ))}
+                      <Card
+                        hoverable
+                        size={expanded ? 'default' : 'small'}
+                        onClick={() => setSelectedCategoryId(cat.category_id)}
+                        className="pos-category-tile"
+                        styles={{ body: { padding: expanded ? 24 : undefined, display: 'flex', alignItems: 'center', justifyContent: 'center' } }}
+                        style={{
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          minWidth: expanded ? undefined : 110,
+                          minHeight: expanded ? 120 : undefined,
+                          background: isSelected ? '#e6f4ff' : undefined,
+                          borderColor: isSelected ? '#5b7ff0' : undefined,
+                          borderWidth: isSelected ? 2 : 1,
+                        }}
+                      >
+                        <Text strong style={{ fontSize: expanded ? 16 : 14 }}>{cat.name}</Text>
+                      </Card>
+                    </Col>
+                  );
+                })}
               </Row>
             </div>
 
@@ -286,11 +297,7 @@ const POSModal = ({
                     )}
                   </Row>
                 </>
-              ) : (
-                <div style={{ padding: '60px 0', textAlign: 'center' }}>
-                  <Text type="secondary" style={{ fontSize: 16 }}>Select a category to browse products</Text>
-                </div>
-              )}
+              ) : null}
             </div>
           </Col>
 
@@ -311,6 +318,12 @@ const POSModal = ({
               }
               .pos-cart-list::-webkit-scrollbar-track {
                 background: transparent;
+              }
+              .pos-category-tile {
+                transition: min-height 150ms ease, padding 150ms ease, background 150ms ease, border-color 150ms ease;
+              }
+              .pos-category-tile .ant-card-body {
+                transition: padding 150ms ease;
               }
             `}</style>
 
