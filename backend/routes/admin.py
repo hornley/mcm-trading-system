@@ -25,6 +25,10 @@ BACKUP_MODELS = [
     ("Payments", Payment), ("Inventory", Inventory),
     ("Stock Transfers", StockTransfer), ("Stock Adjustments", StockAdjustment),
     ("Activity Logs", ActivityLog),
+    ("Password Reset Tokens", PasswordResetToken),
+    ("Stock Requests", StockRequest),
+    ("Store Reports", StoreReport),
+    ("Manual Sections", ManualSection),
 ]
 
 # (child_table, child_fk_column, parent_table, parent_pk_column, is_nullable)
@@ -95,14 +99,6 @@ def _resolve(name):
     for n, m in BACKUP_MODELS:
         if n == name:
             return m
-    if name == "PasswordResetTokens":
-        return PasswordResetToken
-    if name == "StockRequests":
-        return StockRequest
-    if name == "StoreReports":
-        return StoreReport
-    if name == "ManualSections":
-        return ManualSection
     return None
 
 
@@ -177,6 +173,8 @@ def restore_backup(filename):
 
         for name, model in BACKUP_MODELS:
             rows = backup_data.get(name, [])
+            if name == "Manual Sections":
+                rows = sorted(rows, key=lambda r: r.get("section_id", 0))
             for row_data in rows:
                 for col in ("created_at", "updated_at", "order_date", "transfer_date",
                             "date", "timestamp"):
@@ -316,29 +314,77 @@ def integrity_check():
                 continue
             fk_violation_count += count
             if count > 0:
+                samples = []
+                try:
+                    sample_q = db.session.query(child_model).outerjoin(
+                        parent_ref, child_fk == parent_pk
+                    ).filter(parent_pk.is_(None))
+                    if nullable:
+                        sample_q = sample_q.filter(child_fk.isnot(None))
+                    for row in sample_q.limit(50).all():
+                        samples.append(_serialise_row(row))
+                except Exception:
+                    pass
                 orphan_by_table.append({
                     "child_table": child_name,
                     "fk_column": fk_col,
                     "parent_table": parent_name,
                     "count": count,
+                    "samples": samples,
                 })
 
+        neg_inventory_samples = []
         try:
-            neg_inventory_count = db.session.query(Inventory).filter(
+            neg_rows = db.session.query(Inventory).filter(
                 Inventory.quantity < 0
-            ).count()
+            ).limit(50).all()
+            neg_inventory_count = len(neg_rows)
+            if len(neg_rows) < 50:
+                neg_inventory_count = db.session.query(Inventory).filter(
+                    Inventory.quantity < 0
+                ).count()
+            for inv in neg_rows:
+                d = _serialise_row(inv)
+                try:
+                    prod = Product.query.get(inv.product_id)
+                    d["product_name"] = prod.name if prod else None
+                except Exception:
+                    d["product_name"] = None
+                try:
+                    loc = Location.query.get(inv.location_id)
+                    d["location_name"] = loc.name if loc else None
+                except Exception:
+                    d["location_name"] = None
+                neg_inventory_samples.append(d)
         except Exception as e:
             neg_inventory_count = 0
+            neg_inventory_samples = []
             issues.append({"type": "inventory_check_error", "table": "Inventory", "detail": str(e)})
 
+        stale_token_samples = []
         try:
             stale_token_cutoff = datetime.now() - timedelta(hours=24)
-            stale_token_count = PasswordResetToken.query.filter(
+            stale_query = PasswordResetToken.query.filter(
                 PasswordResetToken.used == False,
                 PasswordResetToken.expires_at < stale_token_cutoff,
-            ).count()
+            )
+            stale_rows = stale_query.limit(50).all()
+            stale_token_count = len(stale_rows)
+            if len(stale_rows) < 50:
+                stale_token_count = stale_query.count()
+            for t in stale_rows:
+                d = _serialise_row(t)
+                try:
+                    u = User.query.get(t.user_id)
+                    d["user_name"] = u.name if u else None
+                    d["user_email"] = u.email if u else None
+                except Exception:
+                    d["user_name"] = None
+                    d["user_email"] = None
+                stale_token_samples.append(d)
         except Exception as e:
             stale_token_count = 0
+            stale_token_samples = []
             issues.append({"type": "token_check_error", "table": "PasswordResetTokens", "detail": str(e)})
 
         checks = {
@@ -354,10 +400,12 @@ def integrity_check():
             "negative_inventory": {
                 "ok": neg_inventory_count == 0,
                 "count": neg_inventory_count,
+                "samples": neg_inventory_samples,
             },
             "stale_password_tokens": {
                 "ok": stale_token_count == 0,
                 "count": stale_token_count,
+                "samples": stale_token_samples,
             },
         }
 
@@ -611,6 +659,133 @@ def cleanup_all():
                 "transfers_deleted": transfers_deleted,
                 "retention_days": days,
             }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ── FIX ──
+
+@admin_bp.route("/api/admin/maintenance/fix/orphans", methods=["POST"])
+def fix_orphans():
+    data = request.get_json() or {}
+    usertype = data.get("usertype")
+    if not _authorized(usertype):
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    try:
+        total_deleted = 0
+        for child_name, fk_col, parent_name, pk_col, nullable in FK_RELATIONSHIPS:
+            child_model = _resolve(child_name)
+            parent_model = _resolve(parent_name)
+            if child_model is None or parent_model is None:
+                continue
+            parent_ref = aliased(parent_model) if child_model is parent_model else parent_model
+            child_fk = getattr(child_model, fk_col)
+            parent_pk = getattr(parent_ref, pk_col)
+            subq = db.session.query(child_model).outerjoin(
+                parent_ref, child_fk == parent_pk
+            ).filter(parent_pk.is_(None))
+            if nullable:
+                subq = subq.filter(child_fk.isnot(None))
+            pk_col_name = next(iter(child_model.__table__.primary_key.columns)).name
+            orphan_ids = [getattr(r, pk_col_name) for r in subq.all()]
+            if orphan_ids:
+                db.session.query(child_model).filter(
+                    getattr(child_model, pk_col_name).in_(orphan_ids)
+                ).delete(synchronize_session='fetch')
+                total_deleted += len(orphan_ids)
+        db.session.commit()
+        user_id = data.get("user_id")
+        if user_id:
+            try:
+                log_activity(
+                    user_id=user_id,
+                    module="maintenance",
+                    action_type="fix",
+                    action="Deleted orphan rows",
+                    details={"deleted_count": total_deleted},
+                )
+            except Exception:
+                pass
+        return jsonify({
+            "success": True,
+            "message": f"Deleted {total_deleted} orphan row(s)",
+            "data": {"deleted_count": total_deleted},
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route("/api/admin/maintenance/fix/negative-inventory", methods=["POST"])
+def fix_negative_inventory():
+    data = request.get_json() or {}
+    usertype = data.get("usertype")
+    if not _authorized(usertype):
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    try:
+        target = data.get("target", 0)
+        if not isinstance(target, (int, float)):
+            return jsonify({"success": False, "error": "Invalid target value"}), 400
+        affected = db.session.query(Inventory).filter(
+            Inventory.quantity < 0
+        ).count()
+        db.session.query(Inventory).filter(
+            Inventory.quantity < 0
+        ).update({"quantity": target}, synchronize_session='fetch')
+        db.session.commit()
+        user_id = data.get("user_id")
+        if user_id:
+            try:
+                log_activity(
+                    user_id=user_id,
+                    module="maintenance",
+                    action_type="fix",
+                    action="Reset negative inventory",
+                    details={"affected_count": affected, "target": target},
+                )
+            except Exception:
+                pass
+        return jsonify({
+            "success": True,
+            "message": f"Reset {affected} inventory row(s) to {target}",
+            "data": {"affected_count": affected, "target": target},
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route("/api/admin/maintenance/fix/stale-tokens", methods=["POST"])
+def fix_stale_tokens():
+    data = request.get_json() or {}
+    usertype = data.get("usertype")
+    if not _authorized(usertype):
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    try:
+        stale_cutoff = datetime.now() - timedelta(hours=24)
+        deleted = PasswordResetToken.query.filter(
+            PasswordResetToken.used == False,
+            PasswordResetToken.expires_at < stale_cutoff,
+        ).delete()
+        db.session.commit()
+        user_id = data.get("user_id")
+        if user_id:
+            try:
+                log_activity(
+                    user_id=user_id,
+                    module="maintenance",
+                    action_type="fix",
+                    action="Deleted stale password tokens",
+                    details={"deleted_count": deleted},
+                )
+            except Exception:
+                pass
+        return jsonify({
+            "success": True,
+            "message": f"Deleted {deleted} stale password token(s)",
+            "data": {"deleted_count": deleted},
         })
     except Exception as e:
         db.session.rollback()

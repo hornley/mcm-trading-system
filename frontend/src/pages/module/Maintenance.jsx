@@ -34,6 +34,7 @@ const Maintenance = () => {
   const [cleanupDays, setCleanupDays] = useState(90);
   const [cleanupItems, setCleanupItems] = useState({ logs: true, products: true, transfers: true });
   const [confirmModal, setConfirmModal] = useState(null);
+  const [investigationModal, setInvestigationModal] = useState(null);
 
   const fetchSystemInfo = async () => {
     setLoading(true);
@@ -252,6 +253,140 @@ const Maintenance = () => {
     });
   };
 
+  const handleFixOrphans = () => {
+    setConfirmModal({
+      title: 'Fix Orphan Rows',
+      content: 'This will permanently delete all orphan rows (rows whose foreign key points to a non-existent parent). This action cannot be undone.',
+      okText: 'Delete Orphans',
+      danger: true,
+      onOk: async () => {
+        try {
+          const res = await fetch('/api/admin/maintenance/fix/orphans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usertype: user.usertype, user_id: user.user_id }),
+          });
+          const data = await res.json();
+          if (data.success) { message.success(data.message); handleIntegrityCheck(); }
+          else message.error(data.error);
+        } catch { message.error('Fix failed'); }
+        setConfirmModal(null);
+        setInvestigationModal(null);
+      },
+    });
+  };
+
+  const handleFixNegativeInventory = (target) => {
+    setConfirmModal({
+      title: 'Fix Negative Inventory',
+      content: `Reset all negative inventory quantities to ${target}?`,
+      okText: 'Reset',
+      danger: false,
+      onOk: async () => {
+        try {
+          const res = await fetch('/api/admin/maintenance/fix/negative-inventory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usertype: user.usertype, user_id: user.user_id, target }),
+          });
+          const data = await res.json();
+          if (data.success) { message.success(data.message); handleIntegrityCheck(); }
+          else message.error(data.error);
+        } catch { message.error('Fix failed'); }
+        setConfirmModal(null);
+        setInvestigationModal(null);
+      },
+    });
+  };
+
+  const handleFixStaleTokens = () => {
+    setConfirmModal({
+      title: 'Fix Stale Password Tokens',
+      content: 'This will permanently delete all expired password reset tokens (>24h unused). This action cannot be undone.',
+      okText: 'Delete Tokens',
+      danger: true,
+      onOk: async () => {
+        try {
+          const res = await fetch('/api/admin/maintenance/fix/stale-tokens', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usertype: user.usertype, user_id: user.user_id }),
+          });
+          const data = await res.json();
+          if (data.success) { message.success(data.message); handleIntegrityCheck(); }
+          else message.error(data.error);
+        } catch { message.error('Fix failed'); }
+        setConfirmModal(null);
+        setInvestigationModal(null);
+      },
+    });
+  };
+
+  const openInvestigation = (type) => {
+    if (!checkResult?.checks) return;
+    const checks = checkResult.checks;
+
+    let title, count, description, dataSource, fixLabel, danger, extra;
+
+    if (type === 'orphans') {
+      const byTable = checks.orphan_rows?.by_table || [];
+      const allSamples = [];
+      for (const bt of byTable) {
+        if (bt.samples) {
+          for (const s of bt.samples) {
+            allSamples.push({
+              child_table: bt.child_table,
+              fk_column: bt.fk_column,
+              parent_table: bt.parent_table,
+              ...s,
+            });
+          }
+        }
+      }
+      title = 'Orphan Rows — Fix All';
+      count = checks.orphan_rows.total;
+      description = `Found ${count} orphan row(s) across ${byTable.length} FK relationship(s). This will permanently delete ALL orphan rows.`;
+      dataSource = allSamples;
+      fixLabel = `Fix All (Delete ${count} Row${count !== 1 ? 's' : ''})`;
+      danger = true;
+      extra = null;
+    } else if (type === 'negative_inventory') {
+      const samples = checks.negative_inventory.samples || [];
+      title = 'Negative Inventory — Fix All';
+      count = checks.negative_inventory.count;
+      description = `Found ${count} inventory row(s) with negative quantity. Set all to:`;
+      dataSource = samples;
+      fixLabel = `Fix All (Reset ${count} Row${count !== 1 ? 's' : ''})`;
+      danger = false;
+      extra = { type: 'input', label: 'Target quantity', value: 0 };
+    } else if (type === 'stale_tokens') {
+      const samples = checks.stale_password_tokens.samples || [];
+      title = 'Stale Password Tokens — Fix All';
+      count = checks.stale_password_tokens.count;
+      description = `Found ${count} expired token(s) (>24h unused). This will permanently delete them.`;
+      dataSource = samples;
+      fixLabel = `Fix All (Delete ${count} Token${count !== 1 ? 's' : ''})`;
+      danger = true;
+      extra = null;
+    }
+
+    const keySet = new Set();
+    for (const row of dataSource) {
+      for (const k of Object.keys(row)) {
+        keySet.add(k);
+      }
+    }
+    const cols = Array.from(keySet).map((k) => ({
+      title: k,
+      dataIndex: k,
+      key: k,
+      ellipsis: true,
+      width: 150,
+    }));
+
+    setInvestigationModal({ type, title, count, description, dataSource, columns: cols, fixLabel, danger, extra });
+  };
+
   const backupColumns = [
     {
       title: 'Filename', dataIndex: 'filename', key: 'filename',
@@ -398,7 +533,10 @@ const Maintenance = () => {
 
                 {checkResult.checks && (
                   <Row gutter={[16, 16]}>
-                    <Col xs={24} sm={12} md={6}>
+                    <Col xs={24} sm={12} md={6}
+                      style={{ cursor: checkResult.checks.foreign_key_violations.count > 0 ? 'pointer' : 'default' }}
+                      onClick={() => checkResult.checks.foreign_key_violations.count > 0 && openInvestigation('orphans')}
+                    >
                       <Statistic
                         title="FK Violations"
                         value={checkResult.checks.foreign_key_violations.count}
@@ -406,7 +544,10 @@ const Maintenance = () => {
                         prefix={checkResult.checks.foreign_key_violations.ok ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
                       />
                     </Col>
-                    <Col xs={24} sm={12} md={6}>
+                    <Col xs={24} sm={12} md={6}
+                      style={{ cursor: checkResult.checks.orphan_rows.total > 0 ? 'pointer' : 'default' }}
+                      onClick={() => checkResult.checks.orphan_rows.total > 0 && openInvestigation('orphans')}
+                    >
                       <Statistic
                         title="Orphan Rows"
                         value={checkResult.checks.orphan_rows.total}
@@ -414,7 +555,10 @@ const Maintenance = () => {
                         prefix={checkResult.checks.orphan_rows.ok ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
                       />
                     </Col>
-                    <Col xs={24} sm={12} md={6}>
+                    <Col xs={24} sm={12} md={6}
+                      style={{ cursor: checkResult.checks.negative_inventory.count > 0 ? 'pointer' : 'default' }}
+                      onClick={() => checkResult.checks.negative_inventory.count > 0 && openInvestigation('negative_inventory')}
+                    >
                       <Statistic
                         title="Negative Inventory"
                         value={checkResult.checks.negative_inventory.count}
@@ -422,7 +566,10 @@ const Maintenance = () => {
                         prefix={checkResult.checks.negative_inventory.ok ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
                       />
                     </Col>
-                    <Col xs={24} sm={12} md={6}>
+                    <Col xs={24} sm={12} md={6}
+                      style={{ cursor: checkResult.checks.stale_password_tokens.count > 0 ? 'pointer' : 'default' }}
+                      onClick={() => checkResult.checks.stale_password_tokens.count > 0 && openInvestigation('stale_tokens')}
+                    >
                       <Statistic
                         title="Stale Password Tokens"
                         value={checkResult.checks.stale_password_tokens.count}
@@ -580,6 +727,59 @@ const Maintenance = () => {
       <Card styles={{ body: { padding: '16px 24px' } }}>
         <Tabs defaultActiveKey="info" items={tabItems} />
       </Card>
+      <Modal
+        title={investigationModal?.title}
+        open={!!investigationModal}
+        onCancel={() => setInvestigationModal(null)}
+        width={Math.min(900, window.innerWidth - 48)}
+        footer={[
+          <Button key="cancel" onClick={() => setInvestigationModal(null)}>Cancel</Button>,
+          <Button key="fix" type="primary" danger={investigationModal?.danger} onClick={() => {
+            if (!investigationModal) return;
+            if (investigationModal.type === 'negative_inventory') {
+              handleFixNegativeInventory(investigationModal.extra?.value ?? 0);
+            } else if (investigationModal.type === 'orphans') {
+              handleFixOrphans();
+            } else if (investigationModal.type === 'stale_tokens') {
+              handleFixStaleTokens();
+            }
+          }}>
+            {investigationModal?.fixLabel}
+          </Button>,
+        ]}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
+      >
+        {investigationModal && (
+          <>
+            <Text>{investigationModal.description}</Text>
+            {investigationModal.extra?.type === 'input' && (
+              <div style={{ marginTop: 12, marginBottom: 12 }}>
+                <Text>{investigationModal.extra.label}: </Text>
+                <InputNumber
+                  min={0}
+                  value={investigationModal.extra.value}
+                  onChange={(v) => setInvestigationModal((prev) => prev ? {
+                    ...prev,
+                    extra: { ...prev.extra, value: v },
+                  } : null)}
+                  style={{ marginLeft: 8, width: 100 }}
+                />
+              </div>
+            )}
+            {investigationModal.dataSource.length > 0 && (
+              <Table
+                size="small"
+                dataSource={investigationModal.dataSource}
+                rowKey={(_, i) => i}
+                columns={investigationModal.columns}
+                pagination={{ pageSize: 25 }}
+                scroll={{ x: 'max-content' }}
+                style={{ marginTop: 12 }}
+              />
+            )}
+          </>
+        )}
+      </Modal>
       <Modal
         title={confirmModal?.title}
         open={!!confirmModal}
