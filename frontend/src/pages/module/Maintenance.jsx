@@ -156,7 +156,7 @@ const Maintenance = () => {
       const res = await fetch('/api/admin/maintenance/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usertype: user.usertype }),
+        body: JSON.stringify({ usertype: user.usertype, user_id: user.user_id }),
       });
       const data = await res.json();
       if (data.success) setCheckResult(data.data);
@@ -175,7 +175,7 @@ const Maintenance = () => {
       const res = await fetch('/api/admin/optimize/vacuum', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usertype: user.usertype }),
+        body: JSON.stringify({ usertype: user.usertype, user_id: user.user_id }),
       });
       const data = await res.json();
       if (data.success) {
@@ -199,7 +199,7 @@ const Maintenance = () => {
       const res = await fetch('/api/admin/optimize/reindex', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usertype: user.usertype }),
+        body: JSON.stringify({ usertype: user.usertype, user_id: user.user_id }),
       });
       const data = await res.json();
       if (data.success) {
@@ -377,8 +377,8 @@ const Maintenance = () => {
           </Row>
           {checkResult && (
             <Card>
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Row gutter={16}>
+              <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                <Row gutter={16} align="middle">
                   <Col>
                     <Statistic
                       title="Status"
@@ -387,14 +387,75 @@ const Maintenance = () => {
                       prefix={checkResult.passed ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
                     />
                   </Col>
-                  <Col>
-                    <Statistic title="FK Violations" value={checkResult.foreign_key_violations} />
+                  <Col flex="auto">
+                    <Text type="secondary">{checkResult.summary}</Text>
+                    <br />
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Ran at {checkResult.ran_at ? new Date(checkResult.ran_at).toLocaleString() : ''}
+                    </Text>
                   </Col>
                 </Row>
+
+                {checkResult.checks && (
+                  <Row gutter={[16, 16]}>
+                    <Col xs={24} sm={12} md={6}>
+                      <Statistic
+                        title="FK Violations"
+                        value={checkResult.checks.foreign_key_violations.count}
+                        valueStyle={{ color: checkResult.checks.foreign_key_violations.ok ? '#52c41a' : '#ff4d4f' }}
+                        prefix={checkResult.checks.foreign_key_violations.ok ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
+                      />
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <Statistic
+                        title="Orphan Rows"
+                        value={checkResult.checks.orphan_rows.total}
+                        valueStyle={{ color: checkResult.checks.orphan_rows.ok ? '#52c41a' : '#ff4d4f' }}
+                        prefix={checkResult.checks.orphan_rows.ok ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
+                      />
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <Statistic
+                        title="Negative Inventory"
+                        value={checkResult.checks.negative_inventory.count}
+                        valueStyle={{ color: checkResult.checks.negative_inventory.ok ? '#52c41a' : '#ff4d4f' }}
+                        prefix={checkResult.checks.negative_inventory.ok ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
+                      />
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <Statistic
+                        title="Stale Password Tokens"
+                        value={checkResult.checks.stale_password_tokens.count}
+                        valueStyle={{ color: checkResult.checks.stale_password_tokens.ok ? '#52c41a' : '#ff4d4f' }}
+                        prefix={checkResult.checks.stale_password_tokens.ok ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
+                      />
+                    </Col>
+                  </Row>
+                )}
+
+                {checkResult.checks?.orphan_rows?.by_table?.length > 0 && (
+                  <>
+                    <Divider style={{ margin: '8px 0' }} />
+                    <Title level={5} style={{ marginTop: 0 }}>Orphan Rows by Foreign Key</Title>
+                    <Table
+                      size="small"
+                      pagination={false}
+                      rowKey={(r) => `${r.child_table}.${r.fk_column}`}
+                      dataSource={checkResult.checks.orphan_rows.by_table}
+                      columns={[
+                        { title: 'Child Table', dataIndex: 'child_table', key: 'child_table' },
+                        { title: 'FK Column', dataIndex: 'fk_column', key: 'fk_column' },
+                        { title: 'Parent Table', dataIndex: 'parent_table', key: 'parent_table' },
+                        { title: 'Count', dataIndex: 'count', key: 'count', align: 'right' },
+                      ]}
+                    />
+                  </>
+                )}
+
                 {checkResult.issues.length > 0 && (
                   <>
-                    <Divider />
-                    <Title level={5}>Issues Found</Title>
+                    <Divider style={{ margin: '8px 0' }} />
+                    <Title level={5} style={{ marginTop: 0 }}>Hard Errors</Title>
                     {checkResult.issues.map((issue, i) => (
                       <Tag key={i} color="red">{issue.type}: {issue.detail}</Tag>
                     ))}

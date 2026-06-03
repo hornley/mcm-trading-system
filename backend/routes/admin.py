@@ -4,9 +4,12 @@ import time
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, send_from_directory
 from sqlalchemy import text
+from sqlalchemy.orm import aliased
 from models import db, User, Product, Location, Category, Inventory
 from models import StockTransfer, StockAdjustment, ActivityLog, Order, OrderItem, Payment
+from models import PasswordResetToken, StockRequest, StoreReport, ManualSection
 from utils.sorting import quick_sort
+from utils.activity_logger import log_activity
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -22,6 +25,34 @@ BACKUP_MODELS = [
     ("Payments", Payment), ("Inventory", Inventory),
     ("Stock Transfers", StockTransfer), ("Stock Adjustments", StockAdjustment),
     ("Activity Logs", ActivityLog),
+]
+
+# (child_table, child_fk_column, parent_table, parent_pk_column, is_nullable)
+FK_RELATIONSHIPS = [
+    ("PasswordResetTokens", "user_id", "Users", "user_id", False),
+    ("Products", "category_id", "Categories", "category_id", False),
+    ("Orders", "location_id", "Locations", "location_id", False),
+    ("OrderItems", "order_id", "Orders", "order_id", False),
+    ("OrderItems", "product_id", "Products", "product_id", False),
+    ("Payments", "order_id", "Orders", "order_id", False),
+    ("Inventory", "product_id", "Products", "product_id", False),
+    ("Inventory", "location_id", "Locations", "location_id", False),
+    ("StockTransfers", "product_id", "Products", "product_id", False),
+    ("StockTransfers", "from_location_id", "Locations", "location_id", False),
+    ("StockTransfers", "to_location_id", "Locations", "location_id", False),
+    ("StockTransfers", "user_id", "Users", "user_id", False),
+    ("StockAdjustments", "product_id", "Products", "product_id", False),
+    ("StockAdjustments", "location_id", "Locations", "location_id", False),
+    ("StockAdjustments", "user_id", "Users", "user_id", False),
+    ("ActivityLogs", "user_id", "Users", "user_id", False),
+    ("StockRequests", "product_id", "Products", "product_id", False),
+    ("StockRequests", "from_location_id", "Locations", "location_id", False),
+    ("StockRequests", "to_location_id", "Locations", "location_id", False),
+    ("StockRequests", "requested_by", "Users", "user_id", False),
+    ("StoreReports", "user_id", "Users", "user_id", False),
+    ("StoreReports", "location_id", "Locations", "location_id", False),
+    ("StoreReports", "resolved_by", "Users", "user_id", True),
+    ("ManualSections", "parent_id", "ManualSections", "section_id", True),
 ]
 
 
@@ -58,6 +89,21 @@ def _create_backup_file(data):
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
     return filename, filepath
+
+
+def _resolve(name):
+    for n, m in BACKUP_MODELS:
+        if n == name:
+            return m
+    if name == "PasswordResetTokens":
+        return PasswordResetToken
+    if name == "StockRequests":
+        return StockRequest
+    if name == "StoreReports":
+        return StoreReport
+    if name == "ManualSections":
+        return ManualSection
+    return None
 
 
 # ── BACKUP & RESTORE ──
@@ -235,21 +281,138 @@ def integrity_check():
         return jsonify({"success": False, "error": "Unauthorized"}), 403
     try:
         issues = []
+        tables = []
         for name, model in BACKUP_MODELS:
             try:
                 count = db.session.query(model).count()
+                tables.append({"name": name, "count": count, "ok": True})
             except Exception as e:
                 issues.append({"type": "table_error", "table": name, "detail": str(e)})
+                tables.append({"name": name, "count": 0, "ok": False})
 
-        return jsonify({
-            "success": True,
-            "data": {
-                "integrity_check": "ok" if not issues else "issues_found",
-                "foreign_key_violations": 0,
-                "issues": issues,
-                "passed": len(issues) == 0,
-            }
-        })
+        fk_violation_count = 0
+        orphan_by_table = []
+        for child_name, fk_col, parent_name, pk_col, nullable in FK_RELATIONSHIPS:
+            child_model = _resolve(child_name)
+            parent_model = _resolve(parent_name)
+            if child_model is None or parent_model is None:
+                continue
+            parent_ref = aliased(parent_model) if child_model is parent_model else parent_model
+            child_fk = getattr(child_model, fk_col)
+            parent_pk = getattr(parent_ref, pk_col)
+            q = db.session.query(child_model).outerjoin(
+                parent_ref, child_fk == parent_pk
+            ).filter(parent_pk.is_(None))
+            if nullable:
+                q = q.filter(child_fk.isnot(None))
+            try:
+                count = q.count()
+            except Exception as e:
+                issues.append({
+                    "type": "fk_check_error",
+                    "table": child_name,
+                    "detail": f"{fk_col} -> {parent_name}: {e}",
+                })
+                continue
+            fk_violation_count += count
+            if count > 0:
+                orphan_by_table.append({
+                    "child_table": child_name,
+                    "fk_column": fk_col,
+                    "parent_table": parent_name,
+                    "count": count,
+                })
+
+        try:
+            neg_inventory_count = db.session.query(Inventory).filter(
+                Inventory.quantity < 0
+            ).count()
+        except Exception as e:
+            neg_inventory_count = 0
+            issues.append({"type": "inventory_check_error", "table": "Inventory", "detail": str(e)})
+
+        try:
+            stale_token_cutoff = datetime.now() - timedelta(hours=24)
+            stale_token_count = PasswordResetToken.query.filter(
+                PasswordResetToken.used == False,
+                PasswordResetToken.expires_at < stale_token_cutoff,
+            ).count()
+        except Exception as e:
+            stale_token_count = 0
+            issues.append({"type": "token_check_error", "table": "PasswordResetTokens", "detail": str(e)})
+
+        checks = {
+            "foreign_key_violations": {
+                "ok": fk_violation_count == 0,
+                "count": fk_violation_count,
+            },
+            "orphan_rows": {
+                "ok": fk_violation_count == 0,
+                "total": fk_violation_count,
+                "by_table": orphan_by_table,
+            },
+            "negative_inventory": {
+                "ok": neg_inventory_count == 0,
+                "count": neg_inventory_count,
+            },
+            "stale_password_tokens": {
+                "ok": stale_token_count == 0,
+                "count": stale_token_count,
+            },
+        }
+
+        passed = (
+            fk_violation_count == 0
+            and neg_inventory_count == 0
+            and stale_token_count == 0
+            and not issues
+        )
+
+        if passed:
+            summary = f"All 4 checks passed; {len(tables)} tables scanned"
+        else:
+            parts = []
+            if fk_violation_count:
+                parts.append(f"{fk_violation_count} orphan row(s)")
+            if neg_inventory_count:
+                parts.append(f"{neg_inventory_count} negative inventory")
+            if stale_token_count:
+                parts.append(f"{stale_token_count} stale password token(s)")
+            if issues:
+                parts.append(f"{len(issues)} hard error(s)")
+            summary = f"Issues found: {', '.join(parts) if parts else 'see details'}"
+
+        response_data = {
+            "integrity_check": "ok" if passed else "issues_found",
+            "foreign_key_violations": fk_violation_count,
+            "issues": issues,
+            "passed": passed,
+            "summary": summary,
+            "ran_at": datetime.now().isoformat(),
+            "checks": checks,
+            "tables": tables,
+        }
+
+        user_id = data.get("user_id")
+        if user_id:
+            try:
+                log_activity(
+                    user_id=user_id,
+                    module="maintenance",
+                    action_type="integrity_check",
+                    action="Ran database integrity check",
+                    details={
+                        "passed": passed,
+                        "fk_violations": fk_violation_count,
+                        "negative_inventory": neg_inventory_count,
+                        "stale_tokens": stale_token_count,
+                        "table_errors": len(issues),
+                    },
+                )
+            except Exception:
+                pass
+
+        return jsonify({"success": True, "data": response_data})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -265,16 +428,45 @@ def run_vacuum():
     try:
         if db.engine.url.drivername != "postgresql":
             return jsonify({"success": False, "error": "VACUUM is only available in PostgreSQL mode"}), 400
+        size_before = db.session.execute(
+            text("SELECT pg_database_size(current_database())")
+        ).scalar()
         start = time.time()
         db.session.execute(text("VACUUM ANALYZE"))
         db.session.commit()
+        size_after = db.session.execute(
+            text("SELECT pg_database_size(current_database())")
+        ).scalar()
         elapsed = round(time.time() - start, 2)
+        space_saved = max(0, (size_before or 0) - (size_after or 0))
+        result = {
+            "duration_seconds": elapsed,
+            "size_before": size_before or 0,
+            "size_after": size_after or 0,
+            "size_before_formatted": _format_size(size_before or 0),
+            "size_after_formatted": _format_size(size_after or 0),
+            "space_saved": space_saved,
+            "space_saved_formatted": _format_size(space_saved),
+        }
+        user_id = data.get("user_id")
+        if user_id:
+            try:
+                log_activity(
+                    user_id=user_id,
+                    module="maintenance",
+                    action_type="optimize",
+                    action="Ran VACUUM ANALYZE",
+                    details={"space_saved": space_saved, "duration_seconds": elapsed},
+                )
+            except Exception:
+                pass
         return jsonify({
             "success": True,
             "message": "VACUUM ANALYZE completed",
-            "data": {"duration_seconds": elapsed}
+            "data": result
         })
     except Exception as e:
+        db.session.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -291,6 +483,18 @@ def run_reindex():
         db.session.execute(text("REINDEX SCHEMA public"))
         db.session.commit()
         elapsed = round(time.time() - start, 2)
+        user_id = data.get("user_id")
+        if user_id:
+            try:
+                log_activity(
+                    user_id=user_id,
+                    module="maintenance",
+                    action_type="optimize",
+                    action="Ran REINDEX",
+                    details={"duration_seconds": elapsed},
+                )
+            except Exception:
+                pass
         return jsonify({
             "success": True,
             "message": "Indexes rebuilt successfully",
