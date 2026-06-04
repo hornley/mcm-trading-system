@@ -4,10 +4,9 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy import cast, Integer, func
 from models import db, User, Product, Location, Inventory, Order, OrderItem, Payment
 from models import StockTransfer, StockAdjustment, ActivityLog, StoreReport
+from utils.backup_storage import list_backups as storage_list_backups
 
 reports_bp = Blueprint("reports", __name__)
-
-BACKUP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "db", "backups")
 
 
 def _authorized(usertype):
@@ -376,19 +375,7 @@ def system_summary():
         activity_7d = ActivityLog.query.filter(ActivityLog.timestamp >= cutoff_7d).count()
         activity_30d = ActivityLog.query.filter(ActivityLog.timestamp >= cutoff_30d).count()
 
-        backups = []
-        os.makedirs(BACKUP_DIR, exist_ok=True)
-        for f in os.listdir(BACKUP_DIR):
-            if f.endswith(".json"):
-                fpath = os.path.join(BACKUP_DIR, f)
-                stat = os.stat(fpath)
-                backups.append({
-                    "filename": f,
-                    "size": stat.st_size,
-                    "size_formatted": _format_size(stat.st_size),
-                    "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                })
-
+        backups = storage_list_backups()
         backups.sort(key=lambda b: b["created_at"], reverse=True)
 
         return jsonify({
