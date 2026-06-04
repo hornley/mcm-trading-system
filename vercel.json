@@ -3,7 +3,6 @@
   "outputDirectory": "frontend/dist",
   "installCommand": "uv pip install --system -r backend/requirements.txt",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ]
 }
