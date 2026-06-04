@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, app, send_from_directory
+from flask import Flask, send_from_directory
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 
@@ -84,6 +84,8 @@ def create_app():
     return app
 
 
+app = create_app()
+
+
 if __name__ == "__main__":
-    app = create_app()
     app.run(debug=True, port=5000)
