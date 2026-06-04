@@ -1,8 +1,9 @@
 import os
 import json
 import time
+from io import BytesIO
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify, send_from_directory
+from flask import Blueprint, request, jsonify, send_file
 from sqlalchemy import text
 from sqlalchemy.orm import aliased
 from models import db, User, Product, Location, Category, Inventory
@@ -10,14 +11,16 @@ from models import StockTransfer, StockAdjustment, ActivityLog, Order, OrderItem
 from models import PasswordResetToken, StockRequest, StoreReport, ManualSection
 from utils.sorting import quick_sort
 from utils.activity_logger import log_activity
+from utils.backup_storage import (
+    create_backup as storage_create_backup,
+    list_backups as storage_list_backups,
+    download_backup_json as storage_download_json,
+    delete_backup as storage_delete_backup,
+    backup_count as storage_backup_count,
+)
+from config import IS_PRODUCTION
 
 admin_bp = Blueprint("admin", __name__)
-
-BACKUP_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "..", "db", "backups"
-)
-os.makedirs(BACKUP_DIR, exist_ok=True)
 
 BACKUP_MODELS = [
     ("Users", User), ("Locations", Location), ("Categories", Category),
@@ -86,15 +89,6 @@ def _serialise_row(row):
     return d
 
 
-def _create_backup_file(data):
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"backup_{timestamp}.json"
-    filepath = os.path.join(BACKUP_DIR, filename)
-    with open(filepath, "w") as f:
-        json.dump(data, f, indent=2)
-    return filename, filepath
-
-
 def _resolve(name):
     for n, m in BACKUP_MODELS:
         if n == name:
@@ -112,17 +106,7 @@ def list_backups():
     try:
         sort_by = request.args.get("sort_by", "created_at")
         sort_order = request.args.get("sort_order", "desc")
-        files = []
-        for f in os.listdir(BACKUP_DIR):
-            if f.endswith(".json"):
-                fpath = os.path.join(BACKUP_DIR, f)
-                stat = os.stat(fpath)
-                files.append({
-                    "filename": f,
-                    "size": stat.st_size,
-                    "size_formatted": _format_size(stat.st_size),
-                    "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                })
+        files = storage_list_backups()
         files = quick_sort(files, key=sort_by, order=sort_order)
         return jsonify({"success": True, "data": files})
     except Exception as e:
@@ -141,11 +125,11 @@ def create_backup():
             rows = model.query.all()
             backup_data[name] = [_serialise_row(r) for r in rows]
 
-        filename, filepath = _create_backup_file(backup_data)
+        result = storage_create_backup(backup_data)
         return jsonify({
             "success": True,
             "message": f"Backup created ({len(json.dumps(backup_data))} bytes)",
-            "data": {"filename": filename, "size": os.path.getsize(filepath)},
+            "data": result,
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -160,12 +144,8 @@ def restore_backup(filename):
     try:
         if ".." in filename or "/" in filename:
             return jsonify({"success": False, "error": "Invalid filename"}), 400
-        backup_path = os.path.join(BACKUP_DIR, filename)
-        if not os.path.exists(backup_path):
-            return jsonify({"success": False, "error": "Backup file not found"}), 404
 
-        with open(backup_path) as f:
-            backup_data = json.load(f)
+        backup_data = storage_download_json(filename)
 
         for name, model in reversed(BACKUP_MODELS):
             db.session.query(model).delete()
@@ -201,10 +181,7 @@ def delete_backup(filename):
     try:
         if ".." in filename or "/" in filename:
             return jsonify({"success": False, "error": "Invalid filename"}), 400
-        backup_path = os.path.join(BACKUP_DIR, filename)
-        if not os.path.exists(backup_path):
-            return jsonify({"success": False, "error": "Backup file not found"}), 404
-        os.remove(backup_path)
+        storage_delete_backup(filename)
         return jsonify({"success": True, "message": "Backup deleted"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -217,11 +194,17 @@ def download_backup(filename):
         return jsonify({"success": False, "error": "Unauthorized"}), 403
     if ".." in filename or "/" in filename:
         return jsonify({"success": False, "error": "Invalid filename"}), 400
-    if not os.path.exists(os.path.join(BACKUP_DIR, filename)):
-        return jsonify({"success": False, "error": "Backup file not found"}), 404
-    return send_from_directory(
-        BACKUP_DIR, filename, as_attachment=True, download_name=filename
-    )
+    try:
+        raw = storage_download_json(filename)
+        content = json.dumps(raw, indent=2).encode("utf-8")
+        return send_file(
+            BytesIO(content),
+            mimetype="application/json",
+            as_attachment=True,
+            download_name=filename,
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ── SYSTEM INFO ──
@@ -261,7 +244,7 @@ def system_info():
                 "db_version": db_version,
                 "database_size": db_bytes,
                 "database_size_formatted": _format_size(db_bytes),
-                "backup_count": len([f for f in os.listdir(BACKUP_DIR) if f.endswith(".json")]),
+                "backup_count": storage_backup_count(),
                 "table_counts": counts_list,
             }
         })
@@ -473,6 +456,8 @@ def run_vacuum():
     usertype = data.get("usertype")
     if not _authorized(usertype):
         return jsonify({"success": False, "error": "Unauthorized"}), 403
+    if IS_PRODUCTION:
+        return jsonify({"success": False, "error": "VACUUM is disabled in production"}), 400
     try:
         if db.engine.url.drivername != "postgresql":
             return jsonify({"success": False, "error": "VACUUM is only available in PostgreSQL mode"}), 400
@@ -524,6 +509,8 @@ def run_reindex():
     usertype = data.get("usertype")
     if not _authorized(usertype):
         return jsonify({"success": False, "error": "Unauthorized"}), 403
+    if IS_PRODUCTION:
+        return jsonify({"success": False, "error": "REINDEX is disabled in production"}), 400
     try:
         if db.engine.url.drivername != "postgresql":
             return jsonify({"success": False, "error": "REINDEX is only available in PostgreSQL mode"}), 400
