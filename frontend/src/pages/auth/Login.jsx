@@ -22,12 +22,14 @@ const Login = () => {
       })
       const data = await res.json()
       if (!res.ok) {
-        message.error(data.error)
+        console.error('Login 500:', data)
+        message.error(data.error || data.message || 'Server error')
         return
       }
       login(data)
       navigate(`/dashboard/${data.role}`)
-    } catch {
+    } catch (e) {
+      console.error('Login request failed:', e)
       message.error('Connection error. Is the server running?')
     } finally {
       setLoading(false)
