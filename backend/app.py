@@ -4,6 +4,9 @@ from flask import Flask, send_from_directory
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 
+from config import validate_production
+validate_production()
+
 DB_MODE = os.environ.get("DB_MODE", "remote")
 
 if DB_MODE == "remote":
