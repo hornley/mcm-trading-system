@@ -62,11 +62,23 @@ def create_app():
     @app.errorhandler(Exception)
     def handle_error(e):
         original = getattr(e, "original_exception", None) or e
+        import sys
+        print(f"[500 ERROR] {original}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         return {"success": False, "error": str(original)}, getattr(e, "code", 500)
 
     @app.route("/api/health")
     def health():
         return {"status": "ok"}
+
+    @app.route("/api/health/db")
+    def health_db():
+        try:
+            from models import User
+            count = User.query.count()
+            return {"status": "ok", "users": count}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}, 500
 
     @app.route("/assets/<path:filename>")
     def serve_assets(filename):
