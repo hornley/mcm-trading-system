@@ -71,6 +71,11 @@ def create_app():
     def health():
         return {"status": "ok"}
 
+    @app.before_request
+    def log_request():
+        import sys
+        print(f"[REQUEST] {request.method} {request.path} (HOST: {request.host})", file=sys.stderr)
+
     @app.route("/api/health/db")
     def health_db():
         try:
