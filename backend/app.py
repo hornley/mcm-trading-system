@@ -37,8 +37,12 @@ from routes.orders import orders_bp
 from routes.manual import manual_bp
 
 def create_app():
+    import sys
+    print("[CREATE_APP] starting ...", file=sys.stderr)
+
     app = Flask(__name__, static_folder=FRONTEND_DIST)
     app.config.from_object(Config)
+    print(f"[CREATE_APP] SQLALCHEMY_DATABASE_URI = {'SET' if app.config.get('SQLALCHEMY_DATABASE_URI') else 'NOT SET'}", file=sys.stderr)
     app.config['MAIL_SERVER'] = 'smtp.gmail.com'
     app.config['MAIL_PORT'] = 587
     app.config['MAIL_USE_TLS'] = True
@@ -47,6 +51,7 @@ def create_app():
     CORS(app)
     mail.init_app(app)
     db.init_app(app)
+    print("[CREATE_APP] registering blueprints ...", file=sys.stderr)
     app.register_blueprint(account_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(inventory_bp)
@@ -74,7 +79,29 @@ def create_app():
     @app.before_request
     def log_request():
         import sys
-        print(f"[REQUEST] {request.method} {request.path} (HOST: {request.host})", file=sys.stderr)
+        path_info = request.environ.get('PATH_INFO', '?')
+        raw_uri = request.environ.get('REQUEST_URI', '?')
+        query = request.environ.get('QUERY_STRING', '')
+        print(f"[REQUEST] {request.method} {request.path} | PATH_INFO={path_info} RAW_URI={raw_uri} QS={query} | Content-Type={request.content_type}", file=sys.stderr)
+
+    @app.route("/api/debug", methods=["GET", "POST"])
+    def debug_info():
+        import sys, os as _os
+        return jsonify({
+            "python": sys.version,
+            "cwd": _os.getcwd(),
+            "env_DATABASE_URL": "SET" if _os.environ.get("DATABASE_URL") else "MISSING",
+            "env_DB_MODE": _os.environ.get("DB_MODE", "not set"),
+            "env_SUPABASE_URL": "SET" if _os.environ.get("SUPABASE_URL") else "MISSING",
+            "env_IS_PRODUCTION": _os.environ.get("IS_PRODUCTION", "not set"),
+            "uri": app.config.get("SQLALCHEMY_DATABASE_URI", "NOT SET")[:40] + "..." if app.config.get("SQLALCHEMY_DATABASE_URI") else "NOT SET",
+            "path_info": request.environ.get("PATH_INFO", "?"),
+            "request_uri": request.environ.get("REQUEST_URI", "?"),
+            "script_name": request.environ.get("SCRIPT_NAME", "?"),
+            "request_path": request.path,
+            "request_url": request.url,
+            "headers": dict(request.headers),
+        })
 
     @app.route("/api/health/db")
     def health_db():
