@@ -2,14 +2,12 @@ import sys
 import os
 import traceback
 
-print(f"[BOOT] Python {sys.version} | cwd={os.getcwd()} | __file__={__file__}", file=sys.stderr)
+app = None
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 try:
-    print("[BOOT] importing app.create_app ...", file=sys.stderr)
     from app import create_app
-    print("[BOOT] calling create_app() ...", file=sys.stderr)
     app = create_app()
     print(f"[BOOT] app created OK — {len(app.url_map._rules)} routes", file=sys.stderr)
 
