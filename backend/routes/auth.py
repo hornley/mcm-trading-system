@@ -3,6 +3,7 @@ import secrets
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
+from config import APP_BASE_URL
 from models import db, User, Location, PasswordResetToken
 from flask_mail import Message
 
@@ -111,7 +112,7 @@ def forgot_password():
     db.session.add(reset_token)
     db.session.commit()
     
-    reset_url = f"http://localhost:5173/reset-password/{token}"
+    reset_url = f"{APP_BASE_URL}/reset-password/{token}"
     
     html_content = f"""
     <!DOCTYPE html>
