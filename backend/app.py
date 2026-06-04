@@ -1,7 +1,7 @@
 import os
 import traceback
 from dotenv import load_dotenv
-from flask import Flask, send_from_directory
+from flask import Flask, request, send_from_directory
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 
@@ -77,12 +77,16 @@ def create_app():
         return {"status": "ok"}
 
     @app.before_request
-    def log_request():
+    def log_and_fix_request():
         import sys
         path_info = request.environ.get('PATH_INFO', '?')
         raw_uri = request.environ.get('REQUEST_URI', '?')
-        query = request.environ.get('QUERY_STRING', '')
-        print(f"[REQUEST] {request.method} {request.path} | PATH_INFO={path_info} RAW_URI={raw_uri} QS={query} | Content-Type={request.content_type}", file=sys.stderr)
+        original = request.headers.get('X-Vercel-Original-Url', '')
+        print(f"[REQUEST] {request.method} PATH_INFO={path_info} RAW_URI={raw_uri} X-Vercel-Original-Url={original}", file=sys.stderr)
+        if original and path_info == '/api/index':
+            parsed = original.split('?')[0]
+            request.environ['PATH_INFO'] = parsed
+            print(f"[REQUEST] fixed PATH_INFO to {parsed}", file=sys.stderr)
 
     @app.route("/api/debug", methods=["GET", "POST"])
     def debug_info():
