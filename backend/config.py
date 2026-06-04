@@ -12,9 +12,14 @@ DB_MODE = os.getenv("DB_MODE", "remote")
 if DB_MODE == "local":
     _db_path = os.path.join(BASE_DIR, "..", "db", "database.db")
     _uri = f"sqlite:///{os.path.abspath(_db_path)}"
-else:
+elif DB_MODE == "remote":
     _uri = os.getenv("DATABASE_URL")
-    if _uri and "sslmode" not in _uri:
+    if not _uri:
+        raise RuntimeError(
+            "DATABASE_URL is required when DB_MODE=remote. "
+            "Set it in your Vercel environment variables."
+        )
+    if "sslmode" not in _uri:
         separator = "&" if "?" in _uri else "?"
         _uri = f"{_uri}{separator}sslmode=require"
 
