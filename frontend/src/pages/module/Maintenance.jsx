@@ -24,6 +24,7 @@ const _formatSize = (bytes) => {
 
 const Maintenance = () => {
   const { user } = useAuth();
+  const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
   const [loading, setLoading] = useState(false);
   const [systemInfo, setSystemInfo] = useState(null);
   const [backups, setBackups] = useState([]);
@@ -86,6 +87,18 @@ const Maintenance = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCreateBackupClick = () => {
+    setConfirmModal({
+      title: 'Create Backup',
+      content: 'This will create a new backup of the current database state.',
+      okText: 'Create Backup',
+      onOk: async () => {
+        setConfirmModal(null);
+        await handleCreateBackup();
+      },
+    });
   };
 
   const handleRestoreBackup = (filename) => {
@@ -169,6 +182,18 @@ const Maintenance = () => {
     }
   };
 
+  const handleIntegrityCheckClick = () => {
+    setConfirmModal({
+      title: 'Run Integrity Check',
+      content: 'This will scan the database for orphan rows, foreign key violations, negative inventory, and stale tokens.',
+      okText: 'Run Check',
+      onOk: async () => {
+        setConfirmModal(null);
+        await handleIntegrityCheck();
+      },
+    });
+  };
+
   const handleVacuum = async () => {
     setVacuumResult(null);
     setLoading(true);
@@ -193,6 +218,18 @@ const Maintenance = () => {
     }
   };
 
+  const handleVacuumClick = () => {
+    setConfirmModal({
+      title: 'Run VACUUM',
+      content: 'This will reclaim unused space by rebuilding the database file. The database may be briefly locked during this operation.',
+      okText: 'Run VACUUM',
+      onOk: async () => {
+        setConfirmModal(null);
+        await handleVacuum();
+      },
+    });
+  };
+
   const handleReindex = async () => {
     setReindexResult(null);
     setLoading(true);
@@ -214,6 +251,18 @@ const Maintenance = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleReindexClick = () => {
+    setConfirmModal({
+      title: 'Run REINDEX',
+      content: 'This will rebuild all database indexes for better query performance.',
+      okText: 'Run REINDEX',
+      onOk: async () => {
+        setConfirmModal(null);
+        await handleReindex();
+      },
+    });
   };
 
   const handleCleanup = () => {
@@ -483,7 +532,7 @@ const Maintenance = () => {
         <>
           <Row style={{ marginBottom: 16 }}>
             <Col>
-              <Button type="primary" icon={<CloudUploadOutlined />} onClick={handleCreateBackup} loading={loading}>
+              <Button type="primary" icon={<CloudUploadOutlined />} onClick={handleCreateBackupClick} loading={loading}>
                 Create Backup
               </Button>
             </Col>
@@ -505,7 +554,7 @@ const Maintenance = () => {
         <>
           <Row style={{ marginBottom: 16 }}>
             <Col>
-              <Button type="primary" icon={<ToolOutlined />} onClick={handleIntegrityCheck} loading={loading}>
+              <Button type="primary" icon={<ToolOutlined />} onClick={handleIntegrityCheckClick} loading={loading}>
                 Run Integrity Check
               </Button>
             </Col>
@@ -623,9 +672,16 @@ const Maintenance = () => {
             <Card title="Vacuum Database" size="small">
               <Text>Reclaims unused space in the database file.</Text>
               <br /><br />
-              <Button type="primary" onClick={handleVacuum} loading={loading}>
+              <Button
+                type="primary"
+                onClick={handleVacuumClick}
+                loading={loading}
+                disabled={isProduction}
+                title={isProduction ? 'VACUUM is not supported on Vercel serverless deployment' : undefined}
+              >
                 Run VACUUM
               </Button>
+              {isProduction && <Tag color="orange" style={{ marginLeft: 8 }}>Unavailable in production</Tag>}
               {vacuumResult && (
                 <div style={{ marginTop: 12 }}>
                   <Descriptions bordered column={1} size="small">
@@ -642,9 +698,16 @@ const Maintenance = () => {
             <Card title="Rebuild Indexes" size="small">
               <Text>Rebuilds all database indexes for better query performance.</Text>
               <br /><br />
-              <Button type="primary" onClick={handleReindex} loading={loading}>
+              <Button
+                type="primary"
+                onClick={handleReindexClick}
+                loading={loading}
+                disabled={isProduction}
+                title={isProduction ? 'REINDEX is not supported on Vercel serverless deployment' : undefined}
+              >
                 Run REINDEX
               </Button>
+              {isProduction && <Tag color="orange" style={{ marginLeft: 8 }}>Unavailable in production</Tag>}
               {reindexResult && (
                 <div style={{ marginTop: 12 }}>
                   <Descriptions bordered column={1} size="small">
