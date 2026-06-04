@@ -1,4 +1,5 @@
 import os
+import traceback
 from dotenv import load_dotenv
 from flask import Flask, send_from_directory
 
@@ -58,13 +59,10 @@ def create_app():
     app.register_blueprint(orders_bp)
     app.register_blueprint(manual_bp)
 
-    with app.app_context():
-        from models import (
-            User, Location, Category, Product, Order, OrderItem,
-            Payment, Inventory, StockTransfer, StockAdjustment, ActivityLog,
-            PasswordResetToken, StockRequest, ManualSection,
-        )
-        db.create_all()
+    @app.errorhandler(Exception)
+    def handle_error(e):
+        original = getattr(e, "original_exception", None) or e
+        return {"success": False, "error": str(original)}, getattr(e, "code", 500)
 
     @app.route("/api/health")
     def health():
@@ -87,8 +85,6 @@ def create_app():
     return app
 
 
-app = create_app()
-
-
 if __name__ == "__main__":
+    app = create_app()
     app.run(debug=True, port=5000)

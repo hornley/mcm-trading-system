@@ -14,6 +14,9 @@ if DB_MODE == "local":
     _uri = f"sqlite:///{os.path.abspath(_db_path)}"
 else:
     _uri = os.getenv("DATABASE_URL")
+    if _uri and "sslmode" not in _uri:
+        separator = "&" if "?" in _uri else "?"
+        _uri = f"{_uri}{separator}sslmode=require"
 
 
 def validate_production():
@@ -34,3 +37,8 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
     SQLALCHEMY_DATABASE_URI = _uri
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_size": 1,
+        "pool_recycle": 60,
+        "pool_pre_ping": True,
+    }
