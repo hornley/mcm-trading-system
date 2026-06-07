@@ -1206,7 +1206,7 @@ def list_pending_requests():
     user_id = request.args.get("user_id", type=int)
     query = StockRequest.query.filter_by(status="pending").order_by(StockRequest.created_at.desc())
     if from_location_id:
-        query = query.filter_by(to_location_id=from_location_id)
+        query = query.filter_by(from_location_id=from_location_id)
     if user_id:
         query = query.filter(StockRequest.requested_by != user_id)
     requests = query.limit(50).all()
@@ -1234,9 +1234,7 @@ def list_request_logs():
     usertype = request.args.get("usertype", type=int)
     query = StockRequest.query.order_by(StockRequest.created_at.desc())
     if location_id and location_id != "all":
-        query = query.filter(
-            (StockRequest.from_location_id == location_id) | (StockRequest.to_location_id == location_id)
-        )
+        query = query.filter_by(from_location_id=location_id)
     requests = query.limit(100).all()
     return success_response([{
         "request_id": r.request_id,
