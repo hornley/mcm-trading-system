@@ -32,7 +32,9 @@ def notifications_count():
         return error_response("location_id is required", "MISSING_PARAM", 400)
 
     count = Notification.query.filter_by(location_id=location_id, is_read=False).count()
-    return success_response({"count": count})
+    resp = success_response({"count": count})
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return resp
 
 
 @notifications_bp.route("/api/notifications/<int:notification_id>/read", methods=["PUT"])
@@ -53,3 +55,23 @@ def mark_all_read():
     Notification.query.filter_by(location_id=location_id, is_read=False).update({"is_read": True})
     db.session.commit()
     return success_response({"message": "All marked as read"})
+
+
+@notifications_bp.route("/api/notifications/<int:notification_id>", methods=["DELETE"])
+def delete_notification(notification_id):
+    notification = Notification.query.get(notification_id)
+    if not notification:
+        return error_response("Notification not found", "NOT_FOUND", 404)
+    db.session.delete(notification)
+    db.session.commit()
+    return success_response({"message": "Notification deleted"})
+
+
+@notifications_bp.route("/api/notifications", methods=["DELETE"])
+def clear_notifications():
+    location_id = request.args.get("location_id", type=int)
+    if not location_id:
+        return error_response("location_id is required", "MISSING_PARAM", 400)
+    Notification.query.filter_by(location_id=location_id).delete()
+    db.session.commit()
+    return success_response({"message": "All notifications cleared"})

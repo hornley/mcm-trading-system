@@ -58,7 +58,6 @@ const StockManagement = () => {
   const [requestLogVisible, setRequestLogVisible] = useState(false);
   const [requestLogs, setRequestLogs] = useState([]);
   const [requestLogLoading, setRequestLogLoading] = useState(false);
-  const [autoRestockSourceId, setAutoRestockSourceId] = useState(null);
   const [reorderSourceId, setReorderSourceId] = useState(null);
 
   const fetchData = async (page, sortOverrides) => {
@@ -96,9 +95,6 @@ const StockManagement = () => {
       setLocations(activeLocs);
       setStorehouse(activeLocs.find((l) => l.is_storehouse) || null);
       const currentLoc = activeLocs.find((l) => l.location_id === Number(selectedLocationId));
-      if (currentLoc?.auto_restock_source_id) {
-        setAutoRestockSourceId(currentLoc.auto_restock_source_id);
-      }
     }
     } catch {
       message.error('Failed to load data');
@@ -164,7 +160,7 @@ const StockManagement = () => {
 
   const handleSetReorder = (record) => {
     setSelectedRecord(record);
-    setReorderSourceId(autoRestockSourceId);
+    setReorderSourceId(record.auto_restock_source_id || null);
     reorderForm.resetFields();
     reorderForm.setFieldsValue({ reorder_level: record.reorder_level ? Number(record.reorder_level) : 0 });
     setReorderVisible(true);
@@ -184,8 +180,9 @@ const StockManagement = () => {
       });
       const data = await res.json();
       if (data.success) {
-        if (values.source_branch && values.source_branch !== autoRestockSourceId) {
-          const locRes = await fetch(`/api/locations/${selectedLocationId}`, {
+        const prevSource = selectedRecord.auto_restock_source_id || null;
+        if (values.source_branch && values.source_branch !== prevSource) {
+          await fetch(`/api/products/${selectedRecord.product_id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -193,11 +190,6 @@ const StockManagement = () => {
               auto_restock_source_id: values.source_branch,
             }),
           });
-          const locData = await locRes.json();
-          if (locData.success) {
-            setAutoRestockSourceId(values.source_branch);
-            setLocations((prev) => prev.map((l) => l.location_id === Number(selectedLocationId) ? { ...l, auto_restock_source_id: values.source_branch } : l));
-          }
         }
         message.success('Reorder level updated');
         setReorderVisible(false);
@@ -512,10 +504,11 @@ const StockManagement = () => {
       key: 'autoRestock',
       render: (_, record) => {
         const level = Number(record.reorder_level) || 0;
-        const source = locations.find((l) => l.location_id === autoRestockSourceId);
-        return level > 0 && autoRestockSourceId
+        const sourceId = record.auto_restock_source_id;
+        const source = locations.find((l) => l.location_id === sourceId);
+        return level > 0 && sourceId
           ? <Tag color="green">{source?.name || 'Source Set'}</Tag>
-          : <Tag>{autoRestockSourceId ? 'Inactive' : 'No Source Set'}</Tag>;
+          : <Tag>{sourceId ? 'Inactive' : 'No Source Set'}</Tag>;
       },
     },
     {
@@ -633,12 +626,6 @@ const StockManagement = () => {
           <Space>
             <Tag color="green">Storehouse</Tag>
             <span><strong>{storehouse.name}</strong></span>
-            {autoRestockSourceId && (
-              <>
-                <span style={{ color: '#8c8c8c' }}>|</span>
-                <span>Auto-restock source: <strong>{locations.find((l) => l.location_id === autoRestockSourceId)?.name || 'Unknown'}</strong></span>
-              </>
-            )}
           </Space>
         </Card>
       )}

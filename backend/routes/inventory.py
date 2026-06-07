@@ -33,16 +33,19 @@ def _can_delete(usertype):
 
 def check_and_auto_restock(location_id):
     location = Location.query.get(location_id)
-    if not location or not location.auto_restock_source_id:
-        return
-    source_id = location.auto_restock_source_id
-    source = Location.query.get(source_id)
-    if not source:
+    if not location:
         return
     inventory_list = Inventory.query.filter_by(location_id=location_id).all()
     for inv in inventory_list:
+        product = inv.product
+        if not product or not product.auto_restock_source_id:
+            continue
+        source_id = product.auto_restock_source_id
+        source = Location.query.get(source_id)
+        if not source:
+            continue
         try:
-            level = int(inv.product.reorder_level) if inv.product and inv.product.reorder_level else 0
+            level = int(product.reorder_level) if product and product.reorder_level else 0
         except (ValueError, TypeError):
             level = 0
         if level <= 0 or inv.quantity >= level:
@@ -50,11 +53,10 @@ def check_and_auto_restock(location_id):
         source_inv = Inventory.query.filter_by(product_id=inv.product_id, location_id=source_id).first()
         deficit = level - inv.quantity
         if not source_inv or source_inv.quantity <= 0:
-            notif = Notification(
+            db.session.add(Notification(
                 location_id=location_id, type="restock_failed",
                 message=f"Auto-restock failed for {inv.product.name}: insufficient stock at {source.name}",
-            )
-            db.session.add(notif)
+            ))
             continue
         transfer_qty = min(deficit, source_inv.quantity)
         if transfer_qty <= 0:
@@ -92,6 +94,7 @@ def _serialize_product(product, include_inventory=False):
         "category": product.category.name if product.category else None,
         "price": product.price,
         "reorder_level": product.reorder_level,
+        "auto_restock_source_id": product.auto_restock_source_id,
         "description": product.description,
         "sku": product.sku,
         "unit": product.unit,
@@ -297,6 +300,8 @@ def update_product(product_id):
         product.price = data["price"]
     if "reorder_level" in data:
         product.reorder_level = data["reorder_level"]
+    if "auto_restock_source_id" in data:
+        product.auto_restock_source_id = data["auto_restock_source_id"]
     if "description" in data:
         product.description = data["description"]
     if "unit" in data:
@@ -519,6 +524,7 @@ def list_inventory():
                 "location_name": inv.location.name if inv.location else None,
                 "quantity": inv.quantity,
                 "reorder_level": inv.product.reorder_level,
+                "auto_restock_source_id": inv.product.auto_restock_source_id,
             }
             for inv in inventory
         ],

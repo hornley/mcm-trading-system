@@ -59,6 +59,7 @@ class Product(db.Model):
     name = db.Column(db.String, nullable=False)
     price = db.Column(db.Integer, nullable=False)
     reorder_level = db.Column(db.String)
+    auto_restock_source_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=True)
     description = db.Column(db.Text)
     sku = db.Column(db.String, unique=True)
     unit = db.Column(db.String)
