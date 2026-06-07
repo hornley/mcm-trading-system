@@ -191,6 +191,19 @@ const StockManagement = () => {
       const values = await adjustForm.validateFields();
 
       if (requestPreset) {
+        const sourceRes = await fetch(`/api/inventory/product/${selectedRecord.product_id}?usertype=${user.usertype}&location_id=${values.from_location_id}`);
+        const sourceData = await sourceRes.json();
+        if (sourceData.success) {
+          const sourceInv = sourceData.data.find(i => i.location_id === values.from_location_id);
+          const sourceQty = sourceInv?.quantity || 0;
+          if (sourceQty < values.quantity) {
+            adjustForm.setFields([{
+              name: 'from_location_id',
+              errors: [`Insufficient stock at this branch (available: ${fmtQty(sourceQty, selectedRecord?.category === FABRIC_CATEGORY)})`],
+            }]);
+            return;
+          }
+        }
         const res = await fetch('/api/inventory/request-stock', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
