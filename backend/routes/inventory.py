@@ -1223,3 +1223,31 @@ def list_pending_requests():
         "status": r.status,
         "created_at": r.created_at.isoformat() if r.created_at else None,
     } for r in requests])
+
+
+@inventory_bp.route("/api/inventory/request-logs", methods=["GET"])
+def list_request_logs():
+    location_id = request.args.get("location_id", type=int)
+    usertype = request.args.get("usertype", type=int)
+    query = StockRequest.query.order_by(StockRequest.created_at.desc())
+    if location_id and location_id != "all":
+        query = query.filter(
+            (StockRequest.from_location_id == location_id) | (StockRequest.to_location_id == location_id)
+        )
+    requests = query.limit(100).all()
+    return success_response([{
+        "request_id": r.request_id,
+        "product_id": r.product_id,
+        "product_name": r.product.name if r.product else "Unknown",
+        "quantity": r.quantity,
+        "is_fabric": is_fabric_category(r.product.category_id) if r.product else False,
+        "description": r.description,
+        "from_location_id": r.from_location_id,
+        "from_location_name": r.from_location.name if r.from_location else "Unknown",
+        "to_location_id": r.to_location_id,
+        "to_location_name": r.to_location.name if r.to_location else "Unknown",
+        "requested_by": r.requested_by,
+        "requester_name": r.requester.username if r.requester else "Unknown",
+        "status": r.status,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+    } for r in requests])
