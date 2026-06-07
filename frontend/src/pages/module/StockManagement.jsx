@@ -58,6 +58,9 @@ const StockManagement = () => {
   const [requestLogVisible, setRequestLogVisible] = useState(false);
   const [requestLogs, setRequestLogs] = useState([]);
   const [requestLogLoading, setRequestLogLoading] = useState(false);
+  const [autoRestockVisible, setAutoRestockVisible] = useState(false);
+  const [autoRestockSourceId, setAutoRestockSourceId] = useState(null);
+  const [autoRestockSubmitting, setAutoRestockSubmitting] = useState(false);
 
   const fetchData = async (page, sortOverrides) => {
     if (!user) return;
@@ -89,11 +92,15 @@ const StockManagement = () => {
       if (countData.success) {
         setStats(countData.data);
       }
-      if (locData.success) {
-        const activeLocs = locData.data.filter((l) => l.is_active);
-        setLocations(activeLocs);
-        setStorehouse(activeLocs.find((l) => l.is_storehouse) || null);
+    if (locData.success) {
+      const activeLocs = locData.data.filter((l) => l.is_active);
+      setLocations(activeLocs);
+      setStorehouse(activeLocs.find((l) => l.is_storehouse) || null);
+      const currentLoc = activeLocs.find((l) => l.location_id === Number(selectedLocationId));
+      if (currentLoc?.auto_restock_source_id) {
+        setAutoRestockSourceId(currentLoc.auto_restock_source_id);
       }
+    }
     } catch {
       message.error('Failed to load data');
     } finally {
@@ -457,6 +464,68 @@ const StockManagement = () => {
   const receiptItems = lowStockItems.filter((i) => selectedRestockIds.has(i.product_id) && (restockQuantities[i.product_id] || 0) > 0);
   const receiptTotalQty = receiptItems.reduce((sum, i) => sum + (restockQuantities[i.product_id] || 0), 0);
   const receiptRef = `RS-${Date.now().toString(36).toUpperCase()}`;
+
+  const autoRestockItems = inventory.filter((item) => {
+    const level = Number(item.reorder_level) || 0;
+    return level > 0 && Number(item.quantity) < level;
+  });
+
+  const handleAutoRestock = async () => {
+    if (!autoRestockSourceId) {
+      message.warning('Please select a source branch');
+      return;
+    }
+    if (autoRestockItems.length === 0) {
+      message.info('No items below reorder level');
+      return;
+    }
+    setAutoRestockSubmitting(true);
+    try {
+      const res = await fetch('/api/inventory/restock-below-reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          usertype: user.usertype,
+          user_id: user.user_id,
+          location_id: selectedLocationId,
+          source_location_id: autoRestockSourceId,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        const src = locations.find((l) => l.location_id === autoRestockSourceId);
+        if (json.data.requested_count > 0) {
+          message.success(`${json.data.requested_count} item(s) requested from ${src?.name}`);
+        }
+        if (json.data.failed_count > 0) {
+          message.warning(`${json.data.failed_count} item(s) failed due to insufficient stock. Check notifications.`);
+        }
+        if (json.data.requested_count > 0 || json.data.failed_count > 0) {
+          const locRes = await fetch(`/api/locations/${selectedLocationId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              usertype: user.usertype,
+              auto_restock_source_id: autoRestockSourceId,
+            }),
+          });
+          const locData = await locRes.json();
+          if (locData.success) {
+            setLocations((prev) => prev.map((l) => l.location_id === Number(selectedLocationId) ? { ...l, auto_restock_source_id: autoRestockSourceId } : l));
+          }
+        }
+        setAutoRestockVisible(false);
+        setAutoRestockSourceId(null);
+      } else {
+        message.error(json.message);
+      }
+    } catch {
+      message.error('Failed to process auto restock');
+    } finally {
+      setAutoRestockSubmitting(false);
+    }
+  };
+
   const columns = [
     {
       title: 'Product Name', dataIndex: 'product_name', key: 'product_name',
@@ -489,10 +558,10 @@ const StockManagement = () => {
       key: 'autoRestock',
       render: (_, record) => {
         const level = Number(record.reorder_level) || 0;
-        const enabled = storehouse && level > 0;
-        return enabled
-          ? <Tag color="green">Active</Tag>
-          : <Tag>{storehouse ? 'Inactive' : 'No Storehouse'}</Tag>;
+        const source = locations.find((l) => l.location_id === autoRestockSourceId);
+        return level > 0 && autoRestockSourceId
+          ? <Tag color="green">{source?.name || 'Source Set'}</Tag>
+          : <Tag>{autoRestockSourceId ? 'Inactive' : 'No Source Set'}</Tag>;
       },
     },
     {
@@ -609,7 +678,13 @@ const StockManagement = () => {
         <Card size="small" style={{ marginBottom: 16, background: 'rgba(82, 196, 26, 0.08)', borderColor: 'rgba(82, 196, 26, 0.3)' }}>
           <Space>
             <Tag color="green">Storehouse</Tag>
-            <span><strong>{storehouse.name}</strong> — auto-restock source branch</span>
+            <span><strong>{storehouse.name}</strong></span>
+            {autoRestockSourceId && (
+              <>
+                <span style={{ color: '#8c8c8c' }}>|</span>
+                <span>Auto-restock source: <strong>{locations.find((l) => l.location_id === autoRestockSourceId)?.name || 'Unknown'}</strong></span>
+              </>
+            )}
           </Space>
         </Card>
       )}
@@ -626,9 +701,9 @@ const StockManagement = () => {
               allowClear
               style={{ width: 220 }}
             />
-            {can('update') && storehouse && (
-              <Button type="primary" onClick={handleBulkRestock} loading={restocking} disabled={selectedLocationId === "all"}>
-                Restock Below Reorder
+            {can('update') && (
+              <Button type="primary" onClick={() => setAutoRestockVisible(true)} disabled={selectedLocationId === "all"}>
+                Auto Restock
               </Button>
             )}
             {can('update') && (
@@ -979,13 +1054,62 @@ const StockManagement = () => {
         />
       </Modal>
 
+      <Modal
+        title="Auto Restock"
+        open={autoRestockVisible}
+        onCancel={() => { setAutoRestockVisible(false); setAutoRestockSourceId(null); }}
+        width={800}
+        footer={[
+          <Button key="cancel" onClick={() => { setAutoRestockVisible(false); setAutoRestockSourceId(null); }}>Cancel</Button>,
+          <Button key="restock" type="primary" loading={autoRestockSubmitting} onClick={handleAutoRestock}>
+            Start Auto Restock
+          </Button>,
+        ]}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Text style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Select Source Branch</Text>
+          <Select
+            placeholder="Choose source branch"
+            value={autoRestockSourceId}
+            onChange={setAutoRestockSourceId}
+            style={{ width: '100%' }}
+            size="large"
+          >
+            {locations.filter((l) => l.location_id !== selectedLocationId).map((loc) => (
+              <Select.Option key={loc.location_id} value={loc.location_id}>{loc.name}</Select.Option>
+            ))}
+          </Select>
+          <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 12 }}>
+            The source branch must have sufficient stock. If stock is insufficient, only a notification will be sent to the current branch with no request made to the source.
+          </Text>
+        </div>
+
+        <Typography.Title level={5} style={{ marginTop: 16 }}>Items Below Reorder Level</Typography.Title>
+        <Table
+          dataSource={autoRestockItems}
+          rowKey="product_id"
+          pagination={false}
+          size="small"
+          bordered
+          columns={[
+            { title: 'Product Name', dataIndex: 'product_name', key: 'product' },
+            { title: 'Category', dataIndex: 'category', key: 'category' },
+            { title: 'Current Qty', dataIndex: 'quantity', key: 'quantity', render: (qty, r) => fmtQty(qty, r.category === FABRIC_CATEGORY) },
+            { title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder', render: (val) => val ?? '-' },
+          ]}
+        />
+        {autoRestockItems.length === 0 && (
+          <div style={{ textAlign: 'center', padding: 24, color: '#999' }}>No items are below reorder level at the current branch.</div>
+        )}
+      </Modal>
+
       <style>{`
         @media print {
           @page { size: legal; margin: 12mm; }
           body * { visibility: hidden; }
           #stock-receipt-print, #stock-receipt-print * { visibility: visible; }
-          #stock-receipt-print { position: fixed; left: 0; top: 0; right: 0; bottom: 0; display: flex !important; justify-content: center; align-items: flex-start; }
-          #stock-receipt-print .receipt-inner { width: auto !important; max-width: 700px !important; margin: 0 auto !important; font-size: 14px !important; padding: 16px 24px !important; }
+          #stock-receipt-print { position: fixed; left: 0; top: 0; width: 100%; display: flex !important; justify-content: center; }
+          #stock-receipt-print .receipt-inner { width: 100% !important; font-size: 14px !important; padding: 16px 24px !important; }
           #stock-receipt-print .receipt-inner table { font-size: 14px !important; }
           #stock-receipt-print .receipt-item { font-size: 13px !important; padding: 4px 0 !important; }
           #stock-receipt-print .receipt-header { font-size: 20px !important; }

@@ -11,6 +11,7 @@ const Topbar = () => {
   const [locations, setLocations] = useState([])
   const [notifOpen, setNotifOpen] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
+  const [notifCount, setNotifCount] = useState(0)
   const isDark = theme === 'dark'
 
   useEffect(() => {
@@ -34,6 +35,14 @@ const Topbar = () => {
         if (data.success) setPendingCount(data.data.length)
       })
       .catch(() => {})
+    if (user.location_id) {
+      fetch(`/api/notifications/count?location_id=${user.location_id}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success) setNotifCount(data.count)
+        })
+        .catch(() => {})
+    }
   }
 
   useEffect(() => {
@@ -71,7 +80,7 @@ const Topbar = () => {
         Manco (MCM) Trading
       </Title>
       <div style={{ width: 240, textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-        <Badge count={pendingCount} size="small" offset={[-2, 2]}>
+        <Badge count={pendingCount + notifCount} size="small" offset={[-2, 2]}>
           <Button
             icon={<BellOutlined />}
             onClick={() => { setNotifOpen(true); fetchPendingCount() }}

@@ -12,7 +12,9 @@ import { qtyLabel } from '../utils/format.js'
 const NotificationModal = ({ open, onClose }) => {
   const { user } = useAuth()
   const [requests, setRequests] = useState([])
+  const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(false)
+  const [notifLoading, setNotifLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [closing, setClosing] = useState(false)
   const timerRef = useRef(null)
@@ -34,6 +36,7 @@ const NotificationModal = ({ open, onClose }) => {
   useEffect(() => {
     if (!open || !user) return
     setLoading(true)
+    setNotifLoading(true)
     const params = new URLSearchParams({ usertype: user.usertype, user_id: user.user_id })
     if (user.location_id) params.append('location_id', user.location_id)
     fetch(`/api/inventory/pending-requests?${params}`)
@@ -41,6 +44,22 @@ const NotificationModal = ({ open, onClose }) => {
       .then((data) => setRequests(data.success ? data.data : []))
       .catch(() => setRequests([]))
       .finally(() => setLoading(false))
+    if (user.location_id) {
+      fetch(`/api/notifications?location_id=${user.location_id}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success) {
+            setNotifications(data.data)
+            data.data.forEach((n) => {
+              if (!n.is_read) {
+                fetch(`/api/notifications/${n.notification_id}/read`, { method: 'PUT' }).catch(() => {})
+              }
+            })
+          }
+        })
+        .catch(() => setNotifications([]))
+        .finally(() => setNotifLoading(false))
+    }
   }, [open, user])
 
   const handleAction = async (requestId, action) => {
@@ -128,66 +147,95 @@ const NotificationModal = ({ open, onClose }) => {
         </div>
 
         <div style={{ overflowY: 'auto', flex: 1 }}>
-          {requests.length === 0 && !loading && (
-            <div style={{ padding: '60px 24px', textAlign: 'center' }}>
-              <InboxOutlined style={{ fontSize: 50, color: '#d9d9d9', marginBottom: 12 }} />
-              <div style={{ fontSize: 17, color: '#8c8c8c' }}>No pending requests</div>
-            </div>
-          )}
-          {requests.map((r) => (
-            <div
-              key={r.request_id}
-              style={{ padding: '16px 24px', borderBottom: '1px solid #f5f5f5' }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#fafafa'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-            >
-              <div style={{ display: 'flex', gap: 12 }}>
-                <Avatar size={44} style={{ background: '#1677ff', fontSize: 19, fontWeight: 600, flexShrink: 0 }}>
-                  {r.requester_name?.[0]?.toUpperCase() || '?'}
-                </Avatar>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 16, color: '#333', lineHeight: 1.4 }}>
-                    <strong>{r.requester_name}</strong> requested{' '}
-                    <strong>{fmtQty(r.quantity, r.is_fabric)} {r.product_name}</strong>
-                  </div>
-                  <div style={{ fontSize: 15, color: '#8c8c8c', marginTop: 4 }}>
-                    {r.from_location_name} → {r.to_location_name} · {timeAgo(r.created_at)}
-                  </div>
-                  {r.description && (
-                    <div style={{ fontSize: 15, color: '#666', marginTop: 6, fontStyle: 'italic' }}>
-                      "{r.description}"
+          {notifications.length > 0 && (
+            <>
+              <div style={{ padding: '8px 24px', fontSize: 13, fontWeight: 600, color: '#8c8c8c', textTransform: 'uppercase', letterSpacing: 1 }}>System Notifications</div>
+              {notifications.map((n) => (
+                <div
+                  key={`notif-${n.notification_id}`}
+                  style={{ padding: '12px 24px', borderBottom: '1px solid #f5f5f5', background: n.is_read ? 'transparent' : '#f0f5ff' }}
+                >
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <div style={{
+                      width: 8, height: 8, borderRadius: 4, marginTop: 6, flexShrink: 0,
+                      background: n.type === 'restock_failed' ? '#ff4d4f' : n.type === 'restock_pending' ? '#fa8c16' : '#52c41a',
+                    }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, color: '#333', lineHeight: 1.4 }}>{n.message}</div>
+                      <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 2 }}>{timeAgo(n.created_at)}</div>
                     </div>
-                  )}
-                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                    <Button
-                      size="small"
-                      icon={<CloseCircleOutlined />}
-                      onClick={() => handleAction(r.request_id, 'decline')}
-                      style={{
-                        borderRadius: 8, fontSize: 15, height: 36,
-                        border: '1px solid #ff4d4f', color: '#ff4d4f',
-                        background: '#fff', padding: '0 18px',
-                      }}
-                    >
-                      Decline
-                    </Button>
-                    <Button
-                      size="small"
-                      icon={<CheckOutlined />}
-                      onClick={() => handleAction(r.request_id, 'accept')}
-                      style={{
-                        borderRadius: 8, fontSize: 15, height: 36,
-                        background: '#52c41a', borderColor: '#52c41a',
-                        color: '#fff', boxShadow: 'none', padding: '0 18px',
-                      }}
-                    >
-                      Accept
-                    </Button>
                   </div>
                 </div>
+              ))}
+            </>
+          )}
+          {requests.length > 0 && (
+            <>
+              <div style={{ padding: '8px 24px', fontSize: 13, fontWeight: 600, color: '#8c8c8c', textTransform: 'uppercase', letterSpacing: 1, borderTop: notifications.length > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                Pending Requests
               </div>
+              {requests.map((r) => (
+                <div
+                  key={r.request_id}
+                  style={{ padding: '16px 24px', borderBottom: '1px solid #f5f5f5' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#fafafa'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <Avatar size={44} style={{ background: '#1677ff', fontSize: 19, fontWeight: 600, flexShrink: 0 }}>
+                      {r.requester_name?.[0]?.toUpperCase() || '?'}
+                    </Avatar>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 16, color: '#333', lineHeight: 1.4 }}>
+                        <strong>{r.requester_name}</strong> requested{' '}
+                        <strong>{fmtQty(r.quantity, r.is_fabric)} {r.product_name}</strong>
+                      </div>
+                      <div style={{ fontSize: 15, color: '#8c8c8c', marginTop: 4 }}>
+                        {r.from_location_name} → {r.to_location_name} · {timeAgo(r.created_at)}
+                      </div>
+                      {r.description && (
+                        <div style={{ fontSize: 15, color: '#666', marginTop: 6, fontStyle: 'italic' }}>
+                          "{r.description}"
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                        <Button
+                          size="small"
+                          icon={<CloseCircleOutlined />}
+                          onClick={() => handleAction(r.request_id, 'decline')}
+                          style={{
+                            borderRadius: 8, fontSize: 15, height: 36,
+                            border: '1px solid #ff4d4f', color: '#ff4d4f',
+                            background: '#fff', padding: '0 18px',
+                          }}
+                        >
+                          Decline
+                        </Button>
+                        <Button
+                          size="small"
+                          icon={<CheckOutlined />}
+                          onClick={() => handleAction(r.request_id, 'accept')}
+                          style={{
+                            borderRadius: 8, fontSize: 15, height: 36,
+                            background: '#52c41a', borderColor: '#52c41a',
+                            color: '#fff', boxShadow: 'none', padding: '0 18px',
+                          }}
+                        >
+                          Accept
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+          {requests.length === 0 && notifications.length === 0 && !loading && (
+            <div style={{ padding: '60px 24px', textAlign: 'center' }}>
+              <InboxOutlined style={{ fontSize: 50, color: '#d9d9d9', marginBottom: 12 }} />
+              <div style={{ fontSize: 17, color: '#8c8c8c' }}>No notifications</div>
             </div>
-          ))}
+          )}
         </div>
 
         <div style={{ padding: '12px 24px', borderTop: '1px solid #f0f0f0', textAlign: 'center' }}>

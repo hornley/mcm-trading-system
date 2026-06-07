@@ -35,6 +35,7 @@ from routes.reports import reports_bp
 from routes.dashboard import dashboard_bp
 from routes.orders import orders_bp
 from routes.manual import manual_bp
+from routes.notifications import notifications_bp
 
 def create_app():
     import sys
@@ -51,6 +52,15 @@ def create_app():
     CORS(app)
     mail.init_app(app)
     db.init_app(app)
+    with app.app_context():
+        import sqlalchemy as sa
+        inspector = sa.inspect(db.engine)
+        cols = [c['name'] for c in inspector.get_columns('Locations')]
+        if 'auto_restock_source_id' not in cols:
+            db.session.execute(sa.text('ALTER TABLE "Locations" ADD COLUMN auto_restock_source_id INTEGER REFERENCES "Locations"(location_id)'))
+        if 'Notifications' not in inspector.get_table_names():
+            db.create_all()
+        db.session.commit()
     print("[CREATE_APP] registering blueprints ...", file=sys.stderr)
     app.register_blueprint(account_bp)
     app.register_blueprint(auth_bp)
@@ -63,6 +73,7 @@ def create_app():
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(orders_bp)
     app.register_blueprint(manual_bp)
+    app.register_blueprint(notifications_bp)
 
     @app.errorhandler(Exception)
     def handle_error(e):

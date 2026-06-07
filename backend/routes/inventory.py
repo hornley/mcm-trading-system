@@ -1,7 +1,7 @@
 import math
 from flask import Blueprint, request
 from datetime import datetime
-from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer, StockRequest
+from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer, StockRequest, Notification
 from utils.response import success_response, error_response
 from utils.validation import validate_required, validate_quantity, is_fabric_category
 from utils.activity_logger import log_activity
@@ -670,6 +670,10 @@ def restock_below_reorder():
 
     location_id = data.get("location_id")
     user_id = data.get("user_id")
+    source_location_id = data.get("source_location_id")
+
+    if not source_location_id:
+        return error_response("source_location_id is required", "MISSING_PARAM", 400)
 
     if usertype == 2:
         manager = User.query.get(user_id)
@@ -678,16 +682,17 @@ def restock_below_reorder():
         if manager.location_id != location_id:
             return error_response("You can only restock your assigned location", "FORBIDDEN", 403)
 
-    storehouse = Location.query.filter_by(is_storehouse=True, is_active=True).first()
-    if not storehouse:
-        return error_response("No storehouse branch configured. Mark a location as storehouse first.", "NO_STOREHOUSE", 400)
+    source = Location.query.get(source_location_id)
+    if not source:
+        return error_response("Source branch not found", "NOT_FOUND", 404)
 
     location = Location.query.get(location_id)
     if not location:
         return error_response("Location not found", "NOT_FOUND", 404)
 
     inventory_list = Inventory.query.filter_by(location_id=location_id).all()
-    restocked = []
+    requested = []
+    failed = []
 
     for inv in inventory_list:
         try:
@@ -702,65 +707,87 @@ def restock_below_reorder():
         if inv.quantity >= target:
             continue
 
-        store_inv = Inventory.query.filter_by(
+        source_inv = Inventory.query.filter_by(
             product_id=inv.product_id,
-            location_id=storehouse.location_id,
+            location_id=source_location_id,
         ).first()
 
-        if not store_inv or store_inv.quantity <= 0:
+        deficit = target - inv.quantity
+        if not source_inv or source_inv.quantity <= 0 or deficit <= 0:
+            failed.append({
+                "product_id": inv.product_id,
+                "product_name": inv.product.name,
+                "reason": "Insufficient stock at source branch",
+            })
+            notif = Notification(
+                location_id=location_id,
+                type="restock_failed",
+                message=f"Auto-restock failed for {inv.product.name}: insufficient stock at {source.name}",
+            )
+            db.session.add(notif)
             continue
 
-        deficit = target - inv.quantity
-        transfer_qty = min(deficit, store_inv.quantity)
-
+        transfer_qty = min(deficit, source_inv.quantity)
         if transfer_qty <= 0:
             continue
 
-        store_inv.quantity -= transfer_qty
-        inv.quantity += transfer_qty
-
-        transfer = StockTransfer(
+        stock_request = StockRequest(
             product_id=inv.product_id,
-            from_location_id=storehouse.location_id,
+            from_location_id=source_location_id,
             to_location_id=location_id,
-            user_id=user_id,
+            requested_by=user_id,
             quantity=transfer_qty,
-            status="completed",
-            remarks="Bulk restock (below reorder level)",
+            description=f"Auto-restock (below reorder level {level})",
+            status="pending",
         )
-        db.session.add(transfer)
+        db.session.add(stock_request)
+        db.session.flush()
+
+        notif_target = Notification(
+            location_id=location_id,
+            type="restock_pending",
+            message=f"Auto-restock request for {inv.product.name} x {transfer_qty} sent to {source.name}",
+            request_id=stock_request.request_id,
+        )
+        db.session.add(notif_target)
+
+        notif_source = Notification(
+            location_id=source_location_id,
+            type="restock_pending",
+            message=f"Auto-restock request from {location.name} for {inv.product.name} x {transfer_qty}",
+            request_id=stock_request.request_id,
+        )
+        db.session.add(notif_source)
 
         log_activity(
             user_id=user_id,
             module="inventory",
-            action_type="auto_restock",
-            action=f"Bulk restock: {transfer_qty} {inv.product.name} from {storehouse.name} to {location.name}",
+            action_type="auto_restock_request",
+            action=f"Requested {transfer_qty} {inv.product.name} from {source.name} to {location.name}",
             details={
                 "product_id": inv.product_id,
-                "from_location_id": storehouse.location_id,
+                "from_location_id": source_location_id,
                 "to_location_id": location_id,
                 "quantity": transfer_qty,
+                "request_id": stock_request.request_id,
             },
         )
 
-        restocked.append({
+        requested.append({
             "product_id": inv.product_id,
             "product_name": inv.product.name,
-            "previous_quantity": inv.quantity - transfer_qty,
-            "new_quantity": inv.quantity,
-            "reorder_level": level,
-            "target_level": target,
-            "quantity_added": transfer_qty,
-            "from_location": storehouse.name,
+            "quantity": transfer_qty,
+            "request_id": stock_request.request_id,
         })
 
-    if restocked:
-        db.session.commit()
-        message = f"Restocked {len(restocked)} product(s)"
-    else:
-        message = "No products below reorder level"
+    db.session.commit()
 
-    return success_response({"restocked": restocked, "count": len(restocked)}, message)
+    return success_response({
+        "requested": requested,
+        "failed": failed,
+        "requested_count": len(requested),
+        "failed_count": len(failed),
+    }, f"{len(requested)} item(s) requested, {len(failed)} failed")
 
 
 @inventory_bp.route("/api/inventory/restock-selected", methods=["POST"])

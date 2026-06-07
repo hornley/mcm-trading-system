@@ -23,6 +23,7 @@ def _serialize_location(location, include_inventory=False):
         "address": location.address,
         "is_active": location.is_active,
         "is_storehouse": location.is_storehouse,
+        "auto_restock_source_id": location.auto_restock_source_id,
         "created_at": location.created_at.isoformat() if location.created_at else None,
         "updated_at": location.updated_at.isoformat() if location.updated_at else None,
     }
@@ -144,6 +145,8 @@ def update_location(location_id):
         location.address = data["address"]
     if "is_storehouse" in data:
         location.is_storehouse = data["is_storehouse"]
+    if "auto_restock_source_id" in data:
+        location.auto_restock_source_id = data["auto_restock_source_id"]
 
     db.session.commit()
 
