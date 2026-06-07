@@ -169,17 +169,19 @@ const Inventory = () => {
               enterButton
               style={{ width: 200 }}
             />
-            <Select
-              placeholder="Filter by category"
-              style={{ width: 180 }}
-              allowClear
-              value={categoryFilter}
-              onChange={(val) => setCategoryFilter(val)}
-            >
-              {categories.map((cat) => (
-                <Select.Option key={cat.category_id} value={cat.category_id}>{cat.name}</Select.Option>
-              ))}
-            </Select>
+            {categories.map((cat) => {
+              const active = categoryFilter === cat.category_id;
+              return (
+                <Button
+                  key={cat.category_id}
+                  size="small"
+                  type={active ? 'primary' : 'default'}
+                  onClick={() => setCategoryFilter(active ? null : cat.category_id)}
+                >
+                  {cat.name}
+                </Button>
+              );
+            })}
           </Space>
         </Col>
         <Col xs={24} sm={12} md={10} style={{ textAlign: 'right' }}>
