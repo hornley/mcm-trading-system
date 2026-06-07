@@ -6,6 +6,7 @@ import {
 } from 'antd';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js';
+import { RightCircleOutlined } from '@ant-design/icons';
 import QtyInput from '../../components/QtyInput.jsx';
 
 const { Search, TextArea } = Input;
@@ -52,6 +53,9 @@ const StockManagement = () => {
   const [restockQuantities, setRestockQuantities] = useState({});
   const [orderSummaryVisible, setOrderSummaryVisible] = useState(false);
   const [restockSubmitting, setRestockSubmitting] = useState(false);
+  const [requestLogVisible, setRequestLogVisible] = useState(false);
+  const [requestLogs, setRequestLogs] = useState([]);
+  const [requestLogLoading, setRequestLogLoading] = useState(false);
 
   const fetchData = async (page, sortOverrides) => {
     if (!user) return;
@@ -187,6 +191,19 @@ const StockManagement = () => {
       const values = await adjustForm.validateFields();
 
       if (requestPreset) {
+        const sourceRes = await fetch(`/api/inventory/product/${selectedRecord.product_id}?usertype=${user.usertype}&location_id=${values.from_location_id}&stock_check=1`);
+        const sourceData = await sourceRes.json();
+        if (sourceData.success) {
+          const sourceInv = sourceData.data.find(i => i.location_id === values.from_location_id);
+          const sourceQty = sourceInv?.quantity || 0;
+          if (Number(sourceQty) < Number(values.quantity)) {
+            adjustForm.setFields([{
+              name: 'from_location_id',
+              errors: [`Insufficient stock at this branch (available: ${fmtQty(sourceQty, selectedRecord?.category === FABRIC_CATEGORY)})`],
+            }]);
+            return;
+          }
+        }
         const res = await fetch('/api/inventory/request-stock', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -342,6 +359,19 @@ const StockManagement = () => {
     setSelectRestockVisible(true);
   };
 
+  const fetchRequestLogs = async () => {
+    setRequestLogLoading(true);
+    try {
+      const res = await fetch(`/api/inventory/request-logs?usertype=${user.usertype}&user_id=${user.user_id}`);
+      const data = await res.json();
+      if (data.success) {
+        setRequestLogs(data.data || []);
+      }
+    } catch {}
+    setRequestLogLoading(false);
+    setRequestLogVisible(true);
+  };
+
   const handleToggleRestockItem = (productId) => {
     setSelectedRestockIds((prev) => {
       const next = new Set(prev);
@@ -421,16 +451,17 @@ const StockManagement = () => {
 
   const { total_items: totalItems, low_stock_count: lowStockCount, out_of_stock_count: outOfStockCount, pending_request_count: pendingRequestCount } = stats;
 
+  const showBranch = selectedLocationId === "all";
   const columns = [
     {
       title: 'Product Name', dataIndex: 'product_name', key: 'product_name',
       sorter: true,
       defaultSortOrder: sortBy === 'product_name' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
     },
-    {
+    ...(showBranch ? [{
       title: 'Branch', dataIndex: 'location_name', key: 'location_name',
       sorter: true,
-    },
+    }] : []),
     {
       title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
       render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
@@ -549,8 +580,22 @@ const StockManagement = () => {
           </Card>
         </Col>
         <Col xs={12} sm={6}>
-          <Card>
-            <Statistic title="Current Requested" value={pendingRequestCount} valueStyle={{ color: '#1677ff' }} />
+          <Card
+            hoverable
+            onClick={fetchRequestLogs}
+            styles={{ body: { padding: '20px 24px', cursor: 'pointer' } }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <Statistic title="Current Requested" value={pendingRequestCount} valueStyle={{ color: '#1677ff' }} />
+              <Button
+                type="link"
+                size="small"
+                icon={<RightCircleOutlined />}
+                style={{ padding: 0, marginTop: 8, fontSize: 13 }}
+              >
+                View Request Logs
+              </Button>
+            </div>
           </Card>
         </Col>
       </Row>
@@ -891,6 +936,42 @@ const StockManagement = () => {
             </Col>
           )}
         </Row>
+      </Modal>
+
+      <Modal
+        title="Request Transfer Log"
+        open={requestLogVisible}
+        onCancel={() => setRequestLogVisible(false)}
+        footer={[<Button key="close" type="primary" onClick={() => setRequestLogVisible(false)}>Close</Button>]}
+        width={800}
+      >
+        <Table
+          dataSource={requestLogs}
+          rowKey="request_id"
+          loading={requestLogLoading}
+          size="small"
+          bordered
+          pagination={{ pageSize: 10 }}
+          columns={[
+            { title: 'Branch', key: 'branch', render: (_, r) => `${r.from_location_name} → ${r.to_location_name}` },
+            { title: 'Product', dataIndex: 'product_name', key: 'product' },
+            {
+              title: 'Quantity', dataIndex: 'quantity', key: 'quantity',
+              render: (qty, r) => fmtQty(qty, r.is_fabric),
+            },
+            {
+              title: 'Date & Time', dataIndex: 'created_at', key: 'created_at',
+              render: (d) => d ? new Date(d).toLocaleString() : '-',
+            },
+            {
+              title: 'Status', dataIndex: 'status', key: 'status',
+              render: (s) => {
+                const color = s === 'accepted' ? 'green' : s === 'declined' ? 'red' : 'orange';
+                return <Tag color={color}>{s.charAt(0).toUpperCase() + s.slice(1)}</Tag>;
+              },
+            },
+          ]}
+        />
       </Modal>
 
       <style>{`

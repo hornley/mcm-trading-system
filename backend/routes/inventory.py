@@ -364,7 +364,7 @@ def inventory_counts():
 
     request_query = StockRequest.query.filter_by(status="pending")
     if resolved_location_id and resolved_location_id != "all":
-        request_query = request_query.filter_by(to_location_id=resolved_location_id)
+        request_query = request_query.filter_by(from_location_id=resolved_location_id)
     pending_request_count = request_query.count()
 
     return success_response({
@@ -500,10 +500,14 @@ def get_inventory_by_product(product_id):
 
     user_id = request.args.get("user_id", type=int)
     location_id = request.args.get("location_id")
+    stock_check = request.args.get("stock_check", type=int)
 
-    resolved_location_id, error = _resolve_location_id(usertype, user_id, location_id)
-    if error:
-        return error
+    if stock_check:
+        resolved_location_id = location_id
+    else:
+        resolved_location_id, error = _resolve_location_id(usertype, user_id, location_id)
+        if error:
+            return error
 
     product = Product.query.get(product_id)
     if not product:
@@ -1205,8 +1209,33 @@ def list_pending_requests():
     from_location_id = request.args.get("location_id", type=int)
     query = StockRequest.query.filter_by(status="pending").order_by(StockRequest.created_at.desc())
     if from_location_id:
-        query = query.filter_by(to_location_id=from_location_id)
+        query = query.filter_by(from_location_id=from_location_id)
     requests = query.limit(50).all()
+    return success_response([{
+        "request_id": r.request_id,
+        "product_id": r.product_id,
+        "product_name": r.product.name if r.product else "Unknown",
+        "quantity": r.quantity,
+        "is_fabric": is_fabric_category(r.product.category_id) if r.product else False,
+        "description": r.description,
+        "from_location_id": r.from_location_id,
+        "from_location_name": r.from_location.name if r.from_location else "Unknown",
+        "to_location_id": r.to_location_id,
+        "to_location_name": r.to_location.name if r.to_location else "Unknown",
+        "requested_by": r.requested_by,
+        "requester_name": r.requester.username if r.requester else "Unknown",
+        "status": r.status,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+    } for r in requests])
+
+
+@inventory_bp.route("/api/inventory/request-logs", methods=["GET"])
+def list_request_logs():
+    user_id = request.args.get("user_id", type=int)
+    query = StockRequest.query.order_by(StockRequest.created_at.desc())
+    if user_id:
+        query = query.filter_by(requested_by=user_id)
+    requests = query.limit(100).all()
     return success_response([{
         "request_id": r.request_id,
         "product_id": r.product_id,

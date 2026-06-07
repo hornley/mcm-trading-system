@@ -34,7 +34,7 @@ const NotificationModal = ({ open, onClose }) => {
   useEffect(() => {
     if (!open || !user) return
     setLoading(true)
-    const params = new URLSearchParams({ usertype: user.usertype })
+    const params = new URLSearchParams({ usertype: user.usertype, user_id: user.user_id })
     if (user.location_id) params.append('location_id', user.location_id)
     fetch(`/api/inventory/pending-requests?${params}`)
       .then((r) => r.json())
@@ -122,7 +122,7 @@ const NotificationModal = ({ open, onClose }) => {
       >
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #f0f0f0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 22, fontWeight: 600, color: '#0a0a0a' }}>Stock Requests</span>
+            <span style={{ fontSize: 22, fontWeight: 600, color: '#0a0a0a' }}>Notifications</span>
             <span style={{ fontSize: 15, color: '#8c8c8c' }}>
               {loading ? '...' : `${requests.length} pending`}
             </span>
