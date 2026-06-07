@@ -4,6 +4,7 @@ import {
   Tag, Modal, Statistic, Space, Descriptions, Form, InputNumber,
   DatePicker, message, Spin, Segmented, Checkbox,
 } from 'antd';
+import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js';
 import { RightCircleOutlined } from '@ant-design/icons';
@@ -154,7 +155,7 @@ const StockManagement = () => {
     setSelectedRecord(record);
     setFromLocationId(record.location_id);
     transferForm.resetFields();
-    transferForm.setFieldsValue({ from_location_id: record.location_id });
+    transferForm.setFieldsValue({ from_location_id: record.location_id, date: dayjs() });
     setTransferVisible(true);
   };
 
@@ -564,11 +565,15 @@ const StockManagement = () => {
     },
     {
       title: 'Quantity Change', dataIndex: 'quantity_change', key: 'quantity_change',
-      render: (val) => (
-        <span style={{ color: val >= 0 ? '#52c41a' : '#ff4d4f' }}>
-          {val >= 0 ? `+${val}` : val}
-        </span>
-      ),
+      render: (val) => {
+        const isFab = selectedRecord?.category === FABRIC_CATEGORY;
+        const display = fmtQty(Math.abs(val), isFab);
+        return (
+          <span style={{ color: val >= 0 ? '#52c41a' : '#ff4d4f' }}>
+            {val >= 0 ? `+${display}` : val === 0 ? display : `-${display}`}
+          </span>
+        );
+      },
       sorter: (a, b) => a.quantity_change - b.quantity_change,
     },
     {
@@ -582,6 +587,10 @@ const StockManagement = () => {
   ];
 
   if (loading && inventory.length === 0) return <Card style={{ textAlign: 'center' }}><Spin size="large" /></Card>;
+
+  const visibleColumns = selectedLocationId === 'all'
+    ? columns
+    : columns.filter(col => col.key !== 'location_name');
 
   return (
     <div>
@@ -666,7 +675,7 @@ const StockManagement = () => {
 
       <Table
         dataSource={inventory}
-        columns={columns}
+        columns={visibleColumns}
         rowKey="inventory_id"
         loading={loading}
         rowClassName={(record) => {
@@ -698,7 +707,7 @@ const StockManagement = () => {
           <Descriptions.Item label="Product Name">{selectedRecord?.product_name}</Descriptions.Item>
           <Descriptions.Item label="SKU">{selectedRecord?.sku}</Descriptions.Item>
           <Descriptions.Item label="Branch">{selectedRecord?.location_name}</Descriptions.Item>
-          <Descriptions.Item label="Current Stock Quantity">{fmtQty(selectedRecord?.quantity, selectedRecord?.category === FABRIC_CATEGORY)}</Descriptions.Item>
+          <Descriptions.Item label="Current Stock Quantity">{fmtQty(selectedRecord?.quantity, selectedRecord?.category === FABRIC_CATEGORY, selectedRecord?.category === FABRIC_CATEGORY ? 'yds' : 'pcs')}</Descriptions.Item>
           <Descriptions.Item label="Reorder Level">{selectedRecord?.reorder_level ? Number(selectedRecord.reorder_level).toLocaleString() : 'Not set'}</Descriptions.Item>
         </Descriptions>
 

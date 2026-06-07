@@ -61,6 +61,10 @@ def create_app():
             if 'auto_restock_source_id' not in cols:
                 db.session.execute(sa.text('ALTER TABLE "Locations" ADD COLUMN auto_restock_source_id INTEGER REFERENCES "Locations"(location_id)'))
                 db.session.commit()
+            prod_cols = [c['name'] for c in inspector.get_columns('Products')]
+            if 'auto_restock_source_id' not in prod_cols:
+                db.session.execute(sa.text('ALTER TABLE "Products" ADD COLUMN auto_restock_source_id INTEGER REFERENCES "Locations"(location_id)'))
+                db.session.commit()
             if 'Notifications' not in inspector.get_table_names():
                 db.create_all()
                 db.session.commit()

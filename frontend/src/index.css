@@ -143,15 +143,12 @@
 }
 
 @media print {
-  body * { visibility: hidden; }
-  #receipt-content, #receipt-content * { visibility: visible; }
+  body > *:not(#receipt-content) { display: none !important; }
   #receipt-content {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 80mm;
-    padding: 4px 8px;
-    font-size: 11px;
+    display: block !important;
+    width: 100%;
+    padding: 24px 32px;
+    font-size: 14px;
     font-family: 'Courier New', 'Courier', monospace;
   }
   #receipt-content table { width: 100%; border-collapse: collapse; }
@@ -159,12 +156,4 @@
     padding: 2px;
     border-bottom: 1px dashed #ccc;
   }
-  #receipt-content > div > div {
-    font-family: 'Courier New', 'Courier', monospace !important;
-  }
-  #receipt-content div {
-    font-family: 'Courier New', 'Courier', monospace !important;
-  }
-  .ant-modal { display: none !important; }
-  .ant-btn { display: none !important; }
 }

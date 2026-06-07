@@ -4,14 +4,14 @@ import {
   InputNumber, DatePicker, message, Divider,
 } from 'antd';
 import {
-  PlusOutlined, MinusOutlined, DeleteOutlined, ShoppingCartOutlined, ArrowLeftOutlined,
+  DeleteOutlined, ShoppingCartOutlined, ArrowLeftOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { FABRIC_CATEGORY, qtyLabel, fmtQty } from '../utils/format.js';
+import { FABRIC_CATEGORY, fmtQty } from '../utils/format.js';
+import QtyInput from './QtyInput.jsx';
 
 const { Text } = Typography;
 const PAYMENT_METHODS = ['Cash', 'Card', 'GCash', 'Bank Transfer'];
-const STEP_QTY = 0.25;
 const MIN_FABRIC_QTY = 0.5;
 
 const POSModal = ({
@@ -270,7 +270,7 @@ const POSModal = ({
                             ₱{product.price}
                           </div>
                           <div style={{ fontSize: 12, color: '#888', marginBottom: inCart ? 4 : 0 }}>
-                            Stock: {fmtQty(product.quantity, product.category === FABRIC_CATEGORY)}
+                            Stock: {fmtQty(product.quantity, product.category === FABRIC_CATEGORY, product.category === FABRIC_CATEGORY ? 'yds' : 'pcs')}
                           </div>
                           {inCart && (
                             <div style={{
@@ -283,7 +283,7 @@ const POSModal = ({
                               borderRadius: 4,
                               display: 'inline-block',
                             }}>
-                              In cart: {fmtQty(inCart.quantity, inCart.is_fabric)}
+                              In cart: {fmtQty(inCart.quantity, inCart.is_fabric, inCart.is_fabric ? 'yds' : 'pcs')}
                             </div>
                           )}
                         </Card>
@@ -339,7 +339,6 @@ const POSModal = ({
                     cart.map((item) => {
                       const product = products.find((p) => p.product_id === item.product_id);
                       const maxQty = product?.quantity ?? 999;
-                      const step = item.is_fabric ? STEP_QTY : 1;
                       const minQty = item.is_fabric ? MIN_FABRIC_QTY : 1;
                       return (
                         <div key={item.product_id} style={{
@@ -350,29 +349,13 @@ const POSModal = ({
                             {item.product_name}
                           </div>
                           <Row align="middle" gutter={4}>
-                            <Col>
-                              <Button
-                                size="small"
-                                icon={<MinusOutlined />}
-                                onClick={() => handleUpdateQty(
-                                  item.product_id,
-                                  Math.max(minQty, +((item.quantity - step).toFixed(2))),
-                                )}
-                              />
-                            </Col>
-                            <Col>
-                              <Text style={{ padding: '0 6px', minWidth: 44, display: 'inline-block', textAlign: 'center' }}>
-                                {fmtQty(item.quantity, item.is_fabric)}
-                              </Text>
-                            </Col>
-                            <Col>
-                              <Button
-                                size="small"
-                                icon={<PlusOutlined />}
-                                onClick={() => handleUpdateQty(
-                                  item.product_id,
-                                  Math.min(maxQty, +((item.quantity + step).toFixed(2))),
-                                )}
+                            <Col style={{ minWidth: 150, maxWidth: 220 }}>
+                              <QtyInput
+                                isFabric={item.is_fabric}
+                                min={minQty}
+                                max={maxQty}
+                                value={item.quantity}
+                                onChange={(v) => handleUpdateQty(item.product_id, v ?? minQty)}
                               />
                             </Col>
                             <Col flex="auto" style={{ textAlign: 'right' }}>
@@ -537,22 +520,13 @@ const POSModal = ({
               const isFab = qtyModalProduct.category === FABRIC_CATEGORY;
               const maxQty = qtyModalProduct.quantity ?? 999;
               return (
-                <>
-                  <InputNumber
-                    min={isFab ? MIN_FABRIC_QTY : 1}
-                    max={maxQty}
-                    step={isFab ? STEP_QTY : 1}
-                    value={qtyModalValue}
-                    onChange={(v) => setQtyModalValue(v ?? (isFab ? MIN_FABRIC_QTY : 1))}
-                    size="large"
-                    style={{ width: '100%' }}
-                  />
-                  {isFab && (
-                    <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-                      {qtyLabel(qtyModalValue)} yards
-                    </div>
-                  )}
-                </>
+                <QtyInput
+                  isFabric={isFab}
+                  min={isFab ? MIN_FABRIC_QTY : 1}
+                  max={maxQty}
+                  value={qtyModalValue}
+                  onChange={(v) => setQtyModalValue(v ?? (isFab ? MIN_FABRIC_QTY : 1))}
+                />
               );
             })()}
           </div>

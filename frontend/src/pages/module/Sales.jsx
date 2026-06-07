@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Row, Col, Card, Table, Tag, Typography, Input, Select, Button, Modal,
   DatePicker, Popconfirm, Space, message,
@@ -44,6 +45,7 @@ const Sales = () => {
   const [saleModalVisible, setSaleModalVisible] = useState(false);
   const [receiptModalVisible, setReceiptModalVisible] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
+  const [receiptForPrint, setReceiptForPrint] = useState(null);
   const [totalSalesModalVisible, setTotalSalesModalVisible] = useState(false);
   const [totalSalesDateRange, setTotalSalesDateRange] = useState(null);
   const [totalSalesBranch, setTotalSalesBranch] = useState(defaultTotalBranch);
@@ -220,6 +222,23 @@ const Sales = () => {
     setReceiptModalVisible(true);
   };
 
+  const handlePrintReceipt = () => {
+    setReceiptForPrint(lastOrder);
+  };
+
+  useEffect(() => {
+    if (receiptForPrint) {
+      const raf = requestAnimationFrame(() => window.print());
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [receiptForPrint]);
+
+  useEffect(() => {
+    const cleanup = () => setReceiptForPrint(null);
+    window.addEventListener('afterprint', cleanup);
+    return () => window.removeEventListener('afterprint', cleanup);
+  }, []);
+
   const isVoided = (record) => record.status === 'voided';
 
   const columns = [
@@ -379,7 +398,7 @@ const Sales = () => {
     },
     {
       title: 'Total Quantity Sold', dataIndex: 'total_qty', key: 'total_qty',
-      render: (qty) => Math.floor(qty).toLocaleString(),
+      render: (qty, record) => fmtQty(Math.floor(qty), record.is_fabric),
       sorter: (a, b) => a.total_qty - b.total_qty,
     },
     {
@@ -388,6 +407,117 @@ const Sales = () => {
       sorter: (a, b) => a.total_amount - b.total_amount,
     },
   ];
+
+  const renderReceiptContent = useCallback((order) => {
+    const pmt = (order.payments || [])[0];
+    const total = order.total_amount || 0;
+    const payment = pmt?.price || 0;
+    const change = Math.max(0, payment - total);
+    const vatableSales = total / 1.12;
+    const vatAmount = total - vatableSales;
+    const cfg = receiptConfig;
+    return (
+      <div style={{ fontSize: 13, fontFamily: "'Courier New', monospace" }}>
+        <div style={{ textAlign: 'center', marginBottom: 10 }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>{cfg.companyName}</div>
+          {cfg.companyAddress && <div style={{ fontSize: 11 }}>{cfg.companyAddress}</div>}
+          <div style={{ fontSize: 10, marginTop: 4 }}>VAT REG TIN: {cfg.vatRegTin}</div>
+          <div style={{ fontSize: 10 }}>MIN NO: {cfg.minNo}</div>
+          <div style={{ fontSize: 10 }}>SALES INVOICE NO: {cfg.salesInvoiceNo}</div>
+        </div>
+
+        <div style={{ borderTop: '1px dashed #333', borderBottom: '1px dashed #333', padding: '4px 0', marginBottom: 8 }}>
+          <div style={{ display: 'flex', fontWeight: 600, fontSize: 11, padding: '2px 0', borderBottom: '1px solid #333' }}>
+            <span style={{ width: '45px', textAlign: 'center' }}>QTY</span>
+            <span style={{ flex: 1, paddingLeft: 4 }}>ITEM</span>
+            <span style={{ width: '5.5em', textAlign: 'right' }}>AMOUNT</span>
+          </div>
+          {(order.items || []).map((item) => (
+            <div key={item.order_item_id} style={{ display: 'flex', fontSize: 11, padding: '2px 0' }}>
+              <span style={{ width: '45px', textAlign: 'center', fontFamily: "'Courier New', monospace" }}>
+                {fmtQty(item.quantity, item.category === FABRIC_CATEGORY, item.category === FABRIC_CATEGORY ? 'yds' : 'pcs')}
+              </span>
+              <span style={{ flex: 1, paddingLeft: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Courier New', monospace" }}>
+                {item.product_name}
+              </span>
+              <span style={{ width: '5.5em', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>
+                ₱{(item.line_total || (item.quantity * item.price)).toLocaleString()}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700 }}>
+            <span>TOTAL:</span>
+            <span>₱{total.toLocaleString()}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 2 }}>
+            <span>Payment ({pmt?.payment_method || 'N/A'}):</span>
+            <span>₱{payment.toLocaleString()}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+            <span>Change:</span>
+            <span>₱{change.toLocaleString()}</span>
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px dashed #333', padding: '4px 0', marginBottom: 8, fontSize: 11 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Vatable Sales:</span>
+            <span>₱{vatableSales.toFixed(2)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>VAT (12%):</span>
+            <span>₱{vatAmount.toFixed(2)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>VAT Exempt Sale:</span>
+            <span>₱0.00</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Zero Rated Sale:</span>
+            <span>₱0.00</span>
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px dashed #333', padding: '4px 0', marginBottom: 8, fontSize: 11 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Date:</span>
+            <span>{dayjs(order.order_date).format('YYYY-MM-DD')}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Time:</span>
+            <span>{dayjs(order.order_date).format('hh:mm A')}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Transaction:</span>
+            <span>#{order.order_id}</span>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 11, marginBottom: 8 }}>
+          <div>TIN: {cfg.tin}</div>
+          <div>ACCRED NO: {cfg.accredNo}</div>
+          <div>DATE ISSUED: {cfg.dateIssued}</div>
+          <div>POS PERMIT: {cfg.posPermit}</div>
+        </div>
+
+        <div style={{ borderTop: '1px dashed #333', textAlign: 'center', padding: '6px 0', fontSize: 11, marginTop: 4 }}>
+          Thank you for your purchase!
+        </div>
+
+        {(order.auto_restocks || []).length > 0 && (
+          <div style={{ fontSize: 10, color: '#52c41a', marginTop: 4, borderTop: '1px dashed #999', padding: '4px 0' }}>
+            <div style={{ fontWeight: 600 }}>Auto-Restock:</div>
+            {order.auto_restocks.map((r, i) => (
+              <div key={i}>{r.product_name}: +{qtyLabel(r.quantity)} from {r.from_location}</div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }, []);
 
   return (
     <div>
@@ -478,127 +608,14 @@ const Sales = () => {
         width={520}
         footer={[
           <Button key="print" type="primary" icon={<PrinterOutlined />}
-            onClick={() => window.print()}>
+            onClick={handlePrintReceipt}>
             Print Receipt
           </Button>,
           <Button key="close" onClick={() => setReceiptModalVisible(false)}>Close</Button>,
         ]}
         styles={{ body: { padding: 24 } }}
       >
-        {lastOrder && (
-          <div id="receipt-content">
-            {(() => {
-              const pmt = (lastOrder.payments || [])[0];
-              const total = lastOrder.total_amount || 0;
-              const payment = pmt?.price || 0;
-              const change = Math.max(0, payment - total);
-              const vatableSales = total / 1.12;
-              const vatAmount = total - vatableSales;
-              const cfg = receiptConfig;
-              return (
-                <div style={{ fontSize: 13, fontFamily: "'Courier New', monospace" }}>
-                  <div style={{ textAlign: 'center', marginBottom: 10 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700 }}>{cfg.companyName}</div>
-                    {cfg.companyAddress && <div style={{ fontSize: 11 }}>{cfg.companyAddress}</div>}
-                    <div style={{ fontSize: 10, marginTop: 4 }}>VAT REG TIN: {cfg.vatRegTin}</div>
-                    <div style={{ fontSize: 10 }}>MIN NO: {cfg.minNo}</div>
-                    <div style={{ fontSize: 10 }}>SALES INVOICE NO: {cfg.salesInvoiceNo}</div>
-                  </div>
-
-                  <div style={{ borderTop: '1px dashed #333', borderBottom: '1px dashed #333', padding: '4px 0', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', fontWeight: 600, fontSize: 11, padding: '2px 0', borderBottom: '1px solid #333' }}>
-                      <span style={{ width: '45px', textAlign: 'center' }}>QTY</span>
-                      <span style={{ flex: 1, paddingLeft: 4 }}>ITEM</span>
-                      <span style={{ width: '5.5em', textAlign: 'right' }}>AMOUNT</span>
-                    </div>
-                    {(lastOrder.items || []).map((item) => (
-                      <div key={item.order_item_id} style={{ display: 'flex', fontSize: 11, padding: '2px 0' }}>
-                        <span style={{ width: '45px', textAlign: 'center', fontFamily: "'Courier New', monospace" }}>
-                          {fmtQty(item.quantity, item.category === FABRIC_CATEGORY)}
-                        </span>
-                        <span style={{ flex: 1, paddingLeft: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Courier New', monospace" }}>
-                          {item.product_name}
-                        </span>
-                        <span style={{ width: '5.5em', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>
-                          ₱{(item.line_total || (item.quantity * item.price)).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700 }}>
-                      <span>TOTAL:</span>
-                      <span>₱{total.toLocaleString()}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 2 }}>
-                      <span>Payment ({pmt?.payment_method || 'N/A'}):</span>
-                      <span>₱{payment.toLocaleString()}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                      <span>Change:</span>
-                      <span>₱{change.toLocaleString()}</span>
-                    </div>
-                  </div>
-
-                  <div style={{ borderTop: '1px dashed #333', padding: '4px 0', marginBottom: 8, fontSize: 11 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Vatable Sales:</span>
-                      <span>₱{vatableSales.toFixed(2)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>VAT (12%):</span>
-                      <span>₱{vatAmount.toFixed(2)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>VAT Exempt Sale:</span>
-                      <span>₱0.00</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Zero Rated Sale:</span>
-                      <span>₱0.00</span>
-                    </div>
-                  </div>
-
-                  <div style={{ borderTop: '1px dashed #333', padding: '4px 0', marginBottom: 8, fontSize: 11 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Date:</span>
-                      <span>{dayjs(lastOrder.order_date).format('YYYY-MM-DD')}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Time:</span>
-                      <span>{dayjs(lastOrder.order_date).format('hh:mm A')}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Transaction:</span>
-                      <span>#{lastOrder.order_id}</span>
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: 11, marginBottom: 8 }}>
-                    <div>TIN: {cfg.tin}</div>
-                    <div>ACCRED NO: {cfg.accredNo}</div>
-                    <div>DATE ISSUED: {cfg.dateIssued}</div>
-                    <div>POS PERMIT: {cfg.posPermit}</div>
-                  </div>
-
-                  <div style={{ borderTop: '1px dashed #333', textAlign: 'center', padding: '6px 0', fontSize: 11, marginTop: 4 }}>
-                    Thank you for your purchase!
-                  </div>
-
-                  {(lastOrder.auto_restocks || []).length > 0 && (
-                    <div style={{ fontSize: 10, color: '#52c41a', marginTop: 4, borderTop: '1px dashed #999', padding: '4px 0' }}>
-                      <div style={{ fontWeight: 600 }}>Auto-Restock:</div>
-                      {lastOrder.auto_restocks.map((r, i) => (
-                        <div key={i}>{r.product_name}: +{qtyLabel(r.quantity)} from {r.from_location}</div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-        )}
+        {lastOrder && renderReceiptContent(lastOrder)}
       </Modal>
 
       <Modal
@@ -638,6 +655,13 @@ const Sales = () => {
           />
         </Space>
       </Modal>
+
+      {receiptForPrint && createPortal(
+        <div id="receipt-content">
+          {renderReceiptContent(receiptForPrint)}
+        </div>,
+        document.body,
+      )}
     </div>
   );
 };

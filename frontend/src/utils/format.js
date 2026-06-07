@@ -14,8 +14,8 @@ export const qtyLabel = (qty) => {
   return fracStr ? `${whole} ${fracStr}` : whole.toString();
 };
 
-export const fmtQty = (qty, isFabric) => {
+export const fmtQty = (qty, isFabric, unit) => {
   if (qty == null) return '0';
-  if (isFabric) return qtyLabel(qty);
-  return Number(qty).toLocaleString();
+  const formatted = isFabric ? qtyLabel(qty) : Number(qty).toLocaleString();
+  return unit ? `${formatted} ${unit}` : formatted;
 };
