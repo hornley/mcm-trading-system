@@ -62,7 +62,7 @@ const Login = () => {
             </Text>
           </div>
 
-          <Form layout="vertical" onFinish={handleLogin} autoComplete="off" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <Form layout="vertical" onFinish={handleLogin} autoComplete="off" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <Form.Item name="username" rules={[{ required: true, message: 'Please enter your username' }]} style={{ marginBottom: 24 }}>
               <Input
                 prefix={<UserOutlined style={{ color: '#bfbfbf', fontSize: 18 }} />}
