@@ -305,6 +305,37 @@ def void_product(product_id):
     return success_response(_serialize_product(product), "Product voided successfully")
 
 
+@inventory_bp.route("/api/products/<int:product_id>/restore", methods=["PUT"])
+def restore_product(product_id):
+    data = request.get_json()
+    if not data:
+        return error_response("Request body is required", "MISSING_BODY", 400)
+
+    usertype = data.get("usertype")
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+
+    if not _can_update(usertype):
+        return error_response("You don't have permission to restore products", "FORBIDDEN", 403)
+
+    product = Product.query.get(product_id)
+    if not product:
+        return error_response("Product not found", "NOT_FOUND", 404)
+
+    product.is_active = True
+    db.session.commit()
+
+    log_activity(
+        user_id=data.get("user_id"),
+        module="products",
+        action_type="restore",
+        action=f"Restored product {product.name}",
+        details={"product_id": product.product_id}
+    )
+
+    return success_response(_serialize_product(product), "Product restored successfully")
+
+
 @inventory_bp.route("/api/products/<int:product_id>", methods=["DELETE"])
 def delete_product(product_id):
     data = request.get_json()

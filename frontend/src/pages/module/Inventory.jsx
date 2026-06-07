@@ -85,6 +85,25 @@ const Inventory = () => {
     }
   };
 
+  const handleRestore = async (record) => {
+    try {
+      const res = await fetch(`/api/products/${record.product_id}/restore`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usertype: user.usertype, user_id: user.user_id }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        message.success('Product restored');
+        fetchData();
+      } else {
+        message.error(data.message);
+      }
+    } catch {
+      message.error('Failed to restore product');
+    }
+  };
+
   const handleDelete = async (record) => {
     try {
       const res = await fetch(`/api/products/${record.product_id}`, {
@@ -209,6 +228,11 @@ const Inventory = () => {
                   >
                     <Button size="small" danger>Void</Button>
                   </Popconfirm>
+                )}
+                {can('delete') && !product.is_active && (
+                  <Button size="small" style={{ borderColor: '#52c41a', color: '#52c41a' }} onClick={() => handleRestore(product)}>
+                    Return
+                  </Button>
                 )}
                 {can('delete') && !product.is_active && (
                   <Popconfirm
