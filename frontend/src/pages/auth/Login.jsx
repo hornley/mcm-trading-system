@@ -4,9 +4,8 @@ import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import bgImage from '../../../images/mancoImage.png'
-import logoImage from '../../../images/Manco.png'
 
-const { Text } = Typography
+const { Title, Text } = Typography
 
 const Login = () => {
   const { login } = useAuth()
@@ -52,8 +51,11 @@ const Login = () => {
           justifyContent: 'center',
           padding: '48px 44px',
         }}>
-          <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <img src={logoImage} alt="Manco Trading" style={{ width: 120, height: 'auto' }} />
+          <div style={{ marginBottom: 48, textAlign: 'center' }}>
+            <Title level={1} style={{ margin: 0, fontWeight: 700, fontSize: 34, lineHeight: 1.2 }}>Welcome Back! 👋</Title>
+            <Text style={{ color: '#8c8c8c', fontSize: 16, display: 'block', marginTop: 8 }}>
+              Please enter your details.
+            </Text>
           </div>
 
           <Form layout="vertical" onFinish={handleLogin} autoComplete="off" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
