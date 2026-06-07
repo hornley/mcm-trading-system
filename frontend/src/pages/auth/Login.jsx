@@ -57,7 +57,7 @@ const Login = () => {
           </div>
 
           <Form layout="vertical" onFinish={handleLogin} autoComplete="off" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ textAlign: 'center', marginBottom: 5 }}>
+            <div style={{ marginBottom: 10 }}>
               <Title level={1} style={{ margin: 0, fontWeight: 700, fontSize: 34, lineHeight: 1.2 }}>Welcome Back! 👋</Title>
               <Text style={{ color: '#8c8c8c', fontSize: 16, display: 'block', marginTop: 8 }}>
                 Please enter your details.
