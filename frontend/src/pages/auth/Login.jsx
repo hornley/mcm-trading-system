@@ -52,8 +52,8 @@ const Login = () => {
           justifyContent: 'center',
           padding: '48px 44px',
         }}>
-          <div style={{ textAlign: 'center', marginBottom: 48 }}>
-            <img src={logoImage} alt="Manco Trading" style={{ width: 180, height: 'auto' }} />
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <img src={logoImage} alt="Manco Trading" style={{ width: 120, height: 'auto' }} />
           </div>
 
           <Form layout="vertical" onFinish={handleLogin} autoComplete="off" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
