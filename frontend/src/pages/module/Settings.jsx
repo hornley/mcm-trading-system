@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import {
   UserOutlined, SettingOutlined, SaveOutlined, LockOutlined,
-  BellOutlined,   BgColorsOutlined, CheckCircleOutlined, MailOutlined,
+  BgColorsOutlined, CheckCircleOutlined, MailOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -196,7 +196,6 @@ const Settings = () => {
   const menuItems = [
     { key: 'account', icon: <UserOutlined />, label: 'Account Information' },
     { key: 'password', icon: <LockOutlined />, label: 'Change Password' },
-    { key: 'notifications', icon: <BellOutlined />, label: 'Notifications' },
     { key: 'personalization', icon: <BgColorsOutlined />, label: 'Personalization' },
   ];
 
@@ -344,12 +343,6 @@ const Settings = () => {
               <a onClick={() => setForgotModalOpen(true)} style={{ fontSize: 13, cursor: 'pointer', color: '#1890ff' }}>Forgot Password?</a>
             </div>
           </Form>
-        );
-      case 'notifications':
-        return (
-          <div style={{ padding: 24, textAlign: 'center' }}>
-            <Text type="secondary">Notification settings coming soon.</Text>
-          </div>
         );
       case 'personalization':
         return (
