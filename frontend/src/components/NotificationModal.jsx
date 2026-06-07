@@ -34,7 +34,7 @@ const NotificationModal = ({ open, onClose }) => {
   useEffect(() => {
     if (!open || !user) return
     setLoading(true)
-    const params = new URLSearchParams({ usertype: user.usertype })
+    const params = new URLSearchParams({ usertype: user.usertype, user_id: user.user_id })
     if (user.location_id) params.append('location_id', user.location_id)
     fetch(`/api/inventory/pending-requests?${params}`)
       .then((r) => r.json())
