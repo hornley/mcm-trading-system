@@ -149,11 +149,17 @@ const Inventory = () => {
     }
   };
 
-  const filteredProducts = products.filter((p) => {
-    if (searchText && !p.name.toLowerCase().includes(searchText.toLowerCase())) return false;
-    if (categoryFilter && p.category_id !== categoryFilter) return false;
-    return true;
-  });
+  const filteredProducts = products
+    .filter((p) => {
+      if (searchText && !p.name.toLowerCase().includes(searchText.toLowerCase())) return false;
+      if (categoryFilter && p.category_id !== categoryFilter) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (a.is_active && !b.is_active) return -1;
+      if (!a.is_active && b.is_active) return 1;
+      return 0;
+    });
 
   if (loading) return <Card style={{ textAlign: 'center' }}><Spin size="large" /></Card>;
 
