@@ -20,6 +20,7 @@ const POSModal = ({
 }) => {
   const [categories, setCategories] = useState([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [searchText, setSearchText] = useState('');
   const [cart, setCart] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [paymentAmount, setPaymentAmount] = useState(null);
@@ -41,6 +42,7 @@ const POSModal = ({
   useEffect(() => {
     if (open) {
       setSelectedCategoryId(null);
+      setSearchText('');
       setCart([]);
       setPaymentMethod('Cash');
       setPaymentAmount(null);
@@ -67,8 +69,13 @@ const POSModal = ({
 
   const filteredProducts = useMemo(() => {
     if (!selectedCategoryId) return [];
-    return products.filter((p) => p.category_id === selectedCategoryId && p.is_active !== false);
-  }, [products, selectedCategoryId]);
+    return products.filter((p) => {
+      if (p.category_id !== selectedCategoryId) return false;
+      if (p.is_active === false) return false;
+      if (searchText && !p.name.toLowerCase().includes(searchText.toLowerCase())) return false;
+      return true;
+    });
+  }, [products, selectedCategoryId, searchText]);
 
   const grandTotal = useMemo(() =>
     cart.reduce((sum, item) => sum + item.quantity * item.price, 0),
@@ -87,6 +94,8 @@ const POSModal = ({
     if (windowWidth < 576) return windowWidth - 32;
     return Math.min(windowWidth * 0.92, 1400);
   }, [windowWidth]);
+
+  const isDesktop = windowWidth >= 992;
 
   const getDefaultQty = useCallback((product) =>
     product.category === FABRIC_CATEGORY ? MIN_FABRIC_QTY : 1,
@@ -191,55 +200,65 @@ const POSModal = ({
         open={open}
         onCancel={onClose}
         width={modalWidth}
-        styles={{ body: { maxHeight: '80vh', overflowY: 'auto', padding: '16px 24px' } }}
+        styles={{ body: { maxHeight: '80vh', overflowY: isDesktop ? 'hidden' : 'auto', padding: '16px 24px' } }}
         footer={null}
         destroyOnClose
       >
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={17}>
-            <div style={{ marginBottom: 16 }}>
-              <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 8 }}>Categories</Text>
-              <Row gutter={[16, 16]}>
-                {categories.length === 0 && (
-                  <Col span={24}><Text type="secondary">Loading categories...</Text></Col>
-                )}
-                {categories.map((cat) => {
-                  const isSelected = selectedCategoryId === cat.category_id;
-                  const expanded = !selectedCategoryId;
-                  return (
-                    <Col
-                      key={cat.category_id}
-                      xs={expanded ? 12 : undefined}
-                      md={expanded ? 8 : undefined}
-                    >
-                      <Card
-                        hoverable
-                        size={expanded ? 'default' : 'small'}
-                        onClick={() => setSelectedCategoryId(cat.category_id)}
-                        className="pos-category-tile"
-                        styles={{ body: { padding: expanded ? 24 : undefined, display: 'flex', alignItems: 'center', justifyContent: 'center' } }}
-                        style={{
-                          cursor: 'pointer',
-                          textAlign: 'center',
-                          minWidth: expanded ? undefined : 110,
-                          minHeight: expanded ? 120 : undefined,
-                          background: isSelected ? '#e6f4ff' : undefined,
-                          borderColor: isSelected ? '#5b7ff0' : undefined,
-                          borderWidth: isSelected ? 2 : 1,
-                        }}
-                      >
-                        <Text strong style={{ fontSize: expanded ? 16 : 14 }}>{cat.name}</Text>
-                      </Card>
-                    </Col>
-                  );
-                })}
-              </Row>
-            </div>
-
-            <Divider style={{ margin: '8px 0' }} />
-
-            <div>
-              {selectedCategoryId ? (
+            <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, ...(isDesktop ? { height: 'calc(80vh - 64px)' } : {}) }}>
+              <div style={{ flexShrink: 0, background: '#fff' }}>
+                <Input.Search
+                  placeholder="Search products..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  onSearch={(val) => setSearchText(val)}
+                  allowClear
+                  onClear={() => setSearchText('')}
+                  style={{ marginBottom: 12 }}
+                />
+                <div style={{ marginBottom: 16 }}>
+                  <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 8 }}>Categories</Text>
+                  <Row gutter={[16, 16]}>
+                    {categories.length === 0 && (
+                      <Col span={24}><Text type="secondary">Loading categories...</Text></Col>
+                    )}
+                    {categories.map((cat) => {
+                      const isSelected = selectedCategoryId === cat.category_id;
+                      const expanded = !selectedCategoryId;
+                      return (
+                        <Col
+                          key={cat.category_id}
+                          xs={expanded ? 12 : undefined}
+                          md={expanded ? 8 : undefined}
+                        >
+                          <Card
+                            hoverable
+                            size={expanded ? 'default' : 'small'}
+                            onClick={() => { setSelectedCategoryId(cat.category_id); setSearchText(''); }}
+                            className="pos-category-tile"
+                            styles={{ body: { padding: expanded ? 24 : undefined, display: 'flex', alignItems: 'center', justifyContent: 'center' } }}
+                            style={{
+                              cursor: 'pointer',
+                              textAlign: 'center',
+                              minWidth: expanded ? undefined : 110,
+                              minHeight: expanded ? 120 : undefined,
+                              background: isSelected ? '#e6f4ff' : undefined,
+                              borderColor: isSelected ? '#5b7ff0' : undefined,
+                              borderWidth: isSelected ? 2 : 1,
+                            }}
+                          >
+                            <Text strong style={{ fontSize: expanded ? 16 : 14 }}>{cat.name}</Text>
+                          </Card>
+                        </Col>
+                      );
+                    })}
+                  </Row>
+                </div>
+                <Divider style={{ margin: '8px 0' }} />
+              </div>
+              <div className="pos-product-list" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
+                {selectedCategoryId ? (
                 <>
                   <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 8 }}>
                     {categories.find((c) => c.category_id === selectedCategoryId)?.name}
@@ -299,6 +318,7 @@ const POSModal = ({
                 </>
               ) : null}
             </div>
+            </div>
           </Col>
 
           <Col xs={24} lg={7}>
@@ -324,6 +344,16 @@ const POSModal = ({
               }
               .pos-category-tile .ant-card-body {
                 transition: padding 150ms ease;
+              }
+              .pos-product-list::-webkit-scrollbar {
+                width: 4px;
+              }
+              .pos-product-list::-webkit-scrollbar-thumb {
+                background: rgba(0,0,0,0.15);
+                border-radius: 4px;
+              }
+              .pos-product-list::-webkit-scrollbar-track {
+                background: transparent;
               }
             `}</style>
 
