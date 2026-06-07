@@ -55,7 +55,7 @@ const Login = () => {
           <div style={{ marginBottom: 48 }}>
             <img src={logoImage} alt="Logo" style={{ height: 60, width: 'auto', display: 'block' }} />
           </div>
-          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={{ textAlign: 'center', marginBottom: 5 }}>
             <Title level={1} style={{ margin: 0, fontWeight: 700, fontSize: 34, lineHeight: 1.2 }}>Welcome Back! 👋</Title>
             <Text style={{ color: '#8c8c8c', fontSize: 16, display: 'block', marginTop: 8 }}>
               Please enter your details.
