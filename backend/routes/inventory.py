@@ -31,6 +31,54 @@ def _can_delete(usertype):
     return usertype in [1, 3]
 
 
+def check_and_auto_restock(location_id):
+    location = Location.query.get(location_id)
+    if not location or not location.auto_restock_source_id:
+        return
+    source_id = location.auto_restock_source_id
+    source = Location.query.get(source_id)
+    if not source:
+        return
+    inventory_list = Inventory.query.filter_by(location_id=location_id).all()
+    for inv in inventory_list:
+        try:
+            level = int(inv.product.reorder_level) if inv.product and inv.product.reorder_level else 0
+        except (ValueError, TypeError):
+            level = 0
+        if level <= 0 or inv.quantity >= level:
+            continue
+        source_inv = Inventory.query.filter_by(product_id=inv.product_id, location_id=source_id).first()
+        deficit = level - inv.quantity
+        if not source_inv or source_inv.quantity <= 0:
+            notif = Notification(
+                location_id=location_id, type="restock_failed",
+                message=f"Auto-restock failed for {inv.product.name}: insufficient stock at {source.name}",
+            )
+            db.session.add(notif)
+            continue
+        transfer_qty = min(deficit, source_inv.quantity)
+        if transfer_qty <= 0:
+            continue
+        stock_request = StockRequest(
+            product_id=inv.product_id, from_location_id=source_id, to_location_id=location_id,
+            requested_by=0, quantity=transfer_qty,
+            description=f"Auto-restock (below reorder level {level})", status="pending",
+        )
+        db.session.add(stock_request)
+        db.session.flush()
+        db.session.add(Notification(
+            location_id=location_id, type="restock_pending",
+            message=f"Auto-restock request for {inv.product.name} x {transfer_qty} sent to {source.name}",
+            request_id=stock_request.request_id,
+        ))
+        db.session.add(Notification(
+            location_id=source_id, type="restock_pending",
+            message=f"Auto-restock request from {location.name} for {inv.product.name} x {transfer_qty}",
+            request_id=stock_request.request_id,
+        ))
+    db.session.commit()
+
+
 def _generate_sku():
     count = Product.query.count()
     return f"PROD-{count + 1:03d}"
@@ -393,10 +441,7 @@ def inventory_counts():
     low_stock_count = sum(1 for i in all_inv if i.quantity > 0 and i.quantity <= 10)
     out_of_stock_count = sum(1 for i in all_inv if i.quantity == 0)
 
-    request_query = StockRequest.query.filter_by(status="pending")
-    if resolved_location_id and resolved_location_id != "all":
-        request_query = request_query.filter_by(from_location_id=resolved_location_id)
-    pending_request_count = request_query.count()
+    pending_request_count = StockRequest.query.filter_by(status="pending", requested_by=user_id).count()
 
     return success_response({
         "total_items": total_items,
@@ -594,10 +639,12 @@ def adjust_inventory():
     if not product:
         return error_response("Product not found", "NOT_FOUND", 404)
 
-    qty_error = validate_quantity(data["quantity_change"], "quantity_change", product.category_id)
+    quantity_change = float(data["quantity_change"])
+    if quantity_change == 0:
+        return error_response("quantity_change must not be zero", "INVALID_VALUE", 400)
+    qty_error = validate_quantity(abs(quantity_change), "quantity_change", product.category_id)
     if qty_error:
         return qty_error
-    quantity_change = float(data["quantity_change"])
 
     location = Location.query.get(data["location_id"])
     if not location:
@@ -626,6 +673,9 @@ def adjust_inventory():
     )
     db.session.add(adjustment)
     db.session.commit()
+
+    if quantity_change < 0:
+        check_and_auto_restock(data["location_id"])
 
     log_activity(
         user_id=data.get("user_id"),
@@ -1031,6 +1081,8 @@ def transfer_stock():
     db.session.add(transfer)
     db.session.commit()
 
+    check_and_auto_restock(data["from_location_id"])
+
     log_activity(
         user_id=data.get("user_id"),
         module="inventory",
@@ -1239,6 +1291,7 @@ def accept_request(request_id):
 
     stock_request.status = "accepted"
     db.session.commit()
+    check_and_auto_restock(stock_request.from_location_id)
     return success_response({"message": "Request accepted"})
 
 

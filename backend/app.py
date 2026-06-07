@@ -53,14 +53,19 @@ def create_app():
     mail.init_app(app)
     db.init_app(app)
     with app.app_context():
-        import sqlalchemy as sa
-        inspector = sa.inspect(db.engine)
-        cols = [c['name'] for c in inspector.get_columns('Locations')]
-        if 'auto_restock_source_id' not in cols:
-            db.session.execute(sa.text('ALTER TABLE "Locations" ADD COLUMN auto_restock_source_id INTEGER REFERENCES "Locations"(location_id)'))
-        if 'Notifications' not in inspector.get_table_names():
-            db.create_all()
-        db.session.commit()
+        import sys
+        try:
+            import sqlalchemy as sa
+            inspector = sa.inspect(db.engine)
+            cols = [c['name'] for c in inspector.get_columns('Locations')]
+            if 'auto_restock_source_id' not in cols:
+                db.session.execute(sa.text('ALTER TABLE "Locations" ADD COLUMN auto_restock_source_id INTEGER REFERENCES "Locations"(location_id)'))
+                db.session.commit()
+            if 'Notifications' not in inspector.get_table_names():
+                db.create_all()
+                db.session.commit()
+        except Exception as e:
+            print(f"[MIGRATION] {e}", file=sys.stderr)
     print("[CREATE_APP] registering blueprints ...", file=sys.stderr)
     app.register_blueprint(account_bp)
     app.register_blueprint(auth_bp)

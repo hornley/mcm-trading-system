@@ -32,14 +32,14 @@ const Topbar = () => {
     fetch(`/api/inventory/pending-requests?${params}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.success) setPendingCount(data.data.length)
+        if (data.success) setPendingCount((data.data || []).length)
       })
       .catch(() => {})
     if (user.location_id) {
       fetch(`/api/notifications/count?location_id=${user.location_id}`)
         .then((r) => r.json())
         .then((data) => {
-          if (data.success) setNotifCount(data.count)
+          if (data.success) setNotifCount(data.count || 0)
         })
         .catch(() => {})
     }
@@ -80,7 +80,7 @@ const Topbar = () => {
         Manco (MCM) Trading
       </Title>
       <div style={{ width: 240, textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-        <Badge count={pendingCount + notifCount} size="small" offset={[-2, 2]}>
+        <Badge count={(pendingCount || 0) + (notifCount || 0)} size="small" offset={[-2, 2]}>
           <Button
             icon={<BellOutlined />}
             onClick={() => { setNotifOpen(true); fetchPendingCount() }}
