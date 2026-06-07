@@ -363,8 +363,8 @@ def inventory_counts():
     out_of_stock_count = sum(1 for i in all_inv if i.quantity == 0)
 
     request_query = StockRequest.query.filter_by(status="pending")
-    if resolved_location_id and resolved_location_id != "all":
-        request_query = request_query.filter_by(to_location_id=resolved_location_id)
+    if user_id:
+        request_query = request_query.filter_by(requested_by=user_id)
     pending_request_count = request_query.count()
 
     return success_response({
@@ -1202,13 +1202,10 @@ def decline_request(request_id):
 
 @inventory_bp.route("/api/inventory/pending-requests", methods=["GET"])
 def list_pending_requests():
-    from_location_id = request.args.get("location_id", type=int)
     user_id = request.args.get("user_id", type=int)
     query = StockRequest.query.filter_by(status="pending").order_by(StockRequest.created_at.desc())
-    if from_location_id:
-        query = query.filter_by(from_location_id=from_location_id)
     if user_id:
-        query = query.filter(StockRequest.requested_by != user_id)
+        query = query.filter_by(requested_by=user_id)
     requests = query.limit(50).all()
     return success_response([{
         "request_id": r.request_id,
@@ -1230,11 +1227,10 @@ def list_pending_requests():
 
 @inventory_bp.route("/api/inventory/request-logs", methods=["GET"])
 def list_request_logs():
-    location_id = request.args.get("location_id", type=int)
-    usertype = request.args.get("usertype", type=int)
+    user_id = request.args.get("user_id", type=int)
     query = StockRequest.query.order_by(StockRequest.created_at.desc())
-    if location_id and location_id != "all":
-        query = query.filter_by(from_location_id=location_id)
+    if user_id:
+        query = query.filter_by(requested_by=user_id)
     requests = query.limit(100).all()
     return success_response([{
         "request_id": r.request_id,

@@ -362,8 +362,7 @@ const StockManagement = () => {
   const fetchRequestLogs = async () => {
     setRequestLogLoading(true);
     try {
-      const locationParam = user.location_id ? `&location_id=${user.location_id}` : '';
-      const res = await fetch(`/api/inventory/request-logs?usertype=${user.usertype}${locationParam}`);
+      const res = await fetch(`/api/inventory/request-logs?usertype=${user.usertype}&user_id=${user.user_id}`);
       const data = await res.json();
       if (data.success) {
         setRequestLogs(data.data || []);
