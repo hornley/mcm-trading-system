@@ -439,16 +439,17 @@ const StockManagement = () => {
 
   const { total_items: totalItems, low_stock_count: lowStockCount, out_of_stock_count: outOfStockCount, pending_request_count: pendingRequestCount } = stats;
 
+  const showBranch = selectedLocationId === "all";
   const columns = [
     {
       title: 'Product Name', dataIndex: 'product_name', key: 'product_name',
       sorter: true,
       defaultSortOrder: sortBy === 'product_name' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
     },
-    {
+    ...(showBranch ? [{
       title: 'Branch', dataIndex: 'location_name', key: 'location_name',
       sorter: true,
-    },
+    }] : []),
     {
       title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
       render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
