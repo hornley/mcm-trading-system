@@ -19,7 +19,7 @@ const computeTrend = (current) => {
   const delta = Math.round(current * (Math.random() * 0.2 - 0.05))
   const prev = current - delta
   const pct = prev > 0 ? ((delta / prev) * 100).toFixed(1) : '0.0'
-  return { percent: pct, direction: delta >= 0 ? 'up' : 'down', prev }
+  return { percent: pct, direction: delta >= 0 ?  'up' : 'down', prev }
 }
 
 const Manager = () => {

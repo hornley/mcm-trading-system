@@ -984,8 +984,8 @@ const StockManagement = () => {
           @page { size: legal; margin: 12mm; }
           body * { visibility: hidden; }
           #stock-receipt-print, #stock-receipt-print * { visibility: visible; }
-          #stock-receipt-print { position: absolute; left: 0; top: 0; width: 100%; display: flex !important; justify-content: center; }
-          #stock-receipt-print .receipt-inner { width: 100% !important; font-size: 14px !important; padding: 16px 24px !important; }
+          #stock-receipt-print { position: fixed; left: 0; top: 0; right: 0; bottom: 0; display: flex !important; justify-content: center; align-items: flex-start; }
+          #stock-receipt-print .receipt-inner { width: auto !important; max-width: 700px !important; margin: 0 auto !important; font-size: 14px !important; padding: 16px 24px !important; }
           #stock-receipt-print .receipt-inner table { font-size: 14px !important; }
           #stock-receipt-print .receipt-item { font-size: 13px !important; padding: 4px 0 !important; }
           #stock-receipt-print .receipt-header { font-size: 20px !important; }

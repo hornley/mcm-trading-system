@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Button, Input, message, Typography, Form } from 'antd'
-import { UserOutlined, LockOutlined } from '@ant-design/icons'
+import { Button, Input, message, Typography, Form, Modal } from 'antd'
+import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import bgImage from '../../../images/mancoImage.png'
@@ -11,7 +11,37 @@ const { Title, Text } = Typography
 const Login = () => {
   const { login } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [forgotVisible, setForgotVisible] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
   const navigate = useNavigate()
+
+  const handleForgotPassword = async () => {
+    if (!forgotEmail) {
+      message.warning('Please enter your email address')
+      return
+    }
+    setForgotLoading(true)
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        message.success('If the email exists, a reset link will be sent.')
+        setForgotVisible(false)
+        setForgotEmail('')
+      } else {
+        message.error(data.error || 'Something went wrong')
+      }
+    } catch {
+      message.error('Connection error. Is the server running?')
+    } finally {
+      setForgotLoading(false)
+    }
+  }
 
   const handleLogin = async (values) => {
     setLoading(true)
@@ -81,6 +111,12 @@ const Login = () => {
               />
             </Form.Item>
 
+            <div style={{ textAlign: 'center', marginBottom: 16 }}>
+              <Button type="link" style={{ padding: 0, fontSize: 14 }} onClick={() => setForgotVisible(true)}>
+                Forgot password?
+              </Button>
+            </div>
+
             <Form.Item style={{ marginBottom: 0 }}>
               <Button
                 type="primary"
@@ -94,6 +130,33 @@ const Login = () => {
               </Button>
             </Form.Item>
           </Form>
+
+          <Modal
+            title="Reset Password"
+            open={forgotVisible}
+            onCancel={() => { setForgotVisible(false); setForgotEmail('') }}
+            footer={[
+              <Button key="cancel" onClick={() => { setForgotVisible(false); setForgotEmail('') }}>Cancel</Button>,
+              <Button key="send" type="primary" loading={forgotLoading} onClick={handleForgotPassword}>
+                Send Reset Link
+              </Button>,
+            ]}
+          >
+            <div style={{ padding: '16px 0' }}>
+              <Text style={{ display: 'block', marginBottom: 16, color: '#666' }}>
+                Enter your email address and we'll send you a link to reset your password.
+              </Text>
+              <Input
+                prefix={<MailOutlined style={{ color: '#bfbfbf' }} />}
+                placeholder="Your email address"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                size="large"
+                style={{ borderRadius: 8, height: 48 }}
+                onPressEnter={handleForgotPassword}
+              />
+            </div>
+          </Modal>
         </div>
 
         <div style={{
