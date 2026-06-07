@@ -53,14 +53,16 @@ const Login = () => {
           padding: '48px 44px',
         }}>
           <div style={{ marginBottom: 48 }}>
-            <img src={logoImage} alt="Logo" style={{ height: 60, width: 'auto', display: 'block', marginBottom: 24 }} />
+            <img src={logoImage} alt="Logo" style={{ height: 60, width: 'auto', display: 'block' }} />
+          </div>
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
             <Title level={1} style={{ margin: 0, fontWeight: 700, fontSize: 34, lineHeight: 1.2 }}>Welcome Back! 👋</Title>
             <Text style={{ color: '#8c8c8c', fontSize: 16, display: 'block', marginTop: 8 }}>
               Please enter your details.
             </Text>
           </div>
 
-          <Form layout="vertical" onFinish={handleLogin} autoComplete="off" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <Form layout="vertical" onFinish={handleLogin} autoComplete="off" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             <Form.Item name="username" rules={[{ required: true, message: 'Please enter your username' }]} style={{ marginBottom: 24 }}>
               <Input
                 prefix={<UserOutlined style={{ color: '#bfbfbf', fontSize: 18 }} />}
