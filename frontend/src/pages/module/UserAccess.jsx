@@ -1,5 +1,5 @@
-import { Table, Card, Select, Tag, message, Typography, Button, Space, Modal } from 'antd';
-import { EditOutlined, CloseOutlined, FilterOutlined } from '@ant-design/icons';
+import { Table, Card, Select, Tag, message, Typography, Button, Space, Modal, Input, Form } from 'antd';
+import { EditOutlined, CloseOutlined, FilterOutlined, UserAddOutlined, MailOutlined, LockOutlined, PhoneOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -9,7 +9,6 @@ const USERTYPE_MAP = {
   1: { label: 'Owner', color: 'gold' },
   2: { label: 'Manager', color: 'blue' },
   3: { label: 'Admin', color: 'purple' },
-  4: { label: 'Staff', color: 'default' },
 };
 
 const typeOptions = Object.entries(USERTYPE_MAP).map(([key, val]) => ({
@@ -35,6 +34,9 @@ const UserAccess = () => {
   const [appliedLocation, setAppliedLocation] = useState(null);
   const [sortField, setSortField] = useState(null);
   const [sortOrder, setSortOrder] = useState(null);
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [registerForm] = Form.useForm();
 
   const fetchUsers = (role, location) => {
     if (!user) return;
@@ -119,6 +121,29 @@ const UserAccess = () => {
     } catch { message.error('Failed to update location'); }
   };
 
+  const handleRegister = async (values) => {
+    setRegisterLoading(true);
+    try {
+      const payload = { ...values };
+      if (payload.phone) payload.phone = '63' + payload.phone;
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) { message.error(data.error); return; }
+      message.success('Account created successfully');
+      setRegisterOpen(false);
+      registerForm.resetFields();
+      fetchUsers();
+    } catch {
+      message.error('Failed to create account');
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+
   const columns = [
     { title: 'Employee Code', dataIndex: 'employee_code', key: 'employee_code' },
     { title: 'Username', dataIndex: 'username', key: 'username', sorter: (a, b) => a.username.localeCompare(b.username), sortDirections: ['ascend', 'descend'] },
@@ -175,6 +200,9 @@ const UserAccess = () => {
           <Button icon={editing ? <CloseOutlined /> : <EditOutlined />} onClick={() => setEditing(!editing)}>
             {editing ? 'Done Editing' : 'Edit'}
           </Button>
+          <Button type="primary" icon={<UserAddOutlined />} onClick={() => setRegisterOpen(true)}>
+            Create account
+          </Button>
         </Space>
       </Space>
       <Card styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}>
@@ -190,7 +218,7 @@ const UserAccess = () => {
             setSortOrder(sorter.order || null);
           }}
         />
-      </Card>ssssssssssssssssssssssssssssssssssssssssssssssss
+      </Card>
       <Modal
         title="Filter Users"
         open={filterOpen}
@@ -226,6 +254,43 @@ const UserAccess = () => {
             />
           </div>
         </Space>
+      </Modal>
+      <Modal
+        title="Create Account"
+        open={registerOpen}
+        onCancel={() => { setRegisterOpen(false); registerForm.resetFields(); }}
+        footer={[
+          <Button key="cancel" onClick={() => { setRegisterOpen(false); registerForm.resetFields(); }}>Cancel</Button>,
+          <Button key="create" type="primary" loading={registerLoading} onClick={() => registerForm.submit()}>Create</Button>,
+        ]}
+      >
+        <Form form={registerForm} layout="vertical" onFinish={handleRegister}>
+          <Form.Item name="username" label="Username" rules={[{ required: true, message: 'Please enter a username' }]}>
+            <Input prefix={<UserAddOutlined />} placeholder="Username" />
+          </Form.Item>
+          <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email', message: 'Please enter a valid email' }]}>
+            <Input prefix={<MailOutlined />} placeholder="Email" />
+          </Form.Item>
+          <Form.Item name="password" label="Password" rules={[{ required: true, message: 'Please enter a password' }]}>
+            <Input.Password prefix={<LockOutlined />} placeholder="Password" />
+          </Form.Item>
+          <Form.Item name="usertype" label="Role" rules={[{ required: true, message: 'Please select a role' }]}>
+            <Select placeholder="Select role" options={typeOptions} />
+          </Form.Item>
+          <Form.Item name="location_id" label="Location" rules={[{ required: true, message: 'Please select a location' }]}>
+            <Select placeholder="Select location" options={LOCATIONS.map((l) => ({ value: l.id, label: l.name }))} />
+          </Form.Item>
+          <Form.Item name="phone" label="Phone (optional)" rules={[
+            { validator: (_, value) => {
+              if (!value) return Promise.resolve();
+              if (!/^\d+$/.test(value)) return Promise.reject(new Error('Numbers only'));
+              if (value.length !== 10) return Promise.reject(new Error('Must be 10 digits'));
+              return Promise.resolve();
+            }},
+          ]}>
+            <Input prefix={<><PhoneOutlined /><span style={{ color: '#666', marginLeft: 4 }}>63+</span></>} maxLength={10} placeholder="9123456789" />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );
