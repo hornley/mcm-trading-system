@@ -50,7 +50,7 @@ const Login = () => {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
-          padding: '60px 44px 48px',
+          padding: '48px 44px',
         }}>
           <div style={{ textAlign: 'center', marginBottom: 48 }}>
             <img src={logoImage} alt="Manco Trading" style={{ width: 270, height: 'auto' }} />
