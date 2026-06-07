@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Typography, Button, Select, Space, Badge } from 'antd'
 import { LogoutOutlined, BellOutlined } from '@ant-design/icons'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -11,6 +11,7 @@ const Topbar = () => {
   const [locations, setLocations] = useState([])
   const [notifOpen, setNotifOpen] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
+  const [notifCount, setNotifCount] = useState(0)
   const isDark = theme === 'dark'
 
   useEffect(() => {
@@ -24,23 +25,36 @@ const Topbar = () => {
     }
   }, [user])
 
-  const fetchPendingCount = () => {
+  const fetchCounts = useCallback(() => {
     if (!user) return
     const params = new URLSearchParams({ usertype: user.usertype, user_id: user.user_id })
     if (user.location_id) params.append('location_id', user.location_id)
     fetch(`/api/inventory/pending-requests?${params}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.success) setPendingCount(data.data.length)
+        if (data.success) setPendingCount((data.data || []).length)
       })
       .catch(() => {})
-  }
+    if (user.location_id) {
+      fetch(`/api/notifications/count?location_id=${user.location_id}&_t=${Date.now()}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success) setNotifCount(data.count || 0)
+        })
+        .catch(() => {})
+    }
+  }, [user])
 
   useEffect(() => {
-    fetchPendingCount()
-    const interval = setInterval(fetchPendingCount, 30000)
+    fetchCounts()
+    const interval = setInterval(fetchCounts, 30000)
     return () => clearInterval(interval)
-  }, [user])
+  }, [fetchCounts])
+
+  const handleCloseNotif = () => {
+    setNotifOpen(false)
+    fetchCounts()
+  }
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -71,10 +85,10 @@ const Topbar = () => {
         Manco (MCM) Trading
       </Title>
       <div style={{ width: 240, textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-        <Badge count={pendingCount} size="small" offset={[-2, 2]}>
+        <Badge count={(pendingCount || 0) + (notifCount || 0)} size="small" offset={[-2, 2]}>
           <Button
             icon={<BellOutlined />}
-            onClick={() => { setNotifOpen(true); fetchPendingCount() }}
+            onClick={() => { setNotifOpen(true); fetchCounts() }}
             type="text"
             style={{ color: isDark ? 'rgba(255,255,255,0.65)' : '#595959', fontSize: 16 }}
           />
@@ -83,7 +97,7 @@ const Topbar = () => {
           Logout
         </Button>
       </div>
-      <NotificationModal open={notifOpen} onClose={() => setNotifOpen(false)} />
+      <NotificationModal open={notifOpen} onClose={handleCloseNotif} onUpdate={fetchCounts} />
     </div>
   )
 }

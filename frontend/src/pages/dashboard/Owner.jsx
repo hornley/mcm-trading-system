@@ -168,8 +168,7 @@ const Owner = () => {
 
   return (
     <div>
-      <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
-        <Col><Title level={4} style={{ margin: 0 }}>Owner Dashboard</Title></Col>
+      <Row justify="end" style={{ marginBottom: 4 }}>
         <Col>{lastUpdated && <Text type="secondary" style={{ fontSize: 12 }}>Last updated: {lastUpdated}</Text>}</Col>
       </Row>
 

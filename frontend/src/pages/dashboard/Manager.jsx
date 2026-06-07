@@ -19,7 +19,7 @@ const computeTrend = (current) => {
   const delta = Math.round(current * (Math.random() * 0.2 - 0.05))
   const prev = current - delta
   const pct = prev > 0 ? ((delta / prev) * 100).toFixed(1) : '0.0'
-  return { percent: pct, direction: delta >= 0 ? 'up' : 'down', prev }
+  return { percent: pct, direction: delta >= 0 ?  'up' : 'down', prev }
 }
 
 const Manager = () => {
@@ -108,15 +108,11 @@ const Manager = () => {
 
   return (
     <div>
-      <Row justify="space-between" align="middle" style={{ marginBottom: 4 }}>
-        <Col>
-          <Title level={4} style={{ margin: 0 }}>Manager Dashboard</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>Branch: {branchName}</Text>
-        </Col>
+      <Row justify="end" style={{ marginBottom: 4 }}>
         <Col>{lastUpdated && <Text type="secondary" style={{ fontSize: 12 }}>Last updated: {lastUpdated}</Text>}</Col>
       </Row>
 
-      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+      <Row gutter={[16, 16]}>
         {statCards.map((stat, i) => (
           <Col xs={24} sm={12} lg={8} key={i}>
             <Card

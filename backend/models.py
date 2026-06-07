@@ -37,6 +37,7 @@ class Location(db.Model):
     address = db.Column(db.String)
     is_active = db.Column(db.Boolean, default=True)
     is_storehouse = db.Column(db.Boolean, default=False)
+    auto_restock_source_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
 
@@ -58,6 +59,7 @@ class Product(db.Model):
     name = db.Column(db.String, nullable=False)
     price = db.Column(db.Integer, nullable=False)
     reorder_level = db.Column(db.String)
+    auto_restock_source_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=True)
     description = db.Column(db.Text)
     sku = db.Column(db.String, unique=True)
     unit = db.Column(db.String)
@@ -186,6 +188,18 @@ class StoreReport(db.Model):
     user = db.relationship("User", foreign_keys=[user_id])
     location = db.relationship("Location")
     resolver = db.relationship("User", foreign_keys=[resolved_by])
+
+
+class Notification(db.Model):
+    __tablename__ = "Notifications"
+    notification_id = db.Column(db.Integer, primary_key=True)
+    location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
+    type = db.Column(db.String(50), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    request_id = db.Column(db.Integer, db.ForeignKey("Stock_Requests.request_id"), nullable=True)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    location = db.relationship("Location")
 
 
 class ManualSection(db.Model):

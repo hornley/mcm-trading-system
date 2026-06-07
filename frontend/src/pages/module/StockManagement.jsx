@@ -8,6 +8,8 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js';
 import { RightCircleOutlined } from '@ant-design/icons';
 import QtyInput from '../../components/QtyInput.jsx';
+import logoImage from '../../../images/Logo.png';
+import receiptConfig from '../../config/receipt.json';
 
 const { Search, TextArea } = Input;
 
@@ -56,6 +58,7 @@ const StockManagement = () => {
   const [requestLogVisible, setRequestLogVisible] = useState(false);
   const [requestLogs, setRequestLogs] = useState([]);
   const [requestLogLoading, setRequestLogLoading] = useState(false);
+  const [reorderSourceId, setReorderSourceId] = useState(null);
 
   const fetchData = async (page, sortOverrides) => {
     if (!user) return;
@@ -87,11 +90,12 @@ const StockManagement = () => {
       if (countData.success) {
         setStats(countData.data);
       }
-      if (locData.success) {
-        const activeLocs = locData.data.filter((l) => l.is_active);
-        setLocations(activeLocs);
-        setStorehouse(activeLocs.find((l) => l.is_storehouse) || null);
-      }
+    if (locData.success) {
+      const activeLocs = locData.data.filter((l) => l.is_active);
+      setLocations(activeLocs);
+      setStorehouse(activeLocs.find((l) => l.is_storehouse) || null);
+      const currentLoc = activeLocs.find((l) => l.location_id === Number(selectedLocationId));
+    }
     } catch {
       message.error('Failed to load data');
     } finally {
@@ -156,6 +160,7 @@ const StockManagement = () => {
 
   const handleSetReorder = (record) => {
     setSelectedRecord(record);
+    setReorderSourceId(record.auto_restock_source_id || null);
     reorderForm.resetFields();
     reorderForm.setFieldsValue({ reorder_level: record.reorder_level ? Number(record.reorder_level) : 0 });
     setReorderVisible(true);
@@ -175,6 +180,17 @@ const StockManagement = () => {
       });
       const data = await res.json();
       if (data.success) {
+        const prevSource = selectedRecord.auto_restock_source_id || null;
+        if (values.source_branch && values.source_branch !== prevSource) {
+          await fetch(`/api/products/${selectedRecord.product_id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              usertype: user.usertype,
+              auto_restock_source_id: values.source_branch,
+            }),
+          });
+        }
         message.success('Reorder level updated');
         setReorderVisible(false);
         fetchData();
@@ -452,6 +468,10 @@ const StockManagement = () => {
   const { total_items: totalItems, low_stock_count: lowStockCount, out_of_stock_count: outOfStockCount, pending_request_count: pendingRequestCount } = stats;
 
   const showBranch = selectedLocationId === "all";
+  const receiptItems = lowStockItems.filter((i) => selectedRestockIds.has(i.product_id) && (restockQuantities[i.product_id] || 0) > 0);
+  const receiptTotalQty = receiptItems.reduce((sum, i) => sum + (restockQuantities[i.product_id] || 0), 0);
+  const receiptRef = `RS-${Date.now().toString(36).toUpperCase()}`;
+
   const columns = [
     {
       title: 'Product Name', dataIndex: 'product_name', key: 'product_name',
@@ -484,10 +504,11 @@ const StockManagement = () => {
       key: 'autoRestock',
       render: (_, record) => {
         const level = Number(record.reorder_level) || 0;
-        const enabled = storehouse && level > 0;
-        return enabled
-          ? <Tag color="green">Active</Tag>
-          : <Tag>{storehouse ? 'Inactive' : 'No Storehouse'}</Tag>;
+        const sourceId = record.auto_restock_source_id;
+        const source = locations.find((l) => l.location_id === sourceId);
+        return level > 0 && sourceId
+          ? <Tag color="green">{source?.name || 'Source Set'}</Tag>
+          : <Tag>{sourceId ? 'Inactive' : 'No Source Set'}</Tag>;
       },
     },
     {
@@ -604,7 +625,7 @@ const StockManagement = () => {
         <Card size="small" style={{ marginBottom: 16, background: 'rgba(82, 196, 26, 0.08)', borderColor: 'rgba(82, 196, 26, 0.3)' }}>
           <Space>
             <Tag color="green">Storehouse</Tag>
-            <span><strong>{storehouse.name}</strong> — auto-restock source branch</span>
+            <span><strong>{storehouse.name}</strong></span>
           </Space>
         </Card>
       )}
@@ -621,11 +642,6 @@ const StockManagement = () => {
               allowClear
               style={{ width: 220 }}
             />
-            {can('update') && storehouse && (
-              <Button type="primary" onClick={handleBulkRestock} loading={restocking} disabled={selectedLocationId === "all"}>
-                Restock Below Reorder
-              </Button>
-            )}
             {can('update') && (
               <Button type="primary" onClick={handleOpenSelectRestock} disabled={selectedLocationId === "all"}>
                 Select Restock
@@ -710,10 +726,17 @@ const StockManagement = () => {
       >
         <Form form={reorderForm} layout="vertical">
           <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-            Set the minimum stock threshold. When quantity drops below this level after a sale, an auto-restock transfer from the storehouse will be triggered.
+            Set the minimum stock threshold and choose which branch to auto-restock from when stock drops below this level.
           </Typography.Text>
           <Form.Item name="reorder_level" label="Reorder Level" rules={[{ required: true, message: 'Please enter reorder level' }]}>
             <InputNumber min={0} style={{ width: '100%' }} placeholder="Enter minimum stock level" />
+          </Form.Item>
+          <Form.Item name="source_branch" label="Auto-Restock Source Branch" initialValue={reorderSourceId}>
+            <Select placeholder="Select source branch" allowClear>
+              {locations.filter((l) => l.location_id !== selectedLocationId).map((loc) => (
+                <Select.Option key={loc.location_id} value={loc.location_id}>{loc.name}</Select.Option>
+              ))}
+            </Select>
           </Form.Item>
         </Form>
       </Modal>
@@ -976,13 +999,74 @@ const StockManagement = () => {
 
       <style>{`
         @media print {
+          @page { size: legal; margin: 12mm; }
           body * { visibility: hidden; }
-          #restock-summary-content, #restock-summary-content * { visibility: visible; }
-          #restock-summary-content { position: absolute; left: 0; top: 0; width: 100%; }
+          #stock-receipt-print, #stock-receipt-print * { visibility: visible; }
+          #stock-receipt-print { position: fixed; left: 0; top: 0; width: 100%; display: flex !important; justify-content: center; }
+          #stock-receipt-print .receipt-inner { width: 100% !important; font-size: 14px !important; padding: 16px 24px !important; }
+          #stock-receipt-print .receipt-inner table { font-size: 14px !important; }
+          #stock-receipt-print .receipt-item { font-size: 13px !important; padding: 4px 0 !important; }
+          #stock-receipt-print .receipt-header { font-size: 20px !important; }
+          #stock-receipt-print .receipt-section { font-size: 16px !important; padding: 8px 0 !important; }
+          #stock-receipt-print .receipt-label { font-size: 14px !important; }
+          #stock-receipt-print img { height: 80px !important; }
+          #stock-receipt-print .receipt-totals { font-size: 14px !important; }
+          #stock-receipt-print .receipt-footer { font-size: 13px !important; }
           .ant-modal-header, .ant-modal-footer { display: none !important; }
-          .ant-table-thead > tr > th { background: #fafafa !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
+
+      <div id="stock-receipt-print" style={{ display: 'none' }}>
+        <div className="receipt-inner" style={{ width: 300, padding: '24px 16px', fontFamily: "'Courier New', monospace", fontSize: 12, color: '#222', background: '#fff', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            <img src={logoImage} alt="Logo" style={{ height: 50, width: 'auto', display: 'block', margin: '0 auto 6px' }} />
+            <div className="receipt-header" style={{ fontSize: 15, fontWeight: 700, letterSpacing: 1 }}>{receiptConfig.companyName}</div>
+          </div>
+          <div className="receipt-section" style={{ textAlign: 'center', fontSize: 13, fontWeight: 600, padding: '4px 0', borderTop: '2px dashed #888', borderBottom: '2px dashed #888', marginBottom: 10 }}>
+            RESTOCK ORDER
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 10, fontSize: 12 }}>
+            <tbody>
+              {[['Date:', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })],
+                ['Ref No:', receiptRef],
+                ['Branch:', user?.location_name || `Branch #${user?.location_id}`],
+                ['Prepared by:', user?.username || '-']].map(([label, value], i) => (
+                <tr key={i}>
+                  <td className="receipt-label" style={{ padding: '2px 4px', color: '#666' }}>{label}</td>
+                  <td className="receipt-label" style={{ padding: '2px 4px', textAlign: 'right' }}>{value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ borderTop: '1px dashed #aaa', borderBottom: '1px dashed #aaa', padding: '4px 0', marginBottom: 6, display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: 11 }}>
+            <span>Item</span>
+            <span>Qty</span>
+          </div>
+          {receiptItems.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '12px 0', color: '#999' }}>No items selected</div>
+          ) : (
+            receiptItems.map((item) => (
+              <div key={item.product_id} className="receipt-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: 11, borderBottom: '1px dotted #ddd' }}>
+                <span style={{ flex: 1, paddingRight: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.product_name}</span>
+                <span style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtQty(restockQuantities[item.product_id] || 0, item.category === FABRIC_CATEGORY)}</span>
+              </div>
+            ))
+          )}
+          <div className="receipt-totals" style={{ borderTop: '2px dashed #888', marginTop: 6, paddingTop: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+              <span>Total Items:</span>
+              <span>{receiptItems.length}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600 }}>
+              <span>Total Quantity:</span>
+              <span>{receiptTotalQty}</span>
+            </div>
+          </div>
+          <div className="receipt-footer" style={{ textAlign: 'center', marginTop: 16, paddingTop: 10, borderTop: '2px dashed #888', fontSize: 11, color: '#555' }}>
+            Thank you!
+          </div>
+        </div>
+      </div>
       </Card>
     </div>
   );
