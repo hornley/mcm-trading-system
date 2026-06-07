@@ -375,9 +375,6 @@ const Settings = () => {
 
   return (
     <div>
-      <Title level={4} style={{ marginBottom: 16 }}>
-        <SettingOutlined /> Settings
-      </Title>
       <Row gutter={24}>
         <Col xs={24} sm={6}>
           <Card size="small" styles={{ body: { padding: 0 } }}>

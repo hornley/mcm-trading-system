@@ -1059,8 +1059,7 @@ const ManagerReports = ({ user, selectedLocationId }) => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}>Store Reports</Title>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
           New Report
         </Button>
