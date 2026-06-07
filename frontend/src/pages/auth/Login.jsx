@@ -4,6 +4,7 @@ import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import bgImage from '../../../images/mancoImage.png'
+import logoImage from '../../../images/Logo.png'
 
 const { Title, Text } = Typography
 
@@ -51,14 +52,17 @@ const Login = () => {
           justifyContent: 'center',
           padding: '48px 44px',
         }}>
-          <div style={{ marginBottom: 48, textAlign: 'center' }}>
-            <Title level={1} style={{ margin: 0, fontWeight: 700, fontSize: 34, lineHeight: 1.2 }}>Welcome Back! 👋</Title>
-            <Text style={{ color: '#8c8c8c', fontSize: 16, display: 'block', marginTop: 8 }}>
-              Please enter your details.
-            </Text>
+          <div style={{ marginBottom: 48 }}>
+            <img src={logoImage} alt="Logo" style={{ height: 60, width: 'auto', display: 'block' }} />
           </div>
 
           <Form layout="vertical" onFinish={handleLogin} autoComplete="off" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ marginBottom: 10 }}>
+              <Title level={1} style={{ margin: 0, fontWeight: 700, fontSize: 34, lineHeight: 1.2 }}>Welcome Back! 👋</Title>
+              <Text style={{ color: '#8c8c8c', fontSize: 16, display: 'block', marginTop: 8 }}>
+                Please enter your details.
+              </Text>
+            </div>
             <Form.Item name="username" rules={[{ required: true, message: 'Please enter your username' }]} style={{ marginBottom: 24 }}>
               <Input
                 prefix={<UserOutlined style={{ color: '#bfbfbf', fontSize: 18 }} />}
