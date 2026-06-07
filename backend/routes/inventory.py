@@ -388,7 +388,7 @@ def list_inventory():
     if error:
         return error
 
-    query = Inventory.query.join(Product)
+    query = Inventory.query.join(Product).filter(Product.is_active == True)
 
     if resolved_location_id and resolved_location_id != "all":
         query = query.filter(Inventory.location_id == resolved_location_id)
@@ -397,12 +397,15 @@ def list_inventory():
     if search:
         query = query.filter(Product.name.ilike(f"%{search}%"))
 
+    status_filter = request.args.get("status", "").strip()
     sort_by = request.args.get("sort_by", "product_name")
     sort_order = request.args.get("sort_order", "asc")
 
     sort_map = {
         "product_name": Product.name,
         "location_name": Location.name,
+        "quantity": Inventory.quantity,
+        "reorder_level": Product.reorder_level,
     }
     sort_col = sort_map.get(sort_by, Product.name)
     if sort_order == "desc":
@@ -414,6 +417,13 @@ def list_inventory():
     limit = request.args.get("limit", 20, type=int)
     page = max(1, page)
     limit = max(1, min(100, limit))
+
+    if status_filter == "out_of_stock":
+        query = query.filter(Inventory.quantity == 0)
+    elif status_filter == "low_stock":
+        query = query.filter(Inventory.quantity > 0, Inventory.quantity <= 10)
+    elif status_filter == "in_stock":
+        query = query.filter(Inventory.quantity > 10)
 
     total_count = query.count()
 
@@ -432,7 +442,7 @@ def list_inventory():
                 "location_id": inv.location_id,
                 "location_name": inv.location.name if inv.location else None,
                 "quantity": inv.quantity,
-                "is_active": inv.product.is_active,
+                "reorder_level": inv.product.reorder_level,
             }
             for inv in inventory
         ],
