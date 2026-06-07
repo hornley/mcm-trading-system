@@ -174,7 +174,6 @@ const Inventory = () => {
               return (
                 <Button
                   key={cat.category_id}
-                  size="small"
                   type={active ? 'primary' : 'default'}
                   onClick={() => setCategoryFilter(active ? null : cat.category_id)}
                 >
