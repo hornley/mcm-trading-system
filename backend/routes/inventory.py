@@ -500,10 +500,14 @@ def get_inventory_by_product(product_id):
 
     user_id = request.args.get("user_id", type=int)
     location_id = request.args.get("location_id")
+    stock_check = request.args.get("stock_check", type=int)
 
-    resolved_location_id, error = _resolve_location_id(usertype, user_id, location_id)
-    if error:
-        return error
+    if stock_check:
+        resolved_location_id = location_id
+    else:
+        resolved_location_id, error = _resolve_location_id(usertype, user_id, location_id)
+        if error:
+            return error
 
     product = Product.query.get(product_id)
     if not product:
