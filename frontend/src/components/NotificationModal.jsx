@@ -123,9 +123,7 @@ const NotificationModal = ({ open, onClose }) => {
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #f0f0f0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 22, fontWeight: 600, color: '#0a0a0a' }}>Notifications</span>
-            <span style={{ fontSize: 15, color: '#8c8c8c' }}>
-              {loading ? '...' : `${requests.length} pending`}
-            </span>
+
           </div>
         </div>
 
