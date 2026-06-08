@@ -537,7 +537,7 @@ const Sales = () => {
               <Dropdown
                 menu={{
                   items: [
-                    { key: 'all', label: 'All' },
+                    { key: 'all', label: 'All Locations' },
                     ...branchLocations.map(loc => ({ key: String(loc.location_id), label: loc.name })),
                   ],
                   onClick: ({ key }) => {
@@ -555,7 +555,7 @@ const Sales = () => {
                 <Button type={selectedLocationId !== 'all' ? 'primary' : 'default'}>
                   {selectedLocationId !== 'all'
                     ? (branchLocations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
-                    : 'All'}
+                    : 'All Locations'}
                 </Button>
               </Dropdown>
             )}

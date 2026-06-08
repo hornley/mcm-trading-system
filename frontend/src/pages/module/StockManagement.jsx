@@ -812,7 +812,7 @@ const StockManagement = () => {
                   <Dropdown
                     menu={{
                       items: [
-                        { key: 'all', label: 'All' },
+                        { key: 'all', label: 'All Locations' },
                         ...locations.filter((l) => l.is_active).map(loc => ({ key: String(loc.location_id), label: loc.name })),
                       ],
                       onClick: ({ key }) => {
@@ -830,7 +830,7 @@ const StockManagement = () => {
                     <Button type={selectedLocationId !== 'all' ? 'primary' : 'default'}>
                       {selectedLocationId !== 'all'
                         ? (locations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
-                        : 'All'}
+                        : 'All Locations'}
                     </Button>
                   </Dropdown>
                 )}
