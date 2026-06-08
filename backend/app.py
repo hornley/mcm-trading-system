@@ -56,6 +56,7 @@ def create_app():
         import sys
         try:
             import sqlalchemy as sa
+            sa.event.listen(db.engine, 'connect', lambda c, _: c.execute('PRAGMA journal_mode=WAL'))
             inspector = sa.inspect(db.engine)
             cols = [c['name'] for c in inspector.get_columns('Locations')]
             if 'auto_restock_source_id' not in cols:

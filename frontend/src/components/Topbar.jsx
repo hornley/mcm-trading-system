@@ -7,7 +7,7 @@ import NotificationModal from './NotificationModal.jsx'
 const { Title } = Typography
 
 const Topbar = () => {
-  const { user, selectedLocationId, setSelectedLocationId, logout, theme } = useAuth()
+  const { user, selectedLocationId, setSelectedLocationId, setIsStorehouse, logout, theme } = useAuth()
   const [locations, setLocations] = useState([])
   const [notifOpen, setNotifOpen] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
@@ -64,7 +64,11 @@ const Topbar = () => {
             <span style={{ color: isDark ? 'rgba(255,255,255,0.45)' : '#8c8c8c', fontSize: 13 }}>Branch:</span>
             <Select
               value={selectedLocationId}
-              onChange={setSelectedLocationId}
+              onChange={(value) => {
+                setSelectedLocationId(value);
+                const loc = locations.find((l) => l.location_id === value);
+                setIsStorehouse(loc ? loc.is_storehouse : false);
+              }}
               style={{ width: 160 }}
               size="small"
             >

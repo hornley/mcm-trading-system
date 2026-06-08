@@ -41,6 +41,7 @@ def login():
         "usertype": user.usertype,
         "location_id": user.location_id,
         "location_name": location.name if location else None,
+        "is_storehouse": location.is_storehouse if location else False,
     })
 
 

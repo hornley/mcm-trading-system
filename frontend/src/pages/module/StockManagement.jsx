@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Table, Card, Typography, Row, Col, Input, Select, Button,
   Tag, Modal, Statistic, Space, Descriptions, Form, InputNumber,
@@ -24,7 +24,7 @@ const getStockStatus = (qty) => {
 const adjustmentReasons = ['Restock', 'Damaged', 'Correction', 'Sample', 'Sales Return'];
 
 const StockManagement = () => {
-  const { user, can, selectedLocationId } = useAuth();
+  const { user, can, selectedLocationId, isStorehouse } = useAuth();
   const [inventory, setInventory] = useState([]);
   const [locations, setLocations] = useState([]);
   const [movements, setMovements] = useState([]);
@@ -60,6 +60,12 @@ const StockManagement = () => {
   const [requestLogs, setRequestLogs] = useState([]);
   const [requestLogLoading, setRequestLogLoading] = useState(false);
   const [reorderSourceId, setReorderSourceId] = useState(null);
+  const [branchNeeds, setBranchNeeds] = useState([]);
+  const [branchNeedsLoading, setBranchNeedsLoading] = useState(false);
+  const [storehousePendingRequests, setStorehousePendingRequests] = useState([]);
+  const [storehousePendingLoading, setStorehousePendingLoading] = useState(false);
+  const [branchFilter, setBranchFilter] = useState('all');
+  const [storehouseStockFilter, setStorehouseStockFilter] = useState('all');
 
   const fetchData = async (page, sortOverrides) => {
     if (!user) return;
@@ -103,6 +109,74 @@ const StockManagement = () => {
       setLoading(false);
     }
   };
+
+  const fetchBranchNeeds = async () => {
+    setBranchNeedsLoading(true);
+    try {
+      const res = await fetch(`/api/inventory/branch-needs?usertype=${user.usertype}`);
+      const data = await res.json();
+      if (data.success) setBranchNeeds(data.data || []);
+    } catch {}
+    setBranchNeedsLoading(false);
+  };
+
+  const fetchStorehousePendingRequests = async () => {
+    setStorehousePendingLoading(true);
+    try {
+      const locId = storehouse?.location_id;
+      if (!locId) return;
+      const res = await fetch(`/api/inventory/pending-requests?location_id=${locId}`);
+      const data = await res.json();
+      if (data.success) setStorehousePendingRequests(data.data || []);
+    } catch {}
+    setStorehousePendingLoading(false);
+  };
+
+  const handleAcceptRequest = async (requestId) => {
+    try {
+      const res = await fetch(`/api/inventory/request-stock/${requestId}/accept`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usertype: user.usertype }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        message.success('Request accepted');
+        fetchStorehousePendingRequests();
+        fetchData();
+      } else {
+        message.error(data.message || 'Failed to accept request');
+      }
+    } catch {
+      message.error('Failed to accept request');
+    }
+  };
+
+  const handleDeclineRequest = async (requestId) => {
+    try {
+      const res = await fetch(`/api/inventory/request-stock/${requestId}/decline`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usertype: user.usertype }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        message.success('Request declined');
+        fetchStorehousePendingRequests();
+      } else {
+        message.error(data.message || 'Failed to decline request');
+      }
+    } catch {
+      message.error('Failed to decline request');
+    }
+  };
+
+  useEffect(() => {
+    if (isStorehouse) {
+      fetchBranchNeeds();
+      fetchStorehousePendingRequests();
+    }
+  }, [isStorehouse, selectedLocationId, storehouse]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -433,6 +507,20 @@ const StockManagement = () => {
       message.warning('All selected items have zero quantity');
       return;
     }
+
+    const unavailable = items.filter((item) => {
+      const ls = lowStockItems.find((i) => i.product_id === item.product_id);
+      return !ls || (ls.storehouse_quantity || 0) < item.quantity;
+    });
+    if (unavailable.length > 0) {
+      const names = unavailable.map((i) => {
+        const ls = lowStockItems.find((ls) => ls.product_id === i.product_id);
+        return ls?.product_name || `Product #${i.product_id}`;
+      }).join(', ');
+      message.error(`Insufficient storehouse stock for: ${names}`);
+      return;
+    }
+
     setRestockSubmitting(true);
     try {
       const res = await fetch('/api/inventory/restock-selected', {
@@ -447,7 +535,7 @@ const StockManagement = () => {
       });
       const json = await res.json();
       if (json.success) {
-        message.success(`Restocked ${json.data.count} product(s)`);
+        message.success(`Restock request submitted for ${json.data.count} product(s) — waiting for storehouse approval`);
         setOrderSummaryVisible(false);
         setSelectRestockVisible(false);
         setSelectedRestockIds(new Set());
@@ -456,7 +544,7 @@ const StockManagement = () => {
         message.error(json.message);
       }
     } catch {
-      message.error('Failed to restock selected items');
+      message.error('Failed to submit restock request');
     } finally {
       setRestockSubmitting(false);
     }
@@ -592,6 +680,17 @@ const StockManagement = () => {
     ? columns
     : columns.filter(col => col.key !== 'location_name');
 
+  const restockFooterItems = orderSummaryVisible
+    ? [
+      <Button key="print" style={{ background: '#1677ff', borderColor: '#1677ff', color: '#fff' }} onClick={handlePrintSummary}>Print</Button>,
+      <Button key="cancel" danger onClick={() => { setOrderSummaryVisible(false); }}>Cancel</Button>,
+      <Button key="confirm" type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} loading={restockSubmitting} onClick={handleConfirmRestock}>Confirm</Button>,
+    ]
+    : [
+      <Button key="cancel" onClick={() => { setSelectRestockVisible(false); setOrderSummaryVisible(false); }}>Cancel</Button>,
+      <Button key="order" type="primary" onClick={handleOrderRestock}>Order</Button>,
+    ];
+
   return (
     <div>
       <Card styles={{ body: { padding: '16px 24px' } }}>
@@ -610,23 +709,44 @@ const StockManagement = () => {
           </Card>
         </Col>
         <Col xs={12} sm={6}>
-          <Card
-            hoverable
-            onClick={fetchRequestLogs}
-            styles={{ body: { padding: '20px 24px', cursor: 'pointer' } }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <Statistic title="Current Requested" value={pendingRequestCount} valueStyle={{ color: '#1677ff' }} />
-              <Button
-                type="link"
-                size="small"
-                icon={<RightCircleOutlined />}
-                style={{ padding: 0, marginTop: 8, fontSize: 13 }}
-              >
-                View Request Logs
-              </Button>
-            </div>
-          </Card>
+          {isStorehouse ? (
+            <Card
+              hoverable
+              onClick={() => { setRequestLogVisible(true); fetchStorehousePendingRequests(); }}
+              styles={{ body: { padding: '20px 24px', cursor: 'pointer' } }}
+              loading={storehousePendingLoading}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Statistic title="Pending Requests" value={storehousePendingRequests.length} valueStyle={{ color: '#1677ff' }} />
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<RightCircleOutlined />}
+                  style={{ padding: 0, marginTop: 8, fontSize: 13 }}
+                >
+                  View & Manage Requests
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <Card
+              hoverable
+              onClick={fetchRequestLogs}
+              styles={{ body: { padding: '20px 24px', cursor: 'pointer' } }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Statistic title="Current Requested" value={pendingRequestCount} valueStyle={{ color: '#1677ff' }} />
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<RightCircleOutlined />}
+                  style={{ padding: 0, marginTop: 8, fontSize: 13 }}
+                >
+                  View Request Logs
+                </Button>
+              </div>
+            </Card>
+          )}
         </Col>
       </Row>
 
@@ -642,59 +762,140 @@ const StockManagement = () => {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} md={14}>
           <Space wrap>
-            <Search
-              placeholder="Search by product name"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              onSearch={() => { setCurrentPage(1); fetchData(1); }}
-              enterButton
-              allowClear
-              style={{ width: 220 }}
-            />
-            {can('update') && (
-              <Button type="primary" onClick={handleOpenSelectRestock} disabled={selectedLocationId === "all"}>
-                Select Restock
-              </Button>
+            {isStorehouse ? (
+              <Space>
+                <Search
+                  placeholder="Search products..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  onSearch={() => fetchBranchNeeds()}
+                  enterButton
+                  allowClear
+                  style={{ width: 200 }}
+                />
+                <Select
+                  placeholder="Filter by branch"
+                  value={branchFilter}
+                  onChange={setBranchFilter}
+                  style={{ width: 160 }}
+                  allowClear={false}
+                >
+                  <Select.Option value="all">All Branches</Select.Option>
+                  {locations.filter((l) => l.location_id !== storehouse?.location_id).map((l) => (
+                    <Select.Option key={l.location_id} value={String(l.location_id)}>{l.name}</Select.Option>
+                  ))}
+                </Select>
+                <Segmented
+                  value={storehouseStockFilter}
+                  options={[
+                    { label: 'All', value: 'all' },
+                    { label: 'Has Stock', value: 'has_stock' },
+                    { label: 'No Stock', value: 'no_stock' },
+                  ]}
+                  onChange={setStorehouseStockFilter}
+                />
+              </Space>
+            ) : (
+              <>
+                <Search
+                  placeholder="Search by product name"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  onSearch={() => { setCurrentPage(1); fetchData(1); }}
+                  enterButton
+                  allowClear
+                  style={{ width: 220 }}
+                />
+                {can('update') && (
+                  <Button type="primary" onClick={handleOpenSelectRestock} disabled={selectedLocationId === "all"}>
+                    Select Restock
+                  </Button>
+                )}
+              </>
             )}
           </Space>
         </Col>
       </Row>
 
-      <Space style={{ marginBottom: 12 }}>
-        <Segmented
-          value={statusFilter || 'all'}
-          options={[
-            { label: 'All', value: 'all' },
-            { label: `In Stock (${stats.total_items - stats.low_stock_count - stats.out_of_stock_count})`, value: 'in_stock' },
-            { label: `Low Stock (${stats.low_stock_count})`, value: 'low_stock' },
-            { label: `Out of Stock (${stats.out_of_stock_count})`, value: 'out_of_stock' },
+      {isStorehouse ? (
+        <Table
+          dataSource={branchNeeds.filter((r) => {
+            if (searchText && !r.product_name.toLowerCase().includes(searchText.toLowerCase())) return false;
+            if (branchFilter !== 'all' && String(r.branch_id) !== branchFilter) return false;
+            if (storehouseStockFilter === 'has_stock' && !(r.storehouse_qty > 0)) return false;
+            if (storehouseStockFilter === 'no_stock' && (r.storehouse_qty > 0)) return false;
+            return true;
+          })}
+          rowKey={(r) => `${r.product_id}-${r.branch_id}`}
+          loading={branchNeedsLoading}
+          size="middle"
+          bordered
+          columns={[
+            { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
+            { title: 'Branch', dataIndex: 'branch_name', key: 'branch_name' },
+            {
+              title: 'Current Qty', dataIndex: 'current_qty', key: 'current_qty',
+              render: (v, r) => fmtQty(v, r.category === FABRIC_CATEGORY),
+            },
+            {
+              title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level',
+              render: (v) => Number(v).toLocaleString(),
+            },
+            {
+              title: 'Deficit', dataIndex: 'deficit', key: 'deficit',
+              render: (v, r) => <span style={{ color: '#ff4d4f' }}>{fmtQty(v, r.category === FABRIC_CATEGORY)}</span>,
+            },
+            {
+              title: 'Storehouse Stock', key: 'storehouseQty',
+              render: (_, r) => {
+                const sq = r.storehouse_qty || 0;
+                return sq > 0
+                  ? <span style={{ color: '#52c41a' }}>{fmtQty(sq, r.category === FABRIC_CATEGORY)}</span>
+                  : <Tag color="red">No Stock</Tag>;
+              },
+            },
           ]}
-          onChange={(val) => setStatusFilter(val === 'all' ? '' : val)}
+          locale={{ emptyText: 'All branches are adequately stocked' }}
+          pagination={{ pageSize: 10 }}
         />
-      </Space>
-
-      <Table
-        dataSource={inventory}
-        columns={visibleColumns}
-        rowKey="inventory_id"
-        loading={loading}
-        rowClassName={(record) => {
-          const q = Number(record.quantity);
-          if (q === 0) return 'row-out-of-stock';
-          if (q <= 10) return 'row-low-stock';
-          return '';
-        }}
-        onChange={(pagination, filters, sorter) => {
-          if (sorter.field) {
-            const newSortBy = sorter.field;
-            const newSortOrder = sorter.order === 'descend' ? 'desc' : 'asc';
-            setSortBy(newSortBy);
-            setSortOrder(newSortOrder);
-            fetchData(1, { sortBy: newSortBy, sortOrder: newSortOrder });
-          }
-        }}
-        pagination={{ current: currentPage, pageSize, total: totalCount, showSizeChanger: false, onChange: (p) => fetchData(p) }}
-      />
+      ) : (
+        <>
+          <Space style={{ marginBottom: 12 }}>
+            <Segmented
+              value={statusFilter || 'all'}
+              options={[
+                { label: 'All', value: 'all' },
+                { label: `In Stock (${stats.total_items - stats.low_stock_count - stats.out_of_stock_count})`, value: 'in_stock' },
+                { label: `Low Stock (${stats.low_stock_count})`, value: 'low_stock' },
+                { label: `Out of Stock (${stats.out_of_stock_count})`, value: 'out_of_stock' },
+              ]}
+              onChange={(val) => setStatusFilter(val === 'all' ? '' : val)}
+            />
+          </Space>
+          <Table
+            dataSource={inventory}
+            columns={visibleColumns}
+            rowKey="inventory_id"
+            loading={loading}
+            rowClassName={(record) => {
+              const q = Number(record.quantity);
+              if (q === 0) return 'row-out-of-stock';
+              if (q <= 10) return 'row-low-stock';
+              return '';
+            }}
+            onChange={(pagination, filters, sorter) => {
+              if (sorter.field) {
+                const newSortBy = sorter.field;
+                const newSortOrder = sorter.order === 'descend' ? 'desc' : 'asc';
+                setSortBy(newSortBy);
+                setSortOrder(newSortOrder);
+                fetchData(1, { sortBy: newSortBy, sortOrder: newSortOrder });
+              }
+            }}
+            pagination={{ current: currentPage, pageSize, total: totalCount, showSizeChanger: false, onChange: (p) => fetchData(p) }}
+          />
+        </>
+      )}
 
       <Modal
         title={`${selectedRecord?.product_name} - Stock Details`}
@@ -852,135 +1053,118 @@ const StockManagement = () => {
         title="Select Items to Restock"
         open={selectRestockVisible}
         onCancel={() => { setSelectRestockVisible(false); setOrderSummaryVisible(false); }}
-        width={orderSummaryVisible ? 1100 : 800}
+        width={950}
         styles={{ body: { padding: '16px 24px' } }}
-        footer={
-          orderSummaryVisible
-            ? null
-            : [
-              <Button key="cancel" onClick={() => { setSelectRestockVisible(false); setOrderSummaryVisible(false); }}>Cancel</Button>,
-              <Button key="order" type="primary" onClick={handleOrderRestock}>Order</Button>,
-            ]
-        }
+        footer={restockFooterItems}
       >
-        <Row gutter={16} style={{ minHeight: '100%' }}>
-          <Col xs={24} lg={orderSummaryVisible ? 14 : 24}>
-            <div style={{ marginBottom: 12 }}>
-              <Checkbox
-                checked={selectedRestockIds.size > 0 && selectedRestockIds.size === lowStockItems.length}
-                indeterminate={selectedRestockIds.size > 0 && selectedRestockIds.size < lowStockItems.length}
-                onChange={(e) => handleSelectAllRestock(e.target.checked)}
-              >
-                Select All
-              </Checkbox>
-            </div>
-            <div style={{ overflowY: 'auto', maxHeight: '45vh' }}>
+        <div>
+          <div style={{ marginBottom: 12 }}>
+            <Checkbox
+              checked={selectedRestockIds.size > 0 && selectedRestockIds.size === lowStockItems.length}
+              indeterminate={selectedRestockIds.size > 0 && selectedRestockIds.size < lowStockItems.length}
+              onChange={(e) => handleSelectAllRestock(e.target.checked)}
+            >
+              Select All
+            </Checkbox>
+          </div>
+          <div style={{ overflowY: 'auto', maxHeight: orderSummaryVisible ? '30vh' : '45vh' }}>
+            <Table
+              dataSource={lowStockItems}
+              rowKey="product_id"
+              pagination={false}
+              size="small"
+              bordered
+              columns={[
+                {
+                  title: 'Select', key: 'select', width: 60,
+                  render: (_, record) => (
+                    <Checkbox
+                      checked={selectedRestockIds.has(record.product_id)}
+                      onChange={() => handleToggleRestockItem(record.product_id)}
+                    />
+                  ),
+                },
+                { title: 'Product Name', dataIndex: 'product_name', key: 'product_name', sorter: (a, b) => a.product_name.localeCompare(b.product_name) },
+                { title: 'Category', dataIndex: 'category', key: 'category', sorter: (a, b) => (a.category || '').localeCompare(b.category || '') },
+                {
+                  title: 'Status', key: 'status', width: 130,
+                  sorter: (a, b) => a.quantity - b.quantity,
+                  render: (_, record) => getStockStatus(record.quantity).tag,
+                },
+                {
+                  title: 'Current Quantity', dataIndex: 'quantity', key: 'quantity', width: 110,
+                  sorter: (a, b) => a.quantity - b.quantity,
+                  render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
+                },
+                {
+                  title: 'Storehouse Stock', key: 'storehouseStock', width: 110,
+                  render: (_, record) => {
+                    const sq = record.storehouse_quantity || 0;
+                    return sq > 0
+                      ? <span style={{ color: '#52c41a' }}>{fmtQty(sq, record.category === FABRIC_CATEGORY)}</span>
+                      : <Tag color="red">No Stock</Tag>;
+                  },
+                },
+                {
+                  title: 'Restock Quantity', key: 'restockQty', width: 175,
+                  render: (_, record) => (
+                    <QtyInput
+                      isFabric={record.category === FABRIC_CATEGORY}
+                      value={restockQuantities[record.product_id] || 0}
+                      disabled={!selectedRestockIds.has(record.product_id)}
+                      min={0}
+                      onChange={(val) => handleRestockQtyChange(record.product_id, val || 0)}
+                    />
+                  ),
+                },
+              ]}
+            />
+          </div>
+          {orderSummaryVisible && (
+            <div
+              id="restock-summary-content"
+              style={{
+                marginTop: 16,
+                borderTop: '1px solid #f0f0f0',
+                paddingTop: 16,
+              }}
+            >
+              <Typography.Title level={5} style={{ marginTop: 0 }}>Order Summary</Typography.Title>
               <Table
-                dataSource={lowStockItems}
+                dataSource={lowStockItems.filter((i) => selectedRestockIds.has(i.product_id) && (restockQuantities[i.product_id] || 0) > 0)}
                 rowKey="product_id"
                 pagination={false}
                 size="small"
                 bordered
                 columns={[
+                  { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
+                  { title: 'Category', dataIndex: 'category', key: 'category' },
                   {
-                    title: 'Select', key: 'select', width: 60,
-                    render: (_, record) => (
-                      <Checkbox
-                        checked={selectedRestockIds.has(record.product_id)}
-                        onChange={() => handleToggleRestockItem(record.product_id)}
-                      />
-                    ),
-                  },
-                  { title: 'Product Name', dataIndex: 'product_name', key: 'product_name', sorter: (a, b) => a.product_name.localeCompare(b.product_name) },
-                  { title: 'Category', dataIndex: 'category', key: 'category', sorter: (a, b) => (a.category || '').localeCompare(b.category || '') },
-                  {
-                    title: 'Status', key: 'status', width: 130,
-                    sorter: (a, b) => a.quantity - b.quantity,
-                    render: (_, record) => getStockStatus(record.quantity).tag,
-                  },
-                  {
-                    title: 'Current Quantity', dataIndex: 'quantity', key: 'quantity', width: 130,
-                    sorter: (a, b) => a.quantity - b.quantity,
+                    title: 'Current Qty', dataIndex: 'quantity', key: 'quantity', width: 100,
                     render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
                   },
                   {
-                    title: 'Restock Quantity', key: 'restockQty', width: 140,
-                    render: (_, record) => (
-                      <QtyInput
-                        isFabric={record.category === FABRIC_CATEGORY}
-                        value={restockQuantities[record.product_id] || 0}
-                        disabled={!selectedRestockIds.has(record.product_id)}
-                        min={0}
-                        onChange={(val) => handleRestockQtyChange(record.product_id, val || 0)}
-                      />
-                    ),
+                    title: 'Restock Qty', key: 'restockQty', width: 100,
+                    render: (_, record) => fmtQty(restockQuantities[record.product_id] || 0, record.category === FABRIC_CATEGORY),
                   },
                 ]}
               />
             </div>
-          </Col>
-          {orderSummaryVisible && (
-            <Col xs={24} lg={10}>
-              <div
-                id="restock-summary-content"
-                style={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  borderLeft: '1px solid #f0f0f0',
-                  paddingLeft: 16,
-                }}
-              >
-                <Typography.Title level={5} style={{ marginTop: 0 }}>Order Summary</Typography.Title>
-                <div style={{ flex: 1, overflowY: 'auto', maxHeight: '35vh' }}>
-                  <Table
-                    dataSource={lowStockItems.filter((i) => selectedRestockIds.has(i.product_id) && (restockQuantities[i.product_id] || 0) > 0)}
-                    rowKey="product_id"
-                    pagination={false}
-                    size="small"
-                    bordered
-                    columns={[
-                      { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
-                      { title: 'Category', dataIndex: 'category', key: 'category' },
-                      {
-                        title: 'Current Qty', dataIndex: 'quantity', key: 'quantity', width: 80,
-                        render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
-                      },
-                      {
-                        title: 'Restock Qty', key: 'restockQty', width: 80,
-                        render: (_, record) => fmtQty(restockQuantities[record.product_id] || 0, record.category === FABRIC_CATEGORY),
-                      },
-                    ]}
-                  />
-                </div>
-                <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <Button style={{ background: '#1677ff', borderColor: '#1677ff', color: '#fff' }} onClick={handlePrintSummary}>
-                    Print
-                  </Button>
-                  <Button danger onClick={() => { setOrderSummaryVisible(false); }}>
-                    Cancel
-                  </Button>
-                  <Button type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} loading={restockSubmitting} onClick={handleConfirmRestock}>
-                    Confirm
-                  </Button>
-                </div>
-              </div>
-            </Col>
           )}
-        </Row>
+        </div>
       </Modal>
 
       <Modal
-        title="Request Transfer Log"
+        title={isStorehouse ? "Pending Requests" : "Request Transfer Log"}
         open={requestLogVisible}
         onCancel={() => setRequestLogVisible(false)}
         footer={[<Button key="close" type="primary" onClick={() => setRequestLogVisible(false)}>Close</Button>]}
-        width={800}
+        width={900}
       >
         <Table
-          dataSource={requestLogs}
+          dataSource={isStorehouse ? storehousePendingRequests : requestLogs}
           rowKey="request_id"
-          loading={requestLogLoading}
+          loading={isStorehouse ? storehousePendingLoading : requestLogLoading}
           size="small"
           bordered
           pagination={{ pageSize: 10 }}
@@ -992,16 +1176,34 @@ const StockManagement = () => {
               render: (qty, r) => fmtQty(qty, r.is_fabric),
             },
             {
+              title: 'Requested By', key: 'requester',
+              render: (_, r) => r.requester_name || '-',
+            },
+            {
               title: 'Date & Time', dataIndex: 'created_at', key: 'created_at',
               render: (d) => d ? new Date(d).toLocaleString() : '-',
             },
-            {
+            ...(isStorehouse ? [{
+              title: 'Actions', key: 'actions', width: 180,
+              render: (_, r) => {
+                if (r.status !== 'pending') {
+                  const color = r.status === 'accepted' ? 'green' : 'red';
+                  return <Tag color={color}>{r.status.charAt(0).toUpperCase() + r.status.slice(1)}</Tag>;
+                }
+                return (
+                  <Space>
+                    <Button size="small" danger onClick={() => handleDeclineRequest(r.request_id)}>Decline</Button>
+                    <Button size="small" type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} onClick={() => handleAcceptRequest(r.request_id)}>Accept</Button>
+                  </Space>
+                );
+              },
+            }] : [{
               title: 'Status', dataIndex: 'status', key: 'status',
               render: (s) => {
                 const color = s === 'accepted' ? 'green' : s === 'declined' ? 'red' : 'orange';
                 return <Tag color={color}>{s.charAt(0).toUpperCase() + s.slice(1)}</Tag>;
               },
-            },
+            }]),
           ]}
         />
       </Modal>

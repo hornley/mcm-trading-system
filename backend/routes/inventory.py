@@ -881,7 +881,8 @@ def restock_selected():
     if not location:
         return error_response("Location not found", "NOT_FOUND", 404)
 
-    restocked = []
+    errors = []
+    valid_items = []
 
     for item in items:
         product_id = item.get("product_id")
@@ -892,66 +893,59 @@ def restock_selected():
 
         product = Product.query.get(product_id)
         if not product:
-            continue
-
-        inv = Inventory.query.filter_by(
-            product_id=product_id,
-            location_id=location_id,
-        ).first()
-        if not inv:
+            errors.append(f"Product ID {product_id} (not found)")
             continue
 
         store_inv = Inventory.query.filter_by(
             product_id=product_id,
             location_id=storehouse.location_id,
         ).first()
+
         if not store_inv or store_inv.quantity <= 0:
+            errors.append(f"{product.name} (no stock at storehouse)")
             continue
 
-        transfer_qty = min(requested_qty, store_inv.quantity)
-        if transfer_qty <= 0:
+        if store_inv.quantity < requested_qty:
+            errors.append(f"{product.name} (only {store_inv.quantity:.0f} available, requested {requested_qty:.0f})")
             continue
 
-        store_inv.quantity -= transfer_qty
-        inv.quantity += transfer_qty
-
-        transfer = StockTransfer(
-            product_id=product_id,
-            from_location_id=storehouse.location_id,
-            to_location_id=location_id,
-            user_id=user_id,
-            quantity=transfer_qty,
-            status="completed",
-            remarks="Selected restock",
-        )
-        db.session.add(transfer)
-
-        log_activity(
-            user_id=user_id,
-            module="inventory",
-            action_type="restock",
-            action=f"Selected restock: {transfer_qty} {product.name} from {storehouse.name} to {location.name}",
-            details={
-                "product_id": product_id,
-                "from_location_id": storehouse.location_id,
-                "to_location_id": location_id,
-                "quantity": transfer_qty,
-            },
-        )
-
-        restocked.append({
+        valid_items.append({
+            "product": product,
             "product_id": product_id,
-            "product_name": product.name,
-            "previous_quantity": inv.quantity - transfer_qty,
-            "new_quantity": inv.quantity,
-            "quantity_added": transfer_qty,
-            "from_location": storehouse.name,
+            "quantity": requested_qty,
         })
 
-    if restocked:
-        db.session.commit()
+    if errors:
+        return error_response(
+            "Cannot fulfill request. Issues: " + "; ".join(errors),
+            "INSUFFICIENT_STOCK",
+            400,
+        )
 
-    return success_response({"restocked": restocked, "count": len(restocked)}, f"Restocked {len(restocked)} product(s)")
+    created = []
+    for vi in valid_items:
+        stock_request = StockRequest(
+            product_id=vi["product_id"],
+            from_location_id=storehouse.location_id,
+            to_location_id=location_id,
+            requested_by=user_id,
+            quantity=vi["quantity"],
+            description="Bulk restock request",
+            status="pending",
+        )
+        db.session.add(stock_request)
+        created.append({
+            "product_id": vi["product_id"],
+            "product_name": vi["product"].name,
+            "quantity": vi["quantity"],
+        })
+
+    db.session.commit()
+
+    return success_response(
+        {"requests": created, "count": len(created)},
+        f"Restock request submitted for {len(created)} product(s) — waiting for storehouse approval",
+    )
 
 
 @inventory_bp.route("/api/inventory/low-stock", methods=["GET"])
@@ -966,6 +960,8 @@ def get_low_stock():
     resolved_location_id, error = _resolve_location_id(usertype, user_id, location_id)
     if error:
         return error
+
+    storehouse = Location.query.filter_by(is_storehouse=True, is_active=True).first()
 
     products = Product.query.filter_by(is_active=True).all()
     low_stock = []
@@ -983,6 +979,14 @@ def get_low_stock():
         if resolved_location_id and resolved_location_id != "all":
             query = query.filter_by(location_id=resolved_location_id)
 
+        store_qty = 0
+        if storehouse:
+            store_inv = Inventory.query.filter_by(
+                product_id=product.product_id,
+                location_id=storehouse.location_id,
+            ).first()
+            store_qty = store_inv.quantity if store_inv else 0
+
         inventory = query.all()
         for inv in inventory:
             if inv.quantity < level:
@@ -997,9 +1001,56 @@ def get_low_stock():
                     "location_name": inv.location.name if inv.location else None,
                     "quantity": inv.quantity,
                     "reorder_level": level,
+                    "storehouse_quantity": store_qty,
                 })
 
     return success_response(low_stock)
+
+
+@inventory_bp.route("/api/inventory/branch-needs", methods=["GET"])
+def get_branch_needs():
+    usertype = request.args.get("usertype", type=int)
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+
+    storehouse = Location.query.filter_by(is_storehouse=True, is_active=True).first()
+    if not storehouse:
+        return error_response("No storehouse configured", "NO_STOREHOUSE", 400)
+
+    branches = Location.query.filter(
+        Location.is_storehouse == False,
+        Location.is_active == True
+    ).all()
+
+    branch_needs = []
+    for branch in branches:
+        items = Inventory.query.filter_by(location_id=branch.location_id).all()
+        for inv in items:
+            product = Product.query.get(inv.product_id)
+            if not product or not product.reorder_level:
+                continue
+            try:
+                level = int(product.reorder_level)
+            except (ValueError, TypeError):
+                continue
+            if inv.quantity < level:
+                store_inv = Inventory.query.filter_by(
+                    product_id=product.product_id,
+                    location_id=storehouse.location_id,
+                ).first()
+                branch_needs.append({
+                    "product_id": product.product_id,
+                    "product_name": product.name,
+                    "category": product.category.name if product.category else None,
+                    "branch_id": branch.location_id,
+                    "branch_name": branch.name,
+                    "current_qty": inv.quantity,
+                    "reorder_level": level,
+                    "deficit": level - inv.quantity,
+                    "storehouse_qty": store_inv.quantity if store_inv else 0,
+                })
+
+    return success_response(branch_needs)
 
 
 @inventory_bp.route("/api/stock/transfer", methods=["POST"])
