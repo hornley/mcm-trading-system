@@ -181,6 +181,13 @@ const Inventory = () => {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} md={14}>
           <Space wrap>
+            <Search
+              placeholder="Search by product name"
+              onSearch={(val) => setSearchText(val)}
+              onChange={(e) => { if (!e.target.value) setSearchText(''); }}
+              enterButton
+              style={{ width: 200 }}
+            />
             {user && (user.usertype === 1 || user.usertype === 3) && (
               <Dropdown
                 menu={{
@@ -207,13 +214,6 @@ const Inventory = () => {
                 </Button>
               </Dropdown>
             )}
-            <Search
-              placeholder="Search by product name"
-              onSearch={(val) => setSearchText(val)}
-              onChange={(e) => { if (!e.target.value) setSearchText(''); }}
-              enterButton
-              style={{ width: 200 }}
-            />
             {categories.map((cat) => {
               const active = categoryFilter === cat.category_id;
               return (

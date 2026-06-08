@@ -808,6 +808,15 @@ const StockManagement = () => {
               </Space>
             ) : (
               <>
+                <Search
+                  placeholder="Search by product name"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  onSearch={() => { setCurrentPage(1); fetchData(1); }}
+                  enterButton
+                  allowClear
+                  style={{ width: 220 }}
+                />
                 {user && (user.usertype === 1 || user.usertype === 3) && (
                   <Dropdown
                     menu={{
@@ -834,15 +843,6 @@ const StockManagement = () => {
                     </Button>
                   </Dropdown>
                 )}
-                <Search
-                  placeholder="Search by product name"
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  onSearch={() => { setCurrentPage(1); fetchData(1); }}
-                  enterButton
-                  allowClear
-                  style={{ width: 220 }}
-                />
                 {can('update') && (
                   <Button type="primary" onClick={handleOpenSelectRestock} disabled={selectedLocationId === "all"}>
                     Select Restock

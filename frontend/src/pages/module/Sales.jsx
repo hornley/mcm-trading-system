@@ -533,6 +533,13 @@ const Sales = () => {
       <Row gutter={[16, 16]} style={{ marginTop: 16, marginBottom: 16 }}>
         <Col xs={24} sm={12} md={16}>
           <Space wrap>
+            <Input
+              placeholder="Search by transaction ID"
+              prefix={<SearchOutlined />}
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{ width: 220 }}
+              allowClear
+            />
             {user && (user.usertype === 1 || user.usertype === 3) && (
               <Dropdown
                 menu={{
@@ -559,13 +566,6 @@ const Sales = () => {
                 </Button>
               </Dropdown>
             )}
-            <Input
-              placeholder="Search by transaction ID"
-              prefix={<SearchOutlined />}
-              onChange={(e) => setSearchText(e.target.value)}
-              style={{ width: 220 }}
-              allowClear
-            />
             <RangePicker onChange={(dates) => setDateRange(dates)} />
             <Select
               placeholder="Filter by status"

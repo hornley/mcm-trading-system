@@ -99,7 +99,7 @@ const Sidebar = () => {
                 {user?.username}
               </Text>
               <Text style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#8c8c8c', fontSize: 12 }}>
-                {user?.role}
+                {user?.role}{user?.location_name ? ` · ${user.location_name}` : ''}
               </Text>
             </div>
           </Space>
