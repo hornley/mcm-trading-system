@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Card, Typography, Row, Col, Input, Select, Button,
   Tag, Modal, Form, Space, Popconfirm, InputNumber, message, Spin,
+  Dropdown,
 } from 'antd';
 import { PlusOutlined, EditOutlined } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -11,9 +12,10 @@ const { Search } = Input;
 const { TextArea } = Input;
 
 const Inventory = () => {
-  const { user, can, selectedLocationId } = useAuth();
+  const { user, can, selectedLocationId, setSelectedLocationId, setIsStorehouse } = useAuth();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [branchLocations, setBranchLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [productModalVisible, setProductModalVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -47,6 +49,17 @@ const Inventory = () => {
   useEffect(() => {
     fetchData();
   }, [user, selectedLocationId]);
+
+  useEffect(() => {
+    if (user && (user.usertype === 1 || user.usertype === 3)) {
+      fetch(`/api/locations?usertype=${user.usertype}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) setBranchLocations(data.data.filter((l) => l.is_active));
+        })
+        .catch(() => {});
+    }
+  }, [user]);
 
   const handleAdd = () => {
     setSelectedRecord(null);
@@ -175,6 +188,32 @@ const Inventory = () => {
               enterButton
               style={{ width: 200 }}
             />
+            {user && (user.usertype === 1 || user.usertype === 3) && (
+              <Dropdown
+                menu={{
+                  items: [
+                    { key: 'all', label: 'All Locations' },
+                    ...branchLocations.map(loc => ({ key: String(loc.location_id), label: loc.name })),
+                  ],
+                  onClick: ({ key }) => {
+                    if (key === 'all') {
+                      setSelectedLocationId('all');
+                      setIsStorehouse(false);
+                    } else {
+                      setSelectedLocationId(Number(key));
+                      const loc = branchLocations.find(l => l.location_id === Number(key));
+                      setIsStorehouse(loc ? loc.is_storehouse : false);
+                    }
+                  },
+                }}
+              >
+                <Button type={selectedLocationId !== 'all' ? 'primary' : 'default'}>
+                  {selectedLocationId !== 'all'
+                    ? (branchLocations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
+                    : 'All Locations'}
+                </Button>
+              </Dropdown>
+            )}
             {categories.map((cat) => {
               const active = categoryFilter === cat.category_id;
               return (

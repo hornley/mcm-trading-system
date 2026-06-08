@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Table, Card, Typography, Row, Col, Input, Select, Button,
   Tag, Modal, Statistic, Space, Descriptions, Form, InputNumber,
-  DatePicker, message, Spin, Segmented, Checkbox,
+  DatePicker, message, Spin, Segmented, Checkbox, Dropdown,
 } from 'antd';
 import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -24,7 +24,7 @@ const getStockStatus = (qty) => {
 const adjustmentReasons = ['Restock', 'Damaged', 'Correction', 'Sample', 'Sales Return'];
 
 const StockManagement = () => {
-  const { user, can, selectedLocationId, isStorehouse } = useAuth();
+  const { user, can, selectedLocationId, isStorehouse, setSelectedLocationId, setIsStorehouse } = useAuth();
   const [inventory, setInventory] = useState([]);
   const [locations, setLocations] = useState([]);
   const [movements, setMovements] = useState([]);
@@ -817,6 +817,32 @@ const StockManagement = () => {
                   allowClear
                   style={{ width: 220 }}
                 />
+                {user && (user.usertype === 1 || user.usertype === 3) && (
+                  <Dropdown
+                    menu={{
+                      items: [
+                        { key: 'all', label: 'All Locations' },
+                        ...locations.filter((l) => l.is_active).map(loc => ({ key: String(loc.location_id), label: loc.name })),
+                      ],
+                      onClick: ({ key }) => {
+                        if (key === 'all') {
+                          setSelectedLocationId('all');
+                          setIsStorehouse(false);
+                        } else {
+                          setSelectedLocationId(Number(key));
+                          const loc = locations.find(l => l.location_id === Number(key));
+                          setIsStorehouse(loc ? loc.is_storehouse : false);
+                        }
+                      },
+                    }}
+                  >
+                    <Button type={selectedLocationId !== 'all' ? 'primary' : 'default'}>
+                      {selectedLocationId !== 'all'
+                        ? (locations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
+                        : 'All Locations'}
+                    </Button>
+                  </Dropdown>
+                )}
                 {can('update') && (
                   <Button type="primary" onClick={handleOpenSelectRestock} disabled={selectedLocationId === "all"}>
                     Select Restock
