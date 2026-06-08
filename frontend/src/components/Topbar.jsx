@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Typography, Button, Select, Space, Badge } from 'antd'
+import { Typography, Button, Badge } from 'antd'
 import { LogoutOutlined, BellOutlined } from '@ant-design/icons'
 import { useAuth } from '../context/AuthContext.jsx'
 import NotificationModal from './NotificationModal.jsx'
@@ -7,23 +7,11 @@ import NotificationModal from './NotificationModal.jsx'
 const { Title } = Typography
 
 const Topbar = () => {
-  const { user, selectedLocationId, setSelectedLocationId, setIsStorehouse, logout, theme } = useAuth()
-  const [locations, setLocations] = useState([])
+  const { user, logout, theme } = useAuth()
   const [notifOpen, setNotifOpen] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [notifCount, setNotifCount] = useState(0)
   const isDark = theme === 'dark'
-
-  useEffect(() => {
-    if (user && (user.usertype === 1 || user.usertype === 3)) {
-      fetch(`/api/locations?usertype=${user.usertype}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success) setLocations(data.data.filter((l) => l.is_active))
-        })
-        .catch(() => {})
-    }
-  }, [user])
 
   const fetchCounts = useCallback(() => {
     if (!user) return
@@ -58,33 +46,7 @@ const Topbar = () => {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-      <div style={{ width: 240 }}>
-        {user && (user.usertype === 1 || user.usertype === 3) && (
-          <Space>
-            <span style={{ color: isDark ? 'rgba(255,255,255,0.45)' : '#8c8c8c', fontSize: 13 }}>Branch:</span>
-            <Select
-              value={selectedLocationId}
-              onChange={(value) => {
-                setSelectedLocationId(value);
-                const loc = locations.find((l) => l.location_id === value);
-                setIsStorehouse(loc ? loc.is_storehouse : false);
-              }}
-              style={{ width: 160 }}
-              size="small"
-            >
-              <Select.Option value="all">All Branches</Select.Option>
-              {locations.map((loc) => (
-                <Select.Option key={loc.location_id} value={loc.location_id}>{loc.name}</Select.Option>
-              ))}
-            </Select>
-          </Space>
-        )}
-        {user && user.usertype === 2 && (
-          <span style={{ color: isDark ? 'rgba(255,255,255,0.45)' : '#8c8c8c', fontSize: 13 }}>
-            Branch: {user.location_name || `Location #${user.location_id}`}
-          </span>
-        )}
-      </div>
+      <div style={{ width: 240 }} />
       <Title level={4} style={{ margin: 0, color: isDark ? 'rgba(255,255,255,0.85)' : '#262626', textAlign: 'center', flex: 1 }}>
         Manco (MCM) Trading
       </Title>
