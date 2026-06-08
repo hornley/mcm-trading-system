@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Menu, Layout, Typography, Avatar, Space } from 'antd'
+import { Menu, Layout, Typography, Avatar } from 'antd'
 import {
   DashboardOutlined, AppstoreOutlined, AuditOutlined, TeamOutlined,
   ShoppingCartOutlined, ToolOutlined, SettingOutlined, BarChartOutlined,
@@ -88,22 +88,16 @@ const Sidebar = () => {
 
   return (
     <Sider width={220} collapsedWidth={60} collapsible collapsed={collapsed} onCollapse={handleCollapse} className={isDark ? 'sider-dark' : 'sider-light'} style={{ background: isDark ? '#001529' : '#ffffff' }}>
-      <div style={{ padding: collapsed ? '16px 10px' : '20px 16px', borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0'}`, textAlign: collapsed ? 'center' : 'left' }}>
-        {collapsed ? (
-          <Avatar size={36} src={user?.avatar || null} icon={!user?.avatar && <UserOutlined />} style={{ backgroundColor: '#5b7ff0' }} />
-        ) : (
-          <Space>
-            <Avatar size={36} src={user?.avatar || null} icon={!user?.avatar && <UserOutlined />} style={{ backgroundColor: '#5b7ff0' }} />
-            <div style={{ lineHeight: 1.3 }}>
-              <Text style={{ color: isDark ? '#ffffff' : '#262626', fontWeight: 600, fontSize: 14, display: 'block' }}>
-                {user?.username}
-              </Text>
-              <Text style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#8c8c8c', fontSize: 12 }}>
-                {user?.role}{user?.location_name ? ` · ${user.location_name}` : ''}
-              </Text>
-            </div>
-          </Space>
-        )}
+      <div style={{ padding: collapsed ? '16px 10px' : '20px 16px', borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0'}`, display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 12, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+        <Avatar size={36} src={user?.avatar || null} icon={!user?.avatar && <UserOutlined />} style={{ backgroundColor: '#5b7ff0', flexShrink: 0 }} />
+        <div style={{ lineHeight: 1.3, overflow: 'hidden', opacity: collapsed ? 0 : 1, transition: 'opacity 0.25s ease, transform 0.25s ease', transform: collapsed ? 'translateX(-10px)' : 'translateX(0)' }}>
+          <Text style={{ color: isDark ? '#ffffff' : '#262626', fontWeight: 600, fontSize: 14, display: 'block' }}>
+            {user?.username}
+          </Text>
+          <Text style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#8c8c8c', fontSize: 12 }}>
+            {user?.role}{user?.location_name ? ` · ${user.location_name}` : user && (user.usertype === 1 || user.usertype === 3) ? ' · All Locations' : ''}
+          </Text>
+        </div>
       </div>
       <Menu
         selectedKeys={[selectedKey]}

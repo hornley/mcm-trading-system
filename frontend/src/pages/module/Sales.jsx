@@ -18,6 +18,7 @@ const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
 import { FABRIC_CATEGORY, qtyLabel, fmtQty } from '../../utils/format.js';
+import logoImage from '../../../images/Logo.png';
 
 const Sales = () => {
   const { user, selectedLocationId, setSelectedLocationId, setIsStorehouse } = useAuth();
@@ -410,6 +411,7 @@ const Sales = () => {
     return (
       <div style={{ fontSize: 13, fontFamily: "'Courier New', monospace" }}>
         <div style={{ textAlign: 'center', marginBottom: 10 }}>
+          <img src={logoImage} alt="Logo" style={{ height: 60, width: 'auto', display: 'block', margin: '0 auto 6px', marginLeft: -17 }} />
           <div style={{ fontSize: 16, fontWeight: 700 }}>{cfg.companyName}</div>
           {cfg.companyAddress && <div style={{ fontSize: 11 }}>{cfg.companyAddress}</div>}
           <div style={{ fontSize: 10, marginTop: 4 }}>VAT REG TIN: {cfg.vatRegTin}</div>
