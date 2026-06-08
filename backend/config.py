@@ -42,9 +42,11 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
     SQLALCHEMY_DATABASE_URI = _uri
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ENGINE_OPTIONS = {
+    _engine_options = {
         "pool_size": 1,
         "pool_recycle": 60,
         "pool_pre_ping": True,
-        "connect_args": {"timeout": 15},
     }
+    if _uri and _uri.startswith("sqlite"):
+        _engine_options["connect_args"] = {"timeout": 15}
+    SQLALCHEMY_ENGINE_OPTIONS = _engine_options
