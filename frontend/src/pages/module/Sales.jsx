@@ -1,5 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Row, Col, Card, Table, Tag, Typography, Input, Select, Button, Modal,
   DatePicker, Popconfirm, Space, message,
@@ -7,12 +6,13 @@ import {
 } from 'antd';
 import {
   SearchOutlined,
-  PlusOutlined, PrinterOutlined,
+  PlusOutlined, DownloadOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
 import dayjs from 'dayjs';
 import POSModal from '../../components/POSModal.jsx';
 import receiptConfig from '../../config/receipt.json';
+import { generateReceiptPDF } from '../../utils/generateReceiptPDF.js';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -42,10 +42,10 @@ const Sales = () => {
   const [statusFilter, setStatusFilter] = useState(null);
   const [locations, setLocations] = useState([]);
 
+  const receiptRef = useRef(null);
   const [saleModalVisible, setSaleModalVisible] = useState(false);
   const [receiptModalVisible, setReceiptModalVisible] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
-  const [receiptForPrint, setReceiptForPrint] = useState(null);
   const [totalSalesModalVisible, setTotalSalesModalVisible] = useState(false);
   const [totalSalesDateRange, setTotalSalesDateRange] = useState(null);
   const [totalSalesBranch, setTotalSalesBranch] = useState(defaultTotalBranch);
@@ -222,22 +222,9 @@ const Sales = () => {
     setReceiptModalVisible(true);
   };
 
-  const handlePrintReceipt = () => {
-    setReceiptForPrint(lastOrder);
+  const handleDownloadPDF = () => {
+    if (lastOrder && receiptRef.current) generateReceiptPDF(receiptRef.current, lastOrder.order_id);
   };
-
-  useEffect(() => {
-    if (receiptForPrint) {
-      const raf = requestAnimationFrame(() => window.print());
-      return () => cancelAnimationFrame(raf);
-    }
-  }, [receiptForPrint]);
-
-  useEffect(() => {
-    const cleanup = () => setReceiptForPrint(null);
-    window.addEventListener('afterprint', cleanup);
-    return () => window.removeEventListener('afterprint', cleanup);
-  }, []);
 
   const isVoided = (record) => record.status === 'voided';
 
@@ -607,15 +594,17 @@ const Sales = () => {
         onCancel={() => setReceiptModalVisible(false)}
         width={520}
         footer={[
-          <Button key="print" type="primary" icon={<PrinterOutlined />}
-            onClick={handlePrintReceipt}>
-            Print Receipt
+          <Button key="download" type="primary" icon={<DownloadOutlined />}
+            onClick={handleDownloadPDF}>
+            Download Receipt
           </Button>,
           <Button key="close" onClick={() => setReceiptModalVisible(false)}>Close</Button>,
         ]}
         styles={{ body: { padding: 24 } }}
       >
-        {lastOrder && renderReceiptContent(lastOrder)}
+        <div ref={receiptRef} style={{ padding: '20px' }}>
+          {lastOrder && renderReceiptContent(lastOrder)}
+        </div>
       </Modal>
 
       <Modal
@@ -656,12 +645,7 @@ const Sales = () => {
         </Space>
       </Modal>
 
-      {receiptForPrint && createPortal(
-        <div id="receipt-content">
-          {renderReceiptContent(receiptForPrint)}
-        </div>,
-        document.body,
-      )}
+
     </div>
   );
 };

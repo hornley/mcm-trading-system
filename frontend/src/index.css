@@ -142,18 +142,3 @@
   margin: 20px 0;
 }
 
-@media print {
-  body > *:not(#receipt-content) { display: none !important; }
-  #receipt-content {
-    display: block !important;
-    width: 100%;
-    padding: 24px 32px;
-    font-size: 14px;
-    font-family: 'Courier New', 'Courier', monospace;
-  }
-  #receipt-content table { width: 100%; border-collapse: collapse; }
-  #receipt-content th, #receipt-content td {
-    padding: 2px;
-    border-bottom: 1px dashed #ccc;
-  }
-}
