@@ -1219,16 +1219,16 @@ const StockManagement = () => {
         />
       </Modal>
 
-      <div id="stock-receipt-print" ref={receiptCaptureRef} style={{ position: 'absolute', left: '-9999px', top: 0, width: 350, background: '#fff', zIndex: -1, padding: 16 }}>
-        <div className="receipt-inner" style={{ width: 300, padding: '24px 16px', fontFamily: "'Courier New', monospace", fontSize: 12, color: '#222', background: '#fff', margin: '0 auto' }}>
+      <div id="stock-receipt-print" ref={receiptCaptureRef} style={{ position: 'absolute', left: '-9999px', top: 0, width: 550, background: '#fff', zIndex: -1, padding: 32 }}>
+        <div className="receipt-inner" style={{ width: '100%', padding: '24px 24px', fontFamily: "'Courier New', monospace", fontSize: 14, color: '#222', background: '#fff', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 12 }}>
-            <img src={logoImage} alt="Logo" style={{ height: 50, width: 'auto', display: 'block', margin: '0 auto 6px' }} />
-            <div className="receipt-header" style={{ fontSize: 15, fontWeight: 700, letterSpacing: 1 }}>{receiptConfig.companyName}</div>
+            <img src={logoImage} alt="Logo" style={{ height: 60, width: 'auto', display: 'block', margin: '0 auto 6px' }} />
+            <div className="receipt-header" style={{ fontSize: 18, fontWeight: 700, letterSpacing: 1 }}>{receiptConfig.companyName}</div>
           </div>
-          <div className="receipt-section" style={{ textAlign: 'center', fontSize: 13, fontWeight: 600, padding: '4px 0', borderTop: '2px dashed #888', borderBottom: '2px dashed #888', marginBottom: 10 }}>
+          <div className="receipt-section" style={{ textAlign: 'center', fontSize: 15, fontWeight: 600, padding: '6px 0', borderTop: '2px dashed #888', borderBottom: '2px dashed #888', marginBottom: 12 }}>
             RESTOCK ORDER
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 10, fontSize: 12 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 13 }}>
             <tbody>
               {[['Date:', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })],
                 ['Ref No:', receiptRef],
@@ -1241,31 +1241,31 @@ const StockManagement = () => {
               ))}
             </tbody>
           </table>
-          <div style={{ borderTop: '1px dashed #aaa', borderBottom: '1px dashed #aaa', padding: '4px 0', marginBottom: 6, display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: 11 }}>
+          <div style={{ borderTop: '1px dashed #aaa', borderBottom: '1px dashed #aaa', padding: '6px 0', marginBottom: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: 13 }}>
             <span>Item</span>
             <span>Qty</span>
           </div>
           {receiptItems.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '12px 0', color: '#999' }}>No items selected</div>
+            <div style={{ textAlign: 'center', padding: '16px 0', color: '#999' }}>No items selected</div>
           ) : (
             receiptItems.map((item) => (
-              <div key={item.product_id} className="receipt-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: 11, borderBottom: '1px dotted #ddd' }}>
+              <div key={item.product_id} className="receipt-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, borderBottom: '1px dotted #ddd' }}>
                 <span style={{ flex: 1, paddingRight: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.product_name}</span>
                 <span style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtQty(restockQuantities[item.product_id] || 0, item.category === FABRIC_CATEGORY)}</span>
               </div>
             ))
           )}
-          <div className="receipt-totals" style={{ borderTop: '2px dashed #888', marginTop: 6, paddingTop: 6 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+          <div className="receipt-totals" style={{ borderTop: '2px dashed #888', marginTop: 8, paddingTop: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
               <span>Total Items:</span>
               <span>{receiptItems.length}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 600 }}>
               <span>Total Quantity:</span>
               <span>{receiptTotalQty}</span>
             </div>
           </div>
-          <div className="receipt-footer" style={{ textAlign: 'center', marginTop: 16, paddingTop: 10, borderTop: '2px dashed #888', fontSize: 11, color: '#555' }}>
+          <div className="receipt-footer" style={{ textAlign: 'center', marginTop: 20, paddingTop: 12, borderTop: '2px dashed #888', fontSize: 13, color: '#555' }}>
             Thank you!
           </div>
         </div>
