@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Table, Card, Typography, Row, Col, Input, Select, Button,
   Tag, Modal, Statistic, Space, Descriptions, Form, InputNumber,
@@ -66,6 +66,7 @@ const StockManagement = () => {
   const [storehousePendingLoading, setStorehousePendingLoading] = useState(false);
   const [branchFilter, setBranchFilter] = useState('all');
   const [storehouseStockFilter, setStorehouseStockFilter] = useState('all');
+  const receiptCaptureRef = useRef(null);
 
   const fetchData = async (page, sortOverrides) => {
     if (!user) return;
@@ -550,8 +551,18 @@ const StockManagement = () => {
     }
   };
 
-  const handlePrintSummary = () => {
-    window.print();
+  const handlePrintSummary = async () => {
+    if (!receiptCaptureRef.current) return;
+    const { default: html2canvas } = await import('html2canvas');
+    const canvas = await html2canvas(receiptCaptureRef.current, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+    });
+    const link = document.createElement('a');
+    link.download = 'restock-receipt.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
   };
 
   const { total_items: totalItems, low_stock_count: lowStockCount, out_of_stock_count: outOfStockCount, pending_request_count: pendingRequestCount } = stats;
@@ -682,7 +693,7 @@ const StockManagement = () => {
 
   const restockFooterItems = orderSummaryVisible
     ? [
-      <Button key="print" style={{ background: '#1677ff', borderColor: '#1677ff', color: '#fff' }} onClick={handlePrintSummary}>Print</Button>,
+      <Button key="print" style={{ background: '#1677ff', borderColor: '#1677ff', color: '#fff' }} onClick={handlePrintSummary}>Download Receipt</Button>,
       <Button key="cancel" danger onClick={() => { setOrderSummaryVisible(false); }}>Cancel</Button>,
       <Button key="confirm" type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} loading={restockSubmitting} onClick={handleConfirmRestock}>Confirm</Button>,
     ]
@@ -1208,26 +1219,7 @@ const StockManagement = () => {
         />
       </Modal>
 
-      <style>{`
-        @media print {
-          @page { size: legal; margin: 12mm; }
-          body * { visibility: hidden; }
-          #stock-receipt-print, #stock-receipt-print * { visibility: visible; }
-          #stock-receipt-print { position: fixed; left: 0; top: 0; width: 100%; display: flex !important; justify-content: center; }
-          #stock-receipt-print .receipt-inner { width: 100% !important; font-size: 14px !important; padding: 16px 24px !important; }
-          #stock-receipt-print .receipt-inner table { font-size: 14px !important; }
-          #stock-receipt-print .receipt-item { font-size: 13px !important; padding: 4px 0 !important; }
-          #stock-receipt-print .receipt-header { font-size: 20px !important; }
-          #stock-receipt-print .receipt-section { font-size: 16px !important; padding: 8px 0 !important; }
-          #stock-receipt-print .receipt-label { font-size: 14px !important; }
-          #stock-receipt-print img { height: 80px !important; }
-          #stock-receipt-print .receipt-totals { font-size: 14px !important; }
-          #stock-receipt-print .receipt-footer { font-size: 13px !important; }
-          .ant-modal-header, .ant-modal-footer { display: none !important; }
-        }
-      `}</style>
-
-      <div id="stock-receipt-print" style={{ display: 'none' }}>
+      <div id="stock-receipt-print" ref={receiptCaptureRef} style={{ position: 'absolute', left: '-9999px', top: 0, width: 350, background: '#fff', zIndex: -1, padding: 16 }}>
         <div className="receipt-inner" style={{ width: 300, padding: '24px 16px', fontFamily: "'Courier New', monospace", fontSize: 12, color: '#222', background: '#fff', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 12 }}>
             <img src={logoImage} alt="Logo" style={{ height: 50, width: 'auto', display: 'block', margin: '0 auto 6px' }} />
