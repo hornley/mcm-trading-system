@@ -1,4 +1,4 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, jsonify
 from datetime import datetime
 from models import db, Notification, Location
 from utils.response import success_response, error_response
@@ -32,9 +32,9 @@ def notifications_count():
         return error_response("location_id is required", "MISSING_PARAM", 400)
 
     count = Notification.query.filter_by(location_id=location_id, is_read=False).count()
-    resp = success_response({"count": count})
+    resp = jsonify({"success": True, "data": {"count": count}})
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    return resp
+    return resp, 200
 
 
 @notifications_bp.route("/api/notifications/<int:notification_id>/read", methods=["PUT"])

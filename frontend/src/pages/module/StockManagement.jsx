@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Table, Card, Typography, Row, Col, Input, Select, Button,
   Tag, Modal, Statistic, Space, Descriptions, Form, InputNumber,
-  DatePicker, message, Spin, Segmented, Checkbox, Dropdown,
+  DatePicker, Spin, Segmented, Checkbox, Dropdown,
 } from 'antd';
 import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -47,7 +47,7 @@ const StockManagement = () => {
   const [pageSize] = useState(10);
   const [movementsCache, setMovementsCache] = useState({});
   const [stats, setStats] = useState({ total_items: 0, low_stock_count: 0, out_of_stock_count: 0, pending_request_count: 0 });
-  const [sortBy, setSortBy] = useState('product_name');
+  const [sortBy, setSortBy] = useState('quantity');
   const [sortOrder, setSortOrder] = useState('asc');
   const [statusFilter, setStatusFilter] = useState('');
   const [selectRestockVisible, setSelectRestockVisible] = useState(false);
@@ -105,7 +105,7 @@ const StockManagement = () => {
       const currentLoc = activeLocs.find((l) => l.location_id === Number(selectedLocationId));
     }
     } catch {
-      message.error('Failed to load data');
+      Modal.error({ title: 'Error', content: 'Failed to load data', centered: true });
     } finally {
       setLoading(false);
     }
@@ -142,14 +142,14 @@ const StockManagement = () => {
       });
       const data = await res.json();
       if (data.success) {
-        message.success('Request accepted');
+        Modal.success({ title: 'Success', content: 'Request accepted', centered: true });
         fetchStorehousePendingRequests();
         fetchData();
       } else {
-        message.error(data.message || 'Failed to accept request');
+        Modal.error({ title: 'Error', content: data.message || 'Failed to accept request', centered: true });
       }
     } catch {
-      message.error('Failed to accept request');
+      Modal.error({ title: 'Error', content: 'Failed to accept request', centered: true });
     }
   };
 
@@ -162,13 +162,13 @@ const StockManagement = () => {
       });
       const data = await res.json();
       if (data.success) {
-        message.success('Request declined');
+        Modal.success({ title: 'Success', content: 'Request declined', centered: true });
         fetchStorehousePendingRequests();
       } else {
-        message.error(data.message || 'Failed to decline request');
+        Modal.error({ title: 'Error', content: data.message || 'Failed to decline request', centered: true });
       }
     } catch {
-      message.error('Failed to decline request');
+      Modal.error({ title: 'Error', content: 'Failed to decline request', centered: true });
     }
   };
 
@@ -183,7 +183,7 @@ const StockManagement = () => {
     setCurrentPage(1);
     setMovementsCache({});
     fetchData(1);
-  }, [user, selectedLocationId, statusFilter]);
+  }, [user, selectedLocationId, statusFilter, searchText]);
 
   const handleViewDetails = async (record) => {
     setSelectedRecord(record);
@@ -205,7 +205,7 @@ const StockManagement = () => {
 
   const handleAdjustStock = (record) => {
     if (selectedLocationId === "all") {
-      message.warning('Select a specific branch from the top bar to adjust stock');
+      Modal.warning({ title: 'Warning', content: 'Select a specific branch from the top bar to adjust stock', centered: true });
       return;
     }
     setSelectedRecord(record);
@@ -216,7 +216,7 @@ const StockManagement = () => {
 
   const handleRequestStock = (record) => {
     if (selectedLocationId === "all") {
-      message.warning('Select a specific branch from the top bar to request stock');
+      Modal.warning({ title: 'Warning', content: 'Select a specific branch from the top bar to request stock', centered: true });
       return;
     }
     setSelectedRecord(record);
@@ -267,14 +267,14 @@ const StockManagement = () => {
             }),
           });
         }
-        message.success('Reorder level updated');
+        Modal.success({ title: 'Success', content: 'Reorder level updated', centered: true });
         setReorderVisible(false);
         fetchData();
       } else {
-        message.error(data.message);
+        Modal.error({ title: 'Error', content: data.message, centered: true });
       }
     } catch {
-      message.error('Failed to update reorder level');
+      Modal.error({ title: 'Error', content: 'Failed to update reorder level', centered: true });
     }
   };
 
@@ -311,11 +311,11 @@ const StockManagement = () => {
         });
         const data = await res.json();
         if (data.success) {
-          message.success('Stock request submitted');
+          Modal.success({ title: 'Success', content: 'Stock request submitted', centered: true });
           setAdjustVisible(false);
           adjustForm.resetFields();
         } else {
-          message.error(data.message);
+          Modal.error({ title: 'Error', content: data.message, centered: true });
         }
       } else {
         const adjType = values.adjustmentType;
@@ -338,17 +338,17 @@ const StockManagement = () => {
         });
         const data = await res.json();
         if (data.success) {
-          message.success('Stock adjusted');
+          Modal.success({ title: 'Success', content: 'Stock adjusted', centered: true });
           setAdjustVisible(false);
           adjustForm.resetFields();
           fetchData();
         } else {
-          message.error(data.message);
+          Modal.error({ title: 'Error', content: data.message, centered: true });
         }
       }
     } catch (err) {
       if (err?.errorFields) return;
-      message.error(requestPreset ? 'Failed to submit stock request' : 'Failed to adjust stock');
+      Modal.error({ title: 'Error', content: requestPreset ? 'Failed to submit stock request' : 'Failed to adjust stock', centered: true });
     }
   };
 
@@ -373,27 +373,27 @@ const StockManagement = () => {
       });
       const data = await res.json();
       if (data.success) {
-        message.success('Stock transferred');
+        Modal.success({ title: 'Success', content: 'Stock transferred', centered: true });
         setTransferVisible(false);
         setFromLocationId(null);
         transferForm.resetFields();
         fetchData();
       } else {
-        message.error(data.message || 'Failed to transfer stock');
+        Modal.error({ title: 'Error', content: data.message || 'Failed to transfer stock', centered: true });
       }
     } catch (err) {
       if (err?.errorFields) return;
-      message.error('Failed to transfer stock');
+      Modal.error({ title: 'Error', content: 'Failed to transfer stock', centered: true });
     }
   };
 
   const handleBulkRestock = async () => {
     if (!storehouse) {
-      message.warning('No storehouse configured. Mark a location as storehouse first.');
+      Modal.warning({ title: 'Warning', content: 'No storehouse configured. Mark a location as storehouse first.', centered: true });
       return;
     }
     if (selectedLocationId === "all") {
-      message.warning('Select a specific branch from the top bar to restock');
+      Modal.warning({ title: 'Warning', content: 'Select a specific branch from the top bar to restock', centered: true });
       return;
     }
     setRestocking(true);
@@ -410,16 +410,16 @@ const StockManagement = () => {
       const json = await res.json();
       if (json.success) {
         if (json.data.count > 0) {
-          message.success(`Restocked ${json.data.count} product(s) from ${storehouse.name}`);
+          Modal.success({ title: 'Success', content: `Restocked ${json.data.count} product(s) from ${storehouse.name}`, centered: true });
           fetchData();
         } else {
-          message.info('No products below reorder level');
+          Modal.info({ title: 'Info', content: 'No products below reorder level', centered: true });
         }
       } else {
-        message.error(json.message);
+        Modal.error({ title: 'Error', content: json.message, centered: true });
       }
     } catch {
-      message.error('Failed to restock');
+      Modal.error({ title: 'Error', content: 'Failed to restock', centered: true });
     } finally {
       setRestocking(false);
     }
@@ -427,7 +427,7 @@ const StockManagement = () => {
 
   const handleOpenSelectRestock = async () => {
     if (selectedLocationId === "all") {
-      message.warning('Select a specific branch from the top bar to restock');
+      Modal.warning({ title: 'Warning', content: 'Select a specific branch from the top bar to restock', centered: true });
       return;
     }
     try {
@@ -443,10 +443,10 @@ const StockManagement = () => {
         setRestockQuantities(defaultQtys);
         setSelectedRestockIds(new Set());
       } else {
-        message.error(data.message || 'Failed to load low stock items');
+        Modal.error({ title: 'Error', content: data.message || 'Failed to load low stock items', centered: true });
       }
     } catch {
-      message.error('Failed to load low stock items');
+      Modal.error({ title: 'Error', content: 'Failed to load low stock items', centered: true });
     }
     setSelectRestockVisible(true);
   };
@@ -490,7 +490,7 @@ const StockManagement = () => {
 
   const handleOrderRestock = () => {
     if (selectedRestockIds.size === 0) {
-      message.warning('Select at least one item to restock');
+      Modal.warning({ title: 'Warning', content: 'Select at least one item to restock', centered: true });
       return;
     }
     setOrderSummaryVisible(true);
@@ -505,7 +505,7 @@ const StockManagement = () => {
       }
     }
     if (items.length === 0) {
-      message.warning('All selected items have zero quantity');
+      Modal.warning({ title: 'Warning', content: 'All selected items have zero quantity', centered: true });
       return;
     }
 
@@ -518,7 +518,7 @@ const StockManagement = () => {
         const ls = lowStockItems.find((ls) => ls.product_id === i.product_id);
         return ls?.product_name || `Product #${i.product_id}`;
       }).join(', ');
-      message.error(`Insufficient storehouse stock for: ${names}`);
+      Modal.error({ title: 'Error', content: `Insufficient storehouse stock for: ${names}`, centered: true });
       return;
     }
 
@@ -536,16 +536,16 @@ const StockManagement = () => {
       });
       const json = await res.json();
       if (json.success) {
-        message.success(`Restock request submitted for ${json.data.count} product(s) — waiting for storehouse approval`);
+        Modal.success({ title: 'Success', content: `Restock request submitted for ${json.data.count} product(s) — waiting for storehouse approval`, centered: true });
         setOrderSummaryVisible(false);
         setSelectRestockVisible(false);
         setSelectedRestockIds(new Set());
         fetchData();
       } else {
-        message.error(json.message);
+        Modal.error({ title: 'Error', content: json.message, centered: true });
       }
     } catch {
-      message.error('Failed to submit restock request');
+      Modal.error({ title: 'Error', content: 'Failed to submit restock request', centered: true });
     } finally {
       setRestockSubmitting(false);
     }
@@ -706,58 +706,64 @@ const StockManagement = () => {
     <div>
       <Card styles={{ body: { padding: '16px 24px' } }}>
         <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col xs={12} sm={6}>
-            <Card styles={{ body: { padding: '20px 24px' } }}><Statistic title="Total Stock Items" value={totalItems} /></Card>
+        <Col xs={12} sm={6}>
+          <Card style={{ height: '100%' }} styles={{ body: { padding: '20px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' } }}>
+            <Statistic title="Total Stock Items" value={totalItems} />
+          </Card>
         </Col>
         <Col xs={12} sm={6}>
-          <Card>
+          <Card style={{ height: '100%' }} styles={{ body: { display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' } }}>
             <Statistic title="Low Stock Items" value={lowStockCount} valueStyle={{ color: '#fa8c16' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
-          <Card>
+          <Card style={{ height: '100%' }} styles={{ body: { display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' } }}>
             <Statistic title="Out of Stock Items" value={outOfStockCount} valueStyle={{ color: '#cf1322' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
-          {isStorehouse ? (
-            <Card
-              hoverable
-              onClick={() => { setRequestLogVisible(true); fetchStorehousePendingRequests(); }}
-              styles={{ body: { padding: '20px 24px', cursor: 'pointer' } }}
-              loading={storehousePendingLoading}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <Statistic title="Pending Requests" value={storehousePendingRequests.length} valueStyle={{ color: '#1677ff' }} />
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<RightCircleOutlined />}
-                  style={{ padding: 0, marginTop: 8, fontSize: 13 }}
-                >
-                  View & Manage Requests
-                </Button>
-              </div>
-            </Card>
-          ) : (
-            <Card
-              hoverable
-              onClick={fetchRequestLogs}
-              styles={{ body: { padding: '20px 24px', cursor: 'pointer' } }}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <Statistic title="Current Requested" value={pendingRequestCount} valueStyle={{ color: '#1677ff' }} />
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<RightCircleOutlined />}
-                  style={{ padding: 0, marginTop: 8, fontSize: 13 }}
-                >
-                  View Request Logs
-                </Button>
-              </div>
-            </Card>
-          )}
+          <div style={{ height: '100%' }}>
+            {isStorehouse ? (
+              <Card
+                hoverable
+                onClick={() => { setRequestLogVisible(true); fetchStorehousePendingRequests(); }}
+                style={{ height: '100%' }}
+                styles={{ body: { padding: '20px 24px', cursor: 'pointer', display: 'flex', flexDirection: 'column', height: '100%' } }}
+                loading={storehousePendingLoading}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'center' }}>
+                  <Statistic title="Pending Requests" value={storehousePendingRequests.length} valueStyle={{ color: '#1677ff' }} />
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<RightCircleOutlined />}
+                    style={{ padding: 0, marginTop: 8, fontSize: 13 }}
+                  >
+                    View & Manage Requests
+                  </Button>
+                </div>
+              </Card>
+            ) : (
+              <Card
+                hoverable
+                onClick={fetchRequestLogs}
+                style={{ height: '100%' }}
+                styles={{ body: { padding: '20px 24px', cursor: 'pointer', display: 'flex', flexDirection: 'column', height: '100%' } }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'center' }}>
+                  <Statistic title="Current Requested" value={pendingRequestCount} valueStyle={{ color: '#1677ff' }} />
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<RightCircleOutlined />}
+                    style={{ padding: 0, marginTop: 8, fontSize: 13 }}
+                  >
+                    View Request Logs
+                  </Button>
+                </div>
+              </Card>
+            )}
+          </div>
         </Col>
       </Row>
 
@@ -778,9 +784,7 @@ const StockManagement = () => {
                 <Search
                   placeholder="Search products..."
                   value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  onSearch={() => fetchBranchNeeds()}
-                  enterButton
+                  onChange={(e) => { setSearchText(e.target.value); fetchBranchNeeds(); }}
                   allowClear
                   style={{ width: 200 }}
                 />
@@ -811,9 +815,7 @@ const StockManagement = () => {
                 <Search
                   placeholder="Search by product name"
                   value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  onSearch={() => { setCurrentPage(1); fetchData(1); }}
-                  enterButton
+                  onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1); }}
                   allowClear
                   style={{ width: 220 }}
                 />
@@ -939,7 +941,8 @@ const StockManagement = () => {
         open={detailVisible}
         onCancel={() => setDetailVisible(false)}
         footer={[<Button key="close" type="primary" onClick={() => setDetailVisible(false)}>Close</Button>]}
-        width={700}
+        width={800}
+        centered
       >
         <Descriptions column={2} bordered style={{ marginBottom: 16 }}>
           <Descriptions.Item label="Product Name">{selectedRecord?.product_name}</Descriptions.Item>
@@ -966,6 +969,7 @@ const StockManagement = () => {
         title={`Set Reorder Level - ${selectedRecord?.product_name}`}
         open={reorderVisible}
         onCancel={() => setReorderVisible(false)}
+        centered
         footer={[
           <Button key="cancel" onClick={() => setReorderVisible(false)}>Cancel</Button>,
           <Button key="save" type="primary" onClick={handleReorderSave}>Save</Button>,
@@ -992,6 +996,7 @@ const StockManagement = () => {
         title={requestPreset ? `Request Stock - ${selectedRecord?.product_name}` : `Adjust Stock - ${selectedRecord?.product_name}`}
         open={adjustVisible}
         onCancel={() => setAdjustVisible(false)}
+        centered
         footer={[
           <Button key="cancel" onClick={() => setAdjustVisible(false)}>Cancel</Button>,
           <Button key="save" type="primary" onClick={handleAdjustSave}>{requestPreset ? 'Submit Request' : 'Save'}</Button>,
@@ -1049,6 +1054,7 @@ const StockManagement = () => {
         title={`Transfer Stock - ${selectedRecord?.product_name}`}
         open={transferVisible}
         onCancel={() => { setTransferVisible(false); setFromLocationId(null); }}
+        centered
         footer={[
           <Button key="cancel" onClick={() => { setTransferVisible(false); setFromLocationId(null); }}>Cancel</Button>,
           <Button key="save" type="primary" onClick={handleTransferSave}>Save</Button>,
@@ -1091,6 +1097,7 @@ const StockManagement = () => {
         open={selectRestockVisible}
         onCancel={() => { setSelectRestockVisible(false); setOrderSummaryVisible(false); }}
         width={950}
+        centered
         styles={{ body: { padding: '16px 24px' } }}
         footer={restockFooterItems}
       >
@@ -1197,6 +1204,7 @@ const StockManagement = () => {
         onCancel={() => setRequestLogVisible(false)}
         footer={[<Button key="close" type="primary" onClick={() => setRequestLogVisible(false)}>Close</Button>]}
         width={900}
+        centered
       >
         <Table
           dataSource={isStorehouse ? storehousePendingRequests : requestLogs}

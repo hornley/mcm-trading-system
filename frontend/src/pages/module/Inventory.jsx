@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Card, Typography, Row, Col, Input, Select, Button,
-  Tag, Modal, Form, Space, Popconfirm, InputNumber, message, Spin,
+  Tag, Modal, Form, Space, Popconfirm, InputNumber, Spin,
   Dropdown,
 } from 'antd';
 import { PlusOutlined, EditOutlined } from '@ant-design/icons';
@@ -40,7 +40,7 @@ const Inventory = () => {
       if (productsData.success) setProducts(productsData.data);
       if (categoriesData.success) setCategories(categoriesData.data);
     } catch {
-      message.error('Failed to load data');
+      Modal.error({ title: 'Error', content: 'Failed to load data', centered: true });
     } finally {
       setLoading(false);
     }
@@ -88,13 +88,13 @@ const Inventory = () => {
       });
       const data = await res.json();
       if (data.success) {
-        message.success('Product voided');
+        Modal.success({ title: 'Success', content: 'Product voided', centered: true });
         fetchData();
       } else {
-        message.error(data.message);
+        Modal.error({ title: 'Error', content: data.message, centered: true });
       }
     } catch {
-      message.error('Failed to void product');
+      Modal.error({ title: 'Error', content: 'Failed to void product', centered: true });
     }
   };
 
@@ -107,13 +107,13 @@ const Inventory = () => {
       });
       const data = await res.json();
       if (data.success) {
-        message.success('Product restored');
+        Modal.success({ title: 'Success', content: 'Product restored', centered: true });
         fetchData();
       } else {
-        message.error(data.message);
+        Modal.error({ title: 'Error', content: data.message, centered: true });
       }
     } catch {
-      message.error('Failed to restore product');
+      Modal.error({ title: 'Error', content: 'Failed to restore product', centered: true });
     }
   };
 
@@ -126,13 +126,13 @@ const Inventory = () => {
       });
       const data = await res.json();
       if (data.success) {
-        message.success('Product deleted');
+        Modal.success({ title: 'Success', content: 'Product deleted', centered: true });
         fetchData();
       } else {
-        message.error(data.message);
+        Modal.error({ title: 'Error', content: data.message, centered: true });
       }
     } catch {
-      message.error('Failed to delete product');
+      Modal.error({ title: 'Error', content: 'Failed to delete product', centered: true });
     }
   };
 
@@ -150,15 +150,15 @@ const Inventory = () => {
       });
       const data = await res.json();
       if (data.success) {
-        message.success(isEdit ? 'Product updated' : 'Product created');
+        Modal.success({ title: 'Success', content: isEdit ? 'Product updated' : 'Product created', centered: true });
         setProductModalVisible(false);
         productForm.resetFields();
         fetchData();
       } else {
-        message.error(data.message);
+        Modal.error({ title: 'Error', content: data.message, centered: true });
       }
     } catch {
-      if (!selectedRecord) message.error('Failed to save product');
+      if (!selectedRecord) Modal.error({ title: 'Error', content: 'Failed to save product', centered: true });
     }
   };
 
@@ -183,9 +183,7 @@ const Inventory = () => {
           <Space wrap>
             <Search
               placeholder="Search by product name"
-              onSearch={(val) => setSearchText(val)}
-              onChange={(e) => { if (!e.target.value) setSearchText(''); }}
-              enterButton
+              onChange={(e) => setSearchText(e.target.value)}
               style={{ width: 200 }}
             />
             {user && (user.usertype === 1 || user.usertype === 3) && (
@@ -255,8 +253,11 @@ const Inventory = () => {
               <div style={{ fontSize: 13, color: '#52c41a', fontWeight: 600, marginBottom: 4 }}>
                 ₱{product.price}
               </div>
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 8 }}>
+              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>
                 {product.category === FABRIC_CATEGORY ? 'yards' : (product.unit || '-')}
+              </div>
+              <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>
+                Stock: {product.quantity != null ? product.quantity : '-'}
               </div>
 
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
@@ -265,7 +266,7 @@ const Inventory = () => {
                     Edit
                   </Button>
                 )}
-                {can('delete') && product.is_active && (
+                {can('update') && product.is_active && (
                   <Popconfirm
                     title="Void this product?"
                     onConfirm={() => handleVoid(product)}
@@ -275,12 +276,12 @@ const Inventory = () => {
                     <Button size="small" danger>Void</Button>
                   </Popconfirm>
                 )}
-                {can('delete') && !product.is_active && (
+                {can('update') && !product.is_active && (
                   <Button size="small" style={{ borderColor: '#52c41a', color: '#52c41a' }} onClick={() => handleRestore(product)}>
                     Return
                   </Button>
                 )}
-                {can('delete') && !product.is_active && (
+                {can('update') && !product.is_active && (
                   <Popconfirm
                     title="Permanently delete this product?"
                     onConfirm={() => handleDelete(product)}
@@ -306,6 +307,8 @@ const Inventory = () => {
         title={selectedRecord ? 'Edit Product' : 'Add Product'}
         open={productModalVisible}
         onCancel={() => { setProductModalVisible(false); productForm.resetFields(); }}
+        centered
+        width={520}
         footer={[
           <Button key="cancel" onClick={() => { setProductModalVisible(false); productForm.resetFields(); }}>Cancel</Button>,
           <Button key="save" type="primary" onClick={handleSaveProduct}>Save</Button>,
@@ -331,7 +334,14 @@ const Inventory = () => {
             <InputNumber min={0} style={{ width: '100%' }} placeholder="Enter price" prefix="₱" />
           </Form.Item>
           <Form.Item name="unit" label="Unit">
-            <Input placeholder="e.g. piece, meter" />
+            <Select placeholder="Select unit" allowClear>
+              <Select.Option value="piece">Piece</Select.Option>
+              <Select.Option value="meter">Meter</Select.Option>
+              <Select.Option value="yard">Yard</Select.Option>
+              <Select.Option value="kilogram">Kilogram</Select.Option>
+              <Select.Option value="pack">Pack</Select.Option>
+              <Select.Option value="box">Box</Select.Option>
+            </Select>
           </Form.Item>
           <Form.Item name="description" label="Description">
             <TextArea rows={3} placeholder="Enter description" />

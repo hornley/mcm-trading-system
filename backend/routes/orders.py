@@ -1,5 +1,6 @@
 from flask import Blueprint, request
 from datetime import datetime
+from sqlalchemy import cast, String
 from models import db, User, Order, OrderItem, Payment, Product, Inventory, Location
 from utils.response import success_response, error_response
 from utils.validation import validate_required, validate_quantity
@@ -267,11 +268,7 @@ def list_orders():
         query = query.filter(Order.status == status)
 
     if search:
-        try:
-            search_int = int(search)
-            query = query.filter(Order.order_id == search_int)
-        except (ValueError, TypeError):
-            pass
+        query = query.filter(cast(Order.order_id, String).startswith(search))
 
     if date_from:
         try:

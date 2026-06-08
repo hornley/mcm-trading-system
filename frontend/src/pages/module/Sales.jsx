@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Row, Col, Card, Table, Tag, Typography, Input, Select, Button, Modal,
-  DatePicker, Popconfirm, Space, message,
+  DatePicker, Popconfirm, Space,
   Statistic, Dropdown,
 } from 'antd';
 import {
@@ -43,6 +43,7 @@ const Sales = () => {
   const [statusFilter, setStatusFilter] = useState(null);
   const [locations, setLocations] = useState([]);
   const [branchLocations, setBranchLocations] = useState([]);
+  const [branchFilter, setBranchFilter] = useState('all');
 
   const receiptRef = useRef(null);
   const [saleModalVisible, setSaleModalVisible] = useState(false);
@@ -60,7 +61,8 @@ const Sales = () => {
   const userId = user?.user_id;
   const locationId = isManager ? user?.location_id : undefined;
 
-  const apiParams = `usertype=${usertype}&user_id=${userId}` + (selectedLocationId && selectedLocationId !== 'all' ? `&location_id=${selectedLocationId}` : '');
+  const effectiveBranchId = isOwner && branchFilter !== 'all' ? branchFilter : (selectedLocationId && selectedLocationId !== 'all' ? selectedLocationId : undefined);
+  const apiParams = `usertype=${usertype}&user_id=${userId}` + (effectiveBranchId ? `&location_id=${effectiveBranchId}` : '');
 
   const fetchSales = async (page) => {
     setLoading(true);
@@ -79,7 +81,7 @@ const Sales = () => {
         setCurrentPage(json.data.page || p);
       }
     } catch (e) {
-      message.error('Failed to load sales');
+      Modal.error({ title: 'Error', content: 'Failed to load sales', centered: true });
     } finally {
       setLoading(false);
     }
@@ -133,14 +135,14 @@ const Sales = () => {
     } catch (e) { /* ignore */ }
   };
 
-  useEffect(() => { fetchSales(1); fetchDashboardStats(); }, [searchText, dateRange, statusFilter, selectedLocationId]);
+  useEffect(() => { fetchSales(1); fetchDashboardStats(); }, [searchText, dateRange, statusFilter, selectedLocationId, branchFilter]);
   useEffect(() => { fetchProducts(); fetchLocations(); }, []);
 
   const fetchTotalSalesData = useCallback(async (branch, dateFrom, dateTo) => {
     setTotalSalesLoading(true);
     try {
       const loc = branch && branch !== 'All' ? locations.find((l) => l.name === branch)?.location_id : undefined;
-      const params = new URLSearchParams({ usertype, user_id: userId, include_items: 'true', limit: '999' });
+      const params = new URLSearchParams({ usertype, user_id: userId, include_items: 'true', limit: '999', status: 'completed' });
       if (loc) params.set('location_id', loc);
       if (dateFrom) params.set('date_from', dateFrom.toISOString());
       if (dateTo) params.set('date_to', dateTo.toISOString());
@@ -177,10 +179,10 @@ const Sales = () => {
       });
       const json = await res.json();
       if (json.success) {
-        message.success(`Order #${json.data.order_id} created`);
+        Modal.success({ title: 'Success', content: `Order #${json.data.order_id} created`, centered: true });
         if (json.data.auto_restocks?.length > 0) {
           const names = json.data.auto_restocks.map((r) => r.product_name).join(', ');
-          message.info(`Auto-restock triggered: ${names}`);
+          Modal.info({ title: 'Auto-Restock', content: `Auto-restock triggered: ${names}`, centered: true });
         }
         setLastOrder(json.data);
         setSaleModalVisible(false);
@@ -188,10 +190,10 @@ const Sales = () => {
         fetchSales();
         fetchProducts();
       } else {
-        message.error(json.message || 'Failed to create order');
+        Modal.error({ title: 'Error', content: json.message || 'Failed to create order', centered: true });
       }
     } catch (e) {
-      message.error('Failed to create order');
+      Modal.error({ title: 'Error', content: 'Failed to create order', centered: true });
     } finally {
       setSubmitting(false);
     }
@@ -206,13 +208,13 @@ const Sales = () => {
       });
       const json = await res.json();
       if (json.success) {
-        message.success(`Order #${record.order_id} voided`);
+        Modal.success({ title: 'Success', content: `Order #${record.order_id} voided`, centered: true });
         fetchSales();
       } else {
-        message.error(json.message || 'Failed to void order');
+        Modal.error({ title: 'Error', content: json.message || 'Failed to void order', centered: true });
       }
     } catch (e) {
-      message.error('Failed to void order');
+      Modal.error({ title: 'Error', content: 'Failed to void order', centered: true });
     }
   };
 
@@ -233,16 +235,17 @@ const Sales = () => {
 
   const isVoided = (record) => record.status === 'voided';
 
+  const showBranchCol = selectedLocationId === "all";
   const columns = [
     {
       title: 'Transaction ID', dataIndex: 'order_id', key: 'order_id',
       render: (v) => `#${v}`,
       sorter: (a, b) => a.order_id - b.order_id,
     },
-    {
+    ...(showBranchCol ? [{
       title: 'Branch', dataIndex: 'location_name', key: 'location_name',
       sorter: (a, b) => (a.location_name || '').localeCompare(b.location_name || ''),
-    },
+    }] : []),
     {
       title: 'Date', dataIndex: 'order_date', key: 'order_date',
       render: (v) => v ? dayjs(v).format('YYYY-MM-DD') : '-',
@@ -569,6 +572,19 @@ const Sales = () => {
               </Dropdown>
             )}
             <RangePicker onChange={(dates) => setDateRange(dates)} />
+            {isOwner && (
+              <Select
+                placeholder="Filter by branch"
+                style={{ width: 160 }}
+                value={branchFilter}
+                onChange={setBranchFilter}
+              >
+                <Select.Option value="all">All Branches</Select.Option>
+                {locations.map((l) => (
+                  <Select.Option key={l.location_id} value={l.location_id}>{l.name}</Select.Option>
+                ))}
+              </Select>
+            )}
             <Select
               placeholder="Filter by status"
               style={{ width: 150 }}
@@ -624,7 +640,8 @@ const Sales = () => {
         title="Receipt"
         open={receiptModalVisible}
         onCancel={() => setReceiptModalVisible(false)}
-        width={520}
+        width={600}
+        centered
         footer={[
           <Button key="download" type="primary" icon={<DownloadOutlined />}
             onClick={handleDownloadPDF}>
@@ -643,7 +660,8 @@ const Sales = () => {
         title="Total Sales"
         open={totalSalesModalVisible}
         onCancel={() => setTotalSalesModalVisible(false)}
-        width={700}
+        width={800}
+        centered
         footer={[<Button key="close" onClick={() => setTotalSalesModalVisible(false)}>Close</Button>]}
       >
         <Space direction="vertical" style={{ width: '100%' }}>
