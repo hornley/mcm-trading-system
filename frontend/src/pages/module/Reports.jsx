@@ -11,7 +11,7 @@ import {
 import {
   DatabaseOutlined, ShoppingCartOutlined, DollarOutlined,
   UserOutlined, SettingOutlined, PlusOutlined, EditOutlined, DeleteOutlined,
-  EyeOutlined,
+  EyeOutlined, FileTextOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { qtyLabel } from '../../utils/format.js';
@@ -35,7 +35,8 @@ const formatFileSize = (bytes) => {
 };
 
 const Reports = () => {
-  const { user, selectedLocationId } = useAuth();
+  const { user, theme, selectedLocationId } = useAuth();
+  const isDark = theme === 'dark';
   const [activeTab, setActiveTab] = useState(user?.role === 'admin' ? 'activity' : 'inventory');
   const [inventoryPeriod, setInventoryPeriod] = useState(30);
   const [salesPeriod, setSalesPeriod] = useState(7);
@@ -54,6 +55,7 @@ const Reports = () => {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewingReport, setViewingReport] = useState(null);
+  const [activeReport, setActiveReport] = useState(null);
   const [reportForm] = Form.useForm();
   const [editingReport, setEditingReport] = useState(null);
   const [locations, setLocations] = useState([]);
@@ -437,7 +439,7 @@ const Reports = () => {
 
   const tabs = [];
 
-  if (isOwner) {
+  if (isOwner || isManager) {
     tabs.push({
       key: 'inventory',
       label: <span><DatabaseOutlined /> Inventory</span>,
@@ -609,7 +611,7 @@ const Reports = () => {
     });
   }
 
-  if (isOwner) {
+  if (isOwner || isManager) {
     tabs.push({
       key: 'financial',
       label: <span><DollarOutlined /> Financial</span>,
@@ -653,6 +655,127 @@ const Reports = () => {
                   size="small"
                 />
               </Card>
+            </Col>
+          </Row>
+        </Spin>
+      ),
+    });
+  }
+
+  if (isManager) {
+    tabs.push({
+      key: 'store-reports',
+      label: <span><FileTextOutlined /> Store Reports</span>,
+      children: (
+        <Spin spinning={loadingStoreReports}>
+          <div style={{ marginBottom: 16, textAlign: 'right' }}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateReport}>New Report</Button>
+          </div>
+          <Row gutter={16} style={{ height: 'calc(100vh - 280px)' }}>
+            <Col xs={24} md={10}>
+              <div style={{ height: '100%', overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 6 }}>
+                {storeReports.length === 0 ? (
+                  <div style={{ padding: 24, textAlign: 'center', color: '#8c8c8c' }}>No reports yet</div>
+                ) : (
+                  storeReports.map((report) => {
+                    const colors = { pending: 'orange', resolved: 'green', voided: 'red' };
+                    const labels = { store: 'Store Issue', materials: 'Materials Issue', software: 'Software Issue' };
+                    return (
+                      <div
+                        key={report.report_id}
+                        onClick={() => setActiveReport(report)}
+                        style={{
+                          padding: '12px 16px',
+                          cursor: 'pointer',
+                          borderBottom: '1px solid #f0f0f0',
+                          background: activeReport?.report_id === report.report_id ? (isDark ? '#1d1d1d' : '#e6f4ff') : 'transparent',
+                          borderLeft: activeReport?.report_id === report.report_id ? '3px solid #1677ff' : '3px solid transparent',
+                        }}
+                      >
+                        <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>{report.title}</div>
+                        <Space size={4}>
+                          <Tag color={colors[report.status]}>{report.status}</Tag>
+                          <Tag>{labels[report.issue_type] || report.issue_type}</Tag>
+                        </Space>
+                        <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 4 }}>
+                          {report.username} · {report.created_at ? new Date(report.created_at).toLocaleDateString() : ''}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </Col>
+            <Col xs={24} md={14}>
+              <div style={{ height: '100%', overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 6, padding: 24 }}>
+                {!activeReport ? (
+                  <div style={{ textAlign: 'center', paddingTop: 80, color: '#8c8c8c' }}>
+                    Select a report to view details
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>{activeReport.title}</div>
+                    <Row gutter={[16, 12]}>
+                      <Col xs={24} sm={12}>
+                        <div style={{ color: '#888', fontSize: 12 }}>Branch</div>
+                        <div>{activeReport.location_name}</div>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <div style={{ color: '#888', fontSize: 12 }}>Issue Type</div>
+                        <div>
+                          <Tag color="blue">{ISSUE_TYPES.find((t) => t.value === activeReport.issue_type)?.label}</Tag>
+                        </div>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <div style={{ color: '#888', fontSize: 12 }}>Status</div>
+                        <div>
+                          <Tag color={activeReport.status === 'resolved' ? 'green' : activeReport.status === 'voided' ? 'red' : 'orange'}>
+                            {activeReport.status}
+                          </Tag>
+                        </div>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <div style={{ color: '#888', fontSize: 12 }}>Submitted By</div>
+                        <div>{activeReport.username}</div>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <div style={{ color: '#888', fontSize: 12 }}>Date Submitted</div>
+                        <div>{activeReport.created_at ? new Date(activeReport.created_at).toLocaleString() : ''}</div>
+                      </Col>
+                      {activeReport.status === 'resolved' && activeReport.resolved_by_username && (
+                        <>
+                          <Col xs={24} sm={12}>
+                            <div style={{ color: '#888', fontSize: 12 }}>Resolved By</div>
+                            <div>{activeReport.resolved_by_username}</div>
+                          </Col>
+                          <Col xs={24} sm={12}>
+                            <div style={{ color: '#888', fontSize: 12 }}>Resolved At</div>
+                            <div>{activeReport.resolved_at ? new Date(activeReport.resolved_at).toLocaleString() : ''}</div>
+                          </Col>
+                        </>
+                      )}
+                      <Col xs={24}>
+                        <div style={{ color: '#888', fontSize: 12 }}>Description</div>
+                        <div style={{ whiteSpace: 'pre-wrap', background: '#fafafa', padding: 12, borderRadius: 4, marginTop: 4 }}>
+                          {activeReport.description}
+                        </div>
+                      </Col>
+                    </Row>
+                    <Divider />
+                    <Space>
+                      {activeReport.status === 'pending' && user?.user_id === activeReport.user_id && (
+                        <>
+                          <Button icon={<EditOutlined />} onClick={() => { setEditingReport(activeReport); reportForm.setFieldsValue({ title: activeReport.title, issue_type: activeReport.issue_type, description: activeReport.description }); setReportModalOpen(true); }}>Edit</Button>
+                          <Button danger icon={<DeleteOutlined />} onClick={() => handleVoidReport(activeReport.report_id)}>Void</Button>
+                        </>
+                      )}
+                      {activeReport.status === 'pending' && (
+                        <Button type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} onClick={() => handleUpdateStatus(activeReport.report_id, 'resolved')}>Mark Resolved</Button>
+                      )}
+                    </Space>
+                  </div>
+                )}
+              </div>
             </Col>
           </Row>
         </Spin>
@@ -792,11 +915,7 @@ const Reports = () => {
     });
   }
 
-  if (isManager) {
-    return <ManagerReports user={user} selectedLocationId={selectedLocationId} />;
-  }
-
-  const isOwnerOrAdmin = user?.role === 'owner' || user?.role === 'admin';
+  const isOwnerOrAdmin = user?.role === 'owner' || user?.role === 'admin' || user?.role === 'manager';
 
   return (
     <div>
@@ -916,6 +1035,7 @@ const STATUS_COLORS = {
   voided: 'red',
 };
 
+// kept for potential future use — standalone store reports view for managers
 const ManagerReports = ({ user, selectedLocationId }) => {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
