@@ -620,7 +620,11 @@ def list_inventory():
 
     total_count = query.count()
 
-    inventory = query.offset((page - 1) * limit).limit(limit).all()
+    inventory = query.options(
+        joinedload(Inventory.product).joinedload(Product.category),
+        joinedload(Inventory.location),
+        joinedload(Inventory.variety),
+    ).offset((page - 1) * limit).limit(limit).all()
 
     return success_response({
         "data": [
@@ -1086,49 +1090,46 @@ def get_low_stock():
         return error
 
     storehouse = Location.query.filter_by(is_storehouse=True, is_active=True).first()
+    storehouse_id = storehouse.location_id if storehouse else None
 
-    products = Product.query.filter_by(is_active=True).all()
-    low_stock = []
+    low_stock = db.session.execute(
+        db.text("""
+            SELECT i.inventory_id, p.product_id, p.name as product_name, p.sku,
+                   p.category_id, c.name as category_name,
+                   i.location_id, l.name as location_name,
+                   i.quantity, p.reorder_level,
+                   COALESCE(si.quantity, 0) as storehouse_quantity
+            FROM "Inventory" i
+            JOIN "Products" p ON i.product_id = p.product_id
+            LEFT JOIN "Categories" c ON p.category_id = c.category_id
+            JOIN "Locations" l ON i.location_id = l.location_id
+            LEFT JOIN "Inventory" si ON si.product_id = p.product_id AND si.location_id = :storehouse_id
+            WHERE p.is_active = TRUE
+              AND p.reorder_level IS NOT NULL
+              AND CAST(p.reorder_level AS INTEGER) > 0
+              AND i.quantity < CAST(p.reorder_level AS INTEGER)
+              AND (:loc_id IS NULL OR i.location_id = CAST(:loc_id AS INTEGER))
+        """),
+        {"storehouse_id": storehouse_id, "loc_id": resolved_location_id if resolved_location_id != "all" else None},
+    ).fetchall()
 
-    for product in products:
-        reorder_level = product.reorder_level
-        if reorder_level is None:
-            continue
-        try:
-            level = int(reorder_level)
-        except (ValueError, TypeError):
-            continue
+    result = []
+    for row in low_stock:
+        result.append({
+            "inventory_id": row.inventory_id,
+            "product_id": row.product_id,
+            "product_name": row.product_name,
+            "sku": row.sku,
+            "category_id": row.category_id,
+            "category": row.category_name,
+            "location_id": row.location_id,
+            "location_name": row.location_name,
+            "quantity": row.quantity,
+            "reorder_level": int(row.reorder_level) if row.reorder_level else 0,
+            "storehouse_quantity": row.storehouse_quantity,
+        })
 
-        query = Inventory.query.filter_by(product_id=product.product_id)
-        if resolved_location_id is not None and resolved_location_id != "all":
-            query = query.filter_by(location_id=resolved_location_id)
-
-        store_qty = 0
-        if storehouse:
-            store_inv = Inventory.query.filter_by(
-                product_id=product.product_id,
-                location_id=storehouse.location_id,
-            ).first()
-            store_qty = store_inv.quantity if store_inv else 0
-
-        inventory = query.all()
-        for inv in inventory:
-            if inv.quantity < level:
-                low_stock.append({
-                    "inventory_id": inv.inventory_id,
-                    "product_id": product.product_id,
-                    "product_name": product.name,
-                    "sku": product.sku,
-                    "category_id": product.category_id,
-                    "category": product.category.name if product.category else None,
-                    "location_id": inv.location_id,
-                    "location_name": inv.location.name if inv.location else None,
-                    "quantity": inv.quantity,
-                    "reorder_level": level,
-                    "storehouse_quantity": store_qty,
-                })
-
-    return success_response(low_stock)
+    return success_response(result)
 
 
 @inventory_bp.route("/api/inventory/branch-needs", methods=["GET"])
@@ -1141,38 +1142,42 @@ def get_branch_needs():
     if not storehouse:
         return error_response("No storehouse configured", "NO_STOREHOUSE", 400)
 
-    branches = Location.query.filter(
-        Location.is_storehouse == False,
-        Location.is_active == True
-    ).all()
+    rows = db.session.execute(
+        db.text("""
+            SELECT p.product_id, p.name as product_name,
+                   c.name as category_name,
+                   b.location_id as branch_id, b.name as branch_name,
+                   i.quantity as current_qty,
+                   CAST(p.reorder_level AS INTEGER) as reorder_level,
+                   CAST(p.reorder_level AS INTEGER) - i.quantity as deficit,
+                   COALESCE(si.quantity, 0) as storehouse_qty
+            FROM "Inventory" i
+            JOIN "Products" p ON i.product_id = p.product_id
+            LEFT JOIN "Categories" c ON p.category_id = c.category_id
+            JOIN "Locations" b ON i.location_id = b.location_id
+            LEFT JOIN "Inventory" si ON si.product_id = p.product_id AND si.location_id = :storehouse_id
+            WHERE b.is_storehouse = FALSE
+              AND b.is_active = TRUE
+              AND p.reorder_level IS NOT NULL
+              AND CAST(p.reorder_level AS INTEGER) > 0
+              AND i.quantity < CAST(p.reorder_level AS INTEGER)
+        """),
+        {"storehouse_id": storehouse.location_id},
+    ).fetchall()
 
     branch_needs = []
-    for branch in branches:
-        items = Inventory.query.filter_by(location_id=branch.location_id).all()
-        for inv in items:
-            product = Product.query.get(inv.product_id)
-            if not product or not product.reorder_level:
-                continue
-            try:
-                level = int(product.reorder_level)
-            except (ValueError, TypeError):
-                continue
-            if inv.quantity < level:
-                store_inv = Inventory.query.filter_by(
-                    product_id=product.product_id,
-                    location_id=storehouse.location_id,
-                ).first()
-                branch_needs.append({
-                    "product_id": product.product_id,
-                    "product_name": product.name,
-                    "category": product.category.name if product.category else None,
-                    "branch_id": branch.location_id,
-                    "branch_name": branch.name,
-                    "current_qty": inv.quantity,
-                    "reorder_level": level,
-                    "deficit": level - inv.quantity,
-                    "storehouse_qty": store_inv.quantity if store_inv else 0,
-                })
+    for row in rows:
+        branch_needs.append({
+            "product_id": row.product_id,
+            "product_name": row.product_name,
+            "category": row.category_name,
+            "branch_id": row.branch_id,
+            "branch_name": row.branch_name,
+            "current_qty": row.current_qty,
+            "reorder_level": row.reorder_level,
+            "deficit": row.deficit,
+            "storehouse_qty": row.storehouse_qty,
+        })
 
     return success_response(branch_needs)
 
@@ -1383,9 +1388,17 @@ def get_inventory_movements():
     if not product_id:
         return error_response("product_id query parameter is required", "MISSING_PARAM", 400)
 
-    adjustments = StockAdjustment.query.filter_by(product_id=product_id)
-    transfers_from = StockTransfer.query.filter_by(product_id=product_id)
-    transfers_to = StockTransfer.query.filter_by(product_id=product_id)
+    adjustments = StockAdjustment.query.filter_by(product_id=product_id).options(
+        joinedload(StockAdjustment.location),
+    )
+    transfers_from = StockTransfer.query.filter_by(product_id=product_id).options(
+        joinedload(StockTransfer.from_location),
+        joinedload(StockTransfer.to_location),
+    )
+    transfers_to = StockTransfer.query.filter_by(product_id=product_id).options(
+        joinedload(StockTransfer.from_location),
+        joinedload(StockTransfer.to_location),
+    )
 
     if location_id:
         adjustments = adjustments.filter_by(location_id=location_id)
