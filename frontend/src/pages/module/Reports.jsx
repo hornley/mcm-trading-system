@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Card, Typography, Row, Col, Table, Tabs, Statistic,
   Select, Spin, Space, message, Divider, Button, Modal, Form,
-  Input, Tag, List, Badge, Tooltip,
+  Input, Tag, List, Badge, Tooltip, Dropdown,
 } from 'antd';
 import {
   PieChart, Pie, Cell, BarChart, Bar,
@@ -11,8 +11,10 @@ import {
 import {
   DatabaseOutlined, ShoppingCartOutlined, DollarOutlined,
   UserOutlined, SettingOutlined, PlusOutlined, EditOutlined, DeleteOutlined,
-  EyeOutlined, FileTextOutlined,
+  EyeOutlined, FileTextOutlined, DownloadOutlined,
 } from '@ant-design/icons';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { qtyLabel } from '../../utils/format.js';
 
@@ -35,7 +37,7 @@ const formatFileSize = (bytes) => {
 };
 
 const Reports = () => {
-  const { user, theme, selectedLocationId } = useAuth();
+  const { user, theme, selectedLocationId, setSelectedLocationId, setIsStorehouse } = useAuth();
   const isDark = theme === 'dark';
   const [activeTab, setActiveTab] = useState(user?.role === 'admin' ? 'activity' : 'inventory');
   const [inventoryPeriod, setInventoryPeriod] = useState(30);
@@ -60,16 +62,69 @@ const Reports = () => {
   const [editingReport, setEditingReport] = useState(null);
   const [locations, setLocations] = useState([]);
 
+  const [branchLocations, setBranchLocations] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productsList, setProductsList] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [distributionData, setDistributionData] = useState([]);
   const [stockLevelsView, setStockLevelsView] = useState('table');
 
+  const exportCSV = (data, title, columnDefs) => {
+    if (!data || data.length === 0) {
+      message.warning('No data to export');
+      return;
+    }
+    const headers = columnDefs.map(c => c.label).join(',');
+    const rows = data.map(row =>
+      columnDefs.map(c => {
+        const val = c.accessor(row);
+        const str = val !== null && val !== undefined ? String(val) : '';
+        return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str.replace(/"/g, '""')}"` : str;
+      }).join(',')
+    );
+    const csv = '\uFEFF' + [headers, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title.replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportPDF = (data, title, subtitle, columnDefs, filename) => {
+    if (!data || data.length === 0) {
+      message.warning('No data to export');
+      return;
+    }
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    doc.setFontSize(14);
+    doc.text(title, 14, 20);
+    doc.setFontSize(10);
+    let startY = 27;
+    if (subtitle) {
+      doc.text(subtitle, 14, startY);
+      startY = 33;
+    }
+    doc.setFontSize(9);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, startY);
+    autoTable(doc, {
+      startY: startY + 5,
+      head: [columnDefs.map(c => c.label)],
+      body: data.map(row => columnDefs.map(c => c.accessor(row))),
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [22, 119, 255], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+    doc.save(`${(filename || title).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`);
+  };
+
   const mkParams = (extra) => {
     const p = new URLSearchParams({ usertype: user?.usertype });
     if (user?.user_id) p.set('user_id', user.user_id);
-    p.set('location_id', 'all');
+    p.set('location_id', selectedLocationId !== 'all' ? String(selectedLocationId) : 'all');
     Object.entries(extra || {}).forEach(([k, v]) => {
       if (v !== undefined && v !== null) p.set(k, v);
     });
@@ -348,6 +403,7 @@ const Reports = () => {
       const data = await res.json();
       if (data.success) {
         setLocations(data.data.map((l) => ({ label: l.name, value: l.location_id })));
+        setBranchLocations(data.data.filter((l) => l.is_active));
       }
     } catch {
       message.error('Failed to load locations');
@@ -359,7 +415,10 @@ const Reports = () => {
   }, []);
 
   useEffect(() => {
-    fetchProducts();
+    if (activeTab === 'inventory') fetchProducts();
+  }, [activeTab]);
+
+  useEffect(() => {
     if (activeTab === 'inventory') {
       fetchInventory();
       fetchDistribution();
@@ -371,19 +430,13 @@ const Reports = () => {
       fetchStoreReports();
     }
     else if (activeTab === 'system') fetchSystem();
-  }, [activeTab]);
+  }, [activeTab, selectedLocationId, salesPeriod, financialPeriod, activityPeriod]);
 
   useEffect(() => {
     if (activeTab === 'inventory') {
       fetchDistribution();
     }
   }, [selectedProduct]);
-
-  useEffect(() => {
-    if (activeTab === 'inventory') {
-      fetchInventory();
-    }
-  }, [selectedLocationId]);
 
   const isOwner = user?.role === 'owner';
   const isAdmin = user?.role === 'admin';
@@ -560,14 +613,68 @@ const Reports = () => {
       label: <span><ShoppingCartOutlined /> Sales</span>,
       children: (
         <Spin spinning={loading.sales}>
-          <Space style={{ marginBottom: 16 }}>
-            <span>Period:</span>
-            <Select value={salesPeriod} onChange={(v) => setSalesPeriod(v)} style={{ width: 120 }}>
-              <Select.Option value={7}>7 days</Select.Option>
-              <Select.Option value={30}>30 days</Select.Option>
-              <Select.Option value={90}>90 days</Select.Option>
-            </Select>
-          </Space>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+            <Space>
+              {user && (user.usertype === 1 || user.usertype === 3) && (
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'all', label: 'All Locations' },
+                      ...branchLocations.map(loc => ({ key: String(loc.location_id), label: loc.name })),
+                    ],
+                    onClick: ({ key }) => {
+                      if (key === 'all') {
+                        setSelectedLocationId('all');
+                        setIsStorehouse(false);
+                      } else {
+                        setSelectedLocationId(Number(key));
+                        const loc = branchLocations.find(l => l.location_id === Number(key));
+                        setIsStorehouse(loc ? loc.is_storehouse : false);
+                      }
+                    },
+                  }}
+                >
+                  <Button type={selectedLocationId !== 'all' ? 'primary' : 'default'}>
+                    {selectedLocationId !== 'all'
+                      ? (branchLocations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
+                      : 'All Locations'}
+                  </Button>
+                </Dropdown>
+              )}
+              <span>Period:</span>
+              <Select value={salesPeriod} onChange={(v) => setSalesPeriod(v)} style={{ width: 120 }}>
+                <Select.Option value={7}>7 days</Select.Option>
+                <Select.Option value={30}>30 days</Select.Option>
+                <Select.Option value={90}>90 days</Select.Option>
+              </Select>
+            </Space>
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: 'csv',
+                    label: 'CSV',
+                    onClick: () => exportCSV(salesData.topProducts, `Top_Products_${salesPeriod}d`, [
+                      { label: 'Product', accessor: (r) => r.product_name },
+                      { label: 'Qty Sold', accessor: (r) => r.total_quantity },
+                      { label: 'Total Revenue', accessor: (r) => r.total_revenue },
+                    ]),
+                  },
+                  {
+                    key: 'pdf',
+                    label: 'PDF',
+                    onClick: () => exportPDF(salesData.topProducts, `Top Products - ${salesPeriod} days`, null, [
+                      { label: 'Product', accessor: (r) => r.product_name },
+                      { label: 'Qty Sold', accessor: (r) => r.total_quantity },
+                      { label: 'Total Revenue', accessor: (r) => r.total_revenue },
+                    ], `Top_Products_${salesPeriod}d`),
+                  },
+                ],
+              }}
+            >
+              <Button icon={<DownloadOutlined />}>Export</Button>
+            </Dropdown>
+          </div>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={8}>
               <Card><Statistic title="Total Orders" value={salesData.stats.total_orders ?? 0} /></Card>
@@ -617,14 +724,79 @@ const Reports = () => {
       label: <span><DollarOutlined /> Financial</span>,
       children: (
         <Spin spinning={loading.financial}>
-          <Space style={{ marginBottom: 16 }}>
-            <span>Period:</span>
-            <Select value={financialPeriod} onChange={(v) => setFinancialPeriod(v)} style={{ width: 120 }}>
-              <Select.Option value={30}>30 days</Select.Option>
-              <Select.Option value={90}>90 days</Select.Option>
-              <Select.Option value={365}>365 days</Select.Option>
-            </Select>
-          </Space>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+            <Space>
+              {user && (user.usertype === 1 || user.usertype === 3) && (
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'all', label: 'All Locations' },
+                      ...branchLocations.map(loc => ({ key: String(loc.location_id), label: loc.name })),
+                    ],
+                    onClick: ({ key }) => {
+                      if (key === 'all') {
+                        setSelectedLocationId('all');
+                        setIsStorehouse(false);
+                      } else {
+                        setSelectedLocationId(Number(key));
+                        const loc = branchLocations.find(l => l.location_id === Number(key));
+                        setIsStorehouse(loc ? loc.is_storehouse : false);
+                      }
+                    },
+                  }}
+                >
+                  <Button type={selectedLocationId !== 'all' ? 'primary' : 'default'}>
+                    {selectedLocationId !== 'all'
+                      ? (branchLocations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
+                      : 'All Locations'}
+                  </Button>
+                </Dropdown>
+              )}
+              <span>Period:</span>
+              <Select value={financialPeriod} onChange={(v) => setFinancialPeriod(v)} style={{ width: 120 }}>
+                <Select.Option value={30}>30 days</Select.Option>
+                <Select.Option value={90}>90 days</Select.Option>
+                <Select.Option value={365}>365 days</Select.Option>
+              </Select>
+            </Space>
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: 'csv',
+                    label: 'CSV',
+                    onClick: () => exportCSV(financialData.revenue, `Revenue_by_Date_${financialPeriod}d`, [
+                      { label: 'Date', accessor: (r) => r.date },
+                      { label: 'Orders', accessor: (r) => r.order_count },
+                      { label: 'Revenue', accessor: (r) => r.revenue },
+                    ]),
+                  },
+                  {
+                    key: 'pdf',
+                    label: 'PDF',
+                    onClick: () => {
+                      const branchName = selectedLocationId !== 'all'
+                        ? (branchLocations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
+                        : 'All Locations';
+                      exportPDF(
+                        financialData.revenue,
+                        branchName,
+                        `Revenue - ${financialPeriod} days`,
+                        [
+                          { label: 'Date', accessor: (r) => r.date },
+                          { label: 'Orders', accessor: (r) => r.order_count },
+                          { label: 'Revenue', accessor: (r) => r.revenue },
+                        ],
+                        `Revenue_${branchName.replace(/\s+/g, '_')}_${financialPeriod}d`
+                      );
+                    },
+                  },
+                ],
+              }}
+            >
+              <Button icon={<DownloadOutlined />}>Export</Button>
+            </Dropdown>
+          </div>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12}>
               <Card><Statistic title="Total Revenue" value={formatCurrency(financialData.stats.total_revenue)} /></Card>
@@ -919,7 +1091,6 @@ const Reports = () => {
 
   return (
     <div>
-      <Title level={4} style={{ marginBottom: 16 }}>Reports</Title>
       <Card styles={{ body: { padding: '16px 24px' } }}>
         <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabs} />
       </Card>
