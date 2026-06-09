@@ -74,6 +74,9 @@ def create_app():
             if 'fontsize' not in user_cols:
                 db.session.execute(sa.text('ALTER TABLE "Users" ADD COLUMN fontsize VARCHAR DEFAULT \'medium\''))
                 db.session.commit()
+            if 'is_active' not in user_cols:
+                db.session.execute(sa.text('ALTER TABLE "Users" ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
+                db.session.commit()
             if 'Notifications' not in inspector.get_table_names():
                 db.create_all()
                 db.session.commit()

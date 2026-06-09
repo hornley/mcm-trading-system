@@ -6,7 +6,7 @@ import {
 } from 'antd';
 import { PlusOutlined, EditOutlined } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { FABRIC_CATEGORY } from '../../utils/format.js';
+import { FABRIC_CATEGORY, qtyLabel } from '../../utils/format.js';
 
 const { Search } = Input;
 const { TextArea } = Input;
@@ -267,7 +267,7 @@ const Inventory = () => {
               {product.quantity != null ? (
                 <Space style={{ marginBottom: 8 }}>
                   <span style={{ fontSize: 16, fontWeight: 700, color: getStockStatus(product.quantity, product.reorder_level).color }}>
-                    {product.quantity}
+                    {qtyLabel(product.quantity)}
                   </span>
                   {getStockStatus(product.quantity, product.reorder_level).tag}
                 </Space>

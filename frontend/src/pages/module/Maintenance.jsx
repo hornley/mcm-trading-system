@@ -786,7 +786,6 @@ const Maintenance = () => {
 
   return (
     <div>
-      <Title level={4} style={{ marginBottom: 16 }}>Maintenance</Title>
       <Card styles={{ body: { padding: '16px 24px' } }}>
         <Tabs defaultActiveKey="info" items={tabItems} />
       </Card>

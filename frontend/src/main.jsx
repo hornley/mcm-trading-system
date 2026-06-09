@@ -5,7 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import './index.css'
 import App from './App.jsx'
 
-const fontSizeMap = { small: 12, medium: 14, large: 16, xlarge: 32 }
+const fontSizeMap = { small: 12, medium: 14, large: 16, xlarge: 28 }
 
 const ThemedApp = () => {
   const { theme: appTheme, fontSize } = useAuth()

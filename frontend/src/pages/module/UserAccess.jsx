@@ -1,9 +1,7 @@
-import { Table, Card, Select, Tag, message, Typography, Button, Space, Modal, Input, Form } from 'antd';
-import { EditOutlined, CloseOutlined, FilterOutlined, UserAddOutlined, MailOutlined, LockOutlined, PhoneOutlined } from '@ant-design/icons';
+import { Table, Card, Select, Tag, message, Typography, Button, Space, Modal, Input, Form, Dropdown } from 'antd';
+import { FilterOutlined, UserAddOutlined, MailOutlined, LockOutlined, PhoneOutlined, EllipsisOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
-
-const { Title } = Typography;
 
 const USERTYPE_MAP = {
   1: { label: 'Owner', color: 'gold' },
@@ -26,7 +24,6 @@ const UserAccess = () => {
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterRole, setFilterRole] = useState(null);
   const [filterLocation, setFilterLocation] = useState(null);
@@ -37,6 +34,13 @@ const UserAccess = () => {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [registerLoading, setRegisterLoading] = useState(false);
   const [registerForm] = Form.useForm();
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editForm] = Form.useForm();
+  const [voidConfirmOpen, setVoidConfirmOpen] = useState(false);
+  const [voidingUser, setVoidingUser] = useState(null);
+  const [voidLoading, setVoidLoading] = useState(false);
 
   const fetchUsers = (role, location) => {
     if (!user) return;
@@ -87,38 +91,80 @@ const UserAccess = () => {
 
   const hasActiveFilter = appliedRole || appliedLocation;
 
-  const handleTypeChange = async (targetId, newUsertype) => {
-    try {
-      const res = await fetch(`/api/account/users/${targetId}/access`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requester_usertype: user.usertype, new_usertype: newUsertype }),
-      });
-      const data = await res.json();
-      if (!res.ok) { message.error(data.error); return; }
-      setUsers((prev) => prev.map((u) => u.user_id === targetId ? { ...u, usertype: newUsertype } : u));
-      message.success('Role updated');
-    } catch { message.error('Failed to update role'); }
+  const handleEditOpen = (record) => {
+    setEditingUser(record);
+    editForm.setFieldsValue({
+      usertype: record.usertype,
+      location_id: record.location_id,
+    });
+    setEditModalOpen(true);
   };
 
-  const handleLocationChange = async (targetId, newLocationId) => {
+  const handleEditSave = async (values) => {
+    if (!editingUser) return;
+    setEditLoading(true);
     try {
-      const res = await fetch(`/api/account/users/${targetId}/access`, {
+      const res = await fetch(`/api/account/users/${editingUser.user_id}/access`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requester_usertype: user.usertype, location_id: newLocationId }),
+        body: JSON.stringify({
+          requester_usertype: user.usertype,
+          new_usertype: values.usertype,
+          location_id: values.location_id,
+        }),
       });
       const data = await res.json();
       if (!res.ok) { message.error(data.error); return; }
       setUsers((prev) =>
         prev.map((u) =>
-          u.user_id === targetId
-            ? { ...u, location_id: newLocationId, location: LOCATIONS.find((l) => l.id === newLocationId)?.name || u.location }
+          u.user_id === editingUser.user_id
+            ? {
+                ...u,
+                usertype: values.usertype,
+                location_id: values.location_id,
+                location: LOCATIONS.find((l) => l.id === values.location_id)?.name || u.location,
+              }
             : u
         )
       );
-      message.success('Location updated');
-    } catch { message.error('Failed to update location'); }
+      message.success('User access updated');
+      setEditModalOpen(false);
+      setEditingUser(null);
+    } catch {
+      message.error('Failed to update user access');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleVoidOpen = (record) => {
+    setVoidingUser(record);
+    setVoidConfirmOpen(true);
+  };
+
+  const handleVoidConfirm = async () => {
+    if (!voidingUser) return;
+    setVoidLoading(true);
+    try {
+      const res = await fetch(`/api/account/users/${voidingUser.user_id}/void`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requester_usertype: user.usertype,
+          requester_id: user.user_id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { message.error(data.error); return; }
+      setUsers((prev) => prev.filter((u) => u.user_id !== voidingUser.user_id));
+      message.success('User voided successfully');
+      setVoidConfirmOpen(false);
+      setVoidingUser(null);
+    } catch {
+      message.error('Failed to void user');
+    } finally {
+      setVoidLoading(false);
+    }
   };
 
   const handleRegister = async (values) => {
@@ -153,19 +199,6 @@ const UserAccess = () => {
       key: 'location_id',
       sorter: (a, b) => a.location_id - b.location_id,
       sortDirections: ['ascend', 'descend'],
-      render: (loc, record) =>
-        editing ? (
-          <Select
-            value={record.location_id}
-            onChange={(val) => handleLocationChange(record.user_id, val)}
-            size="small"
-            style={{ width: '100%' }}
-            disabled={record.usertype === 1 || record.user_id === user?.user_id}
-            options={LOCATIONS.map((l) => ({ value: l.id, label: l.name }))}
-          />
-        ) : (
-          loc
-        ),
     },
     {
       title: 'Role',
@@ -173,39 +206,50 @@ const UserAccess = () => {
       key: 'usertype',
       sorter: (a, b) => a.usertype - b.usertype,
       sortDirections: ['ascend', 'descend'],
-      render: (usertype, record) =>
-        editing ? (
-          <Select
-            value={usertype}
-            onChange={(val) => handleTypeChange(record.user_id, val)}
-            size="small"
-            style={{ width: '100%' }}
-            disabled={record.user_id === user?.user_id}
-            options={typeOptions}
-          />
-        ) : (
-          <Tag color={USERTYPE_MAP[usertype]?.color}>{USERTYPE_MAP[usertype]?.label}</Tag>
-        ),
+      render: (usertype) => (
+        <Tag color={USERTYPE_MAP[usertype]?.color}>{USERTYPE_MAP[usertype]?.label}</Tag>
+      ),
+    },
+    {
+      title: '',
+      key: 'actions',
+      width: 60,
+      render: (_, record) => (
+        <Dropdown
+          menu={{
+            items: [
+              {
+                key: 'edit',
+                label: 'Edit',
+                onClick: () => handleEditOpen(record),
+              },
+              {
+                key: 'void',
+                label: 'Void',
+                danger: true,
+                onClick: () => handleVoidOpen(record),
+              },
+            ],
+          }}
+          trigger={['click']}
+        >
+          <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
+        </Dropdown>
+      ),
     },
   ];
 
   return (
     <div>
-      <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
-        <Title level={4} style={{ margin: 0 }}>User Access</Title>
-        <Space>
+      <Card styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}>
+        <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'flex-end' }}>
           <Button icon={<FilterOutlined />} type={hasActiveFilter ? 'primary' : 'default'} onClick={() => setFilterOpen(true)}>
             Filter{hasActiveFilter ? ' (1)' : ''}
-          </Button>
-          <Button icon={editing ? <CloseOutlined /> : <EditOutlined />} onClick={() => setEditing(!editing)}>
-            {editing ? 'Done Editing' : 'Edit'}
           </Button>
           <Button type="primary" icon={<UserAddOutlined />} onClick={() => setRegisterOpen(true)}>
             Create account
           </Button>
         </Space>
-      </Space>
-      <Card styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}>
         <Table
           dataSource={sortedUsers}
           columns={columns}
@@ -254,6 +298,36 @@ const UserAccess = () => {
             />
           </div>
         </Space>
+      </Modal>
+      <Modal
+        title="Edit User Access"
+        open={editModalOpen}
+        onCancel={() => { setEditModalOpen(false); setEditingUser(null); editForm.resetFields(); }}
+        footer={[
+          <Button key="cancel" onClick={() => { setEditModalOpen(false); setEditingUser(null); editForm.resetFields(); }}>Cancel</Button>,
+          <Button key="save" type="primary" loading={editLoading} onClick={() => editForm.submit()}>Save</Button>,
+        ]}
+      >
+        <Form form={editForm} layout="vertical" onFinish={handleEditSave}>
+          <Form.Item name="usertype" label="Role" rules={[{ required: true, message: 'Please select a role' }]}>
+            <Select placeholder="Select role" options={typeOptions} />
+          </Form.Item>
+          <Form.Item name="location_id" label="Location" rules={[{ required: true, message: 'Please select a location' }]}>
+            <Select placeholder="Select location" options={LOCATIONS.map((l) => ({ value: l.id, label: l.name }))} />
+          </Form.Item>
+        </Form>
+      </Modal>
+      <Modal
+        title={<><ExclamationCircleOutlined style={{ color: '#faad14', marginRight: 8 }} />Void User</>}
+        open={voidConfirmOpen}
+        onCancel={() => { setVoidConfirmOpen(false); setVoidingUser(null); }}
+        footer={[
+          <Button key="cancel" onClick={() => { setVoidConfirmOpen(false); setVoidingUser(null); }}>Cancel</Button>,
+          <Button key="void" danger type="primary" loading={voidLoading} onClick={handleVoidConfirm}>Void</Button>,
+        ]}
+      >
+        <p>Are you sure you want to void user <strong>{voidingUser?.username}</strong> ({voidingUser?.employee_code})?</p>
+        <p>This will deactivate their account and they will no longer be able to log in.</p>
       </Modal>
       <Modal
         title="Create Account"
