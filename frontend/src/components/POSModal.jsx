@@ -179,6 +179,7 @@ const POSModal = ({
         );
       }
       const parts = [];
+      if (variety.color) parts.push(variety.color);
       if (variety.pattern) parts.push(variety.pattern);
       return [...prev, {
         product_id: product.product_id,
@@ -636,12 +637,21 @@ const POSModal = ({
                     background: selectedVariety?.variety_id === v.variety_id ? '#e6f4ff' : '#fff',
                   }}
                 >
+                  {v.color && (
+                    <span style={{
+                      width: 28, height: 28, borderRadius: '50%',
+                      backgroundColor: v.color, border: '1px solid #d9d9d9',
+                      flexShrink: 0, display: 'inline-block',
+                    }} />
+                  )}
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 500, fontSize: 14 }}>
                       {v.pattern || 'Default'}
                     </div>
                     <div style={{ fontSize: 11, color: '#888' }}>
-                      SKU: {v.variety_sku || '-'}
+                      {v.color && <span style={{ color: v.color, fontWeight: 600 }}>{v.color}</span>}
+                      {v.color && v.variety_sku && <span> — </span>}
+                      {v.variety_sku && <span>SKU: {v.variety_sku}</span>}
                     </div>
                   </div>
                 </div>

@@ -7,6 +7,7 @@ import {
 import { PlusOutlined, EditOutlined, CloseOutlined } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { FABRIC_CATEGORY, qtyLabel } from '../../utils/format.js';
+import ColorPickerModal from '../../components/ColorPickerModal.jsx';
 
 const { Search } = Input;
 const { TextArea } = Input;
@@ -32,6 +33,8 @@ const Inventory = () => {
   const [productForm] = Form.useForm();
   const [isFabricCategory, setIsFabricCategory] = useState(false);
   const [varieties, setVarieties] = useState([]);
+  const [varietyColorPickerVisible, setVarietyColorPickerVisible] = useState(false);
+  const [editingVarietyIndex, setEditingVarietyIndex] = useState(null);
 
   const fetchData = async () => {
     if (!user) return;
@@ -76,6 +79,7 @@ const Inventory = () => {
     productForm.resetFields();
     setIsFabricCategory(false);
     setVarieties([]);
+    setEditingVarietyIndex(null);
     setProductModalVisible(true);
   };
 
@@ -90,7 +94,7 @@ const Inventory = () => {
     });
     const cat = categories.find(c => c.category_id === record.category_id);
     setIsFabricCategory(cat?.name === FABRIC_CATEGORY);
-    setVarieties((record.varieties || []).map(v => ({ variety_sku: v.variety_sku, pattern: v.pattern || '' })));
+    setVarieties((record.varieties || []).map(v => ({ color: v.color, pattern: v.pattern || '', variety_sku: v.variety_sku })));
     setProductModalVisible(true);
   };
 
@@ -165,7 +169,7 @@ const Inventory = () => {
           ...values,
           usertype: user.usertype,
           user_id: user.user_id,
-          varieties: isFabricCategory ? varieties.map(v => ({ pattern: v.pattern, variety_sku: v.variety_sku })) : [],
+          varieties: isFabricCategory ? varieties.map(v => ({ color: v.color, pattern: v.pattern, variety_sku: v.variety_sku })) : [],
         }),
       });
       const data = await res.json();
@@ -304,7 +308,7 @@ const Inventory = () => {
                       {v.color && (
                         <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: v.color, display: 'inline-block', border: '1px solid #d9d9d9' }} />
                       )}
-                      <span>{v.pattern || v.color || '-'}</span>
+                      {v.pattern && <span>{v.pattern}</span>}
                     </div>
                   ))}
                 </div>
@@ -391,6 +395,18 @@ const Inventory = () => {
               <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13 }}>Varieties</div>
               {varieties.map((v, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                  <div
+                    onClick={() => { setEditingVarietyIndex(i); setVarietyColorPickerVisible(true); }}
+                    style={{
+                      width: 36, height: 36, borderRadius: 4, cursor: 'pointer',
+                      backgroundColor: v.color || '#fff',
+                      border: '2px solid #d9d9d9', flexShrink: 0, fontSize: 9, color: '#999',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                    title={v.color || 'Pick color'}
+                  >
+                    {!v.color ? 'Pick' : ''}
+                  </div>
                   <Input
                     placeholder="Pattern (e.g. Solid, Striped, Floral)"
                     value={v.pattern || ''}
@@ -422,7 +438,7 @@ const Inventory = () => {
               <Button
                 size="small"
                 icon={<PlusOutlined />}
-                onClick={() => setVarieties([...varieties, { pattern: '', variety_sku: '' }])}
+                onClick={() => setVarieties([...varieties, { color: '', pattern: '', variety_sku: '' }])}
               >
                 Add Variety
               </Button>
@@ -452,6 +468,21 @@ const Inventory = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      <ColorPickerModal
+        visible={varietyColorPickerVisible}
+        onClose={() => { setVarietyColorPickerVisible(false); setEditingVarietyIndex(null); }}
+        onColorSelect={(colors) => {
+          if (editingVarietyIndex != null && colors.length > 0) {
+            const next = [...varieties];
+            const existing = next[editingVarietyIndex] || {};
+            next[editingVarietyIndex] = { ...existing, color: colors[0] };
+            setVarieties(next);
+          }
+          setVarietyColorPickerVisible(false);
+          setEditingVarietyIndex(null);
+        }}
+      />
     </div>
   );
 };
