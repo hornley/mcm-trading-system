@@ -368,7 +368,12 @@ const Sales = () => {
         <Table
           dataSource={items}
           columns={[
-            { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
+            { title: 'Product', dataIndex: 'product_name', key: 'product_name', render: (name, r) => {
+              const parts = [];
+              if (r.color) parts.push(r.color);
+              if (r.pattern) parts.push(r.pattern);
+              return parts.length ? `${name} (${parts.join(', ')})` : name;
+            } },
             { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty, r) => fmtQty(qty, r.category === FABRIC_CATEGORY) },
             { title: 'Unit Price', dataIndex: 'price', key: 'price', render: (v) => `₱${v}` },
             { title: 'Line Total', dataIndex: 'line_total', key: 'line_total', render: (v) => `₱${v?.toLocaleString() || 0}` },
@@ -472,7 +477,7 @@ const Sales = () => {
                 {fmtQty(item.quantity, item.category === FABRIC_CATEGORY, item.category === FABRIC_CATEGORY ? 'yds' : 'pcs')}
               </span>
               <span style={{ flex: 1, paddingLeft: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Courier New', monospace" }}>
-                {item.product_name}
+                {item.product_name}{item.color ? ` (${[item.color, item.pattern].filter(Boolean).join(', ')})` : ''}
               </span>
               <span style={{ width: '5.5em', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>
                 ₱{(item.line_total || (item.quantity * item.price)).toLocaleString()}

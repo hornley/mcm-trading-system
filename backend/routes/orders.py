@@ -1,7 +1,7 @@
 from flask import Blueprint, request
 from datetime import datetime
 from sqlalchemy import cast, String
-from models import db, User, Order, OrderItem, Payment, Product, Inventory, Location
+from models import db, User, Order, OrderItem, Payment, Product, Inventory, Location, ProductVariety
 from utils.response import success_response, error_response
 from utils.validation import validate_required, validate_quantity
 from utils.activity_logger import log_activity
@@ -46,12 +46,15 @@ def _serialize_order_detail(order):
             {
                 "order_item_id": item.order_item_id,
                 "product_id": item.product_id,
+                "variety_id": item.variety_id,
                 "product_name": item.product.name if item.product else "Unknown",
                 "category": item.product.category.name if item.product and item.product.category else None,
                 "is_active": item.product.is_active if item.product else True,
                 "quantity": item.quantity,
                 "price": item.price,
                 "line_total": item.quantity * item.price,
+                "color": item.variety.color if item.variety else None,
+                "pattern": item.variety.pattern if item.variety else None,
             }
             for item in items
         ],
@@ -80,11 +83,25 @@ def _serialize_order_list(order):
         "status": order.status,
         "total_amount": order.total_amount,
         "item_count": len(items),
-        "product_names": [item.product.name for item in items if item.product],
+        "product_names": [
+            _item_label(item) for item in items if item.product
+        ],
         "product_categories": {item.product_id: (item.product.category.name if item.product and item.product.category else None) for item in items},
         "payment_method": first_payment.payment_method if first_payment else None,
         "payment_price": first_payment.price if first_payment else None,
     }
+
+
+def _item_label(item):
+    label = item.product.name if item.product else "Unknown"
+    parts = []
+    if item.variety and item.variety.color:
+        parts.append(item.variety.color)
+    if item.variety and item.variety.pattern:
+        parts.append(item.variety.pattern)
+    if parts:
+        label += f" ({', '.join(parts)})"
+    return label
 
 
 @orders_bp.route("/api/orders", methods=["POST"])
@@ -141,6 +158,7 @@ def create_order():
 
     for idx, item in enumerate(items_data):
         pid = item.get("product_id")
+        vid = item.get("variety_id")
         qty = item.get("quantity")
 
         if not pid:
@@ -149,6 +167,11 @@ def create_order():
         product = Product.query.get(pid)
         if not product or not product.is_active:
             return error_response(f"Product {pid} not found or inactive", "NOT_FOUND", 404)
+
+        if vid:
+            variety = ProductVariety.query.get(vid)
+            if not variety or variety.product_id != pid:
+                return error_response(f"Variety {vid} not found for product {pid}", "NOT_FOUND", 404)
 
         qty_error = validate_quantity(qty, "quantity", product.category_id)
         if qty_error:
@@ -160,7 +183,9 @@ def create_order():
         seen_product_ids.add(pid)
 
         inventory = Inventory.query.filter_by(
-            product_id=pid, location_id=resolved_location_id
+            product_id=pid,
+            location_id=resolved_location_id,
+            variety_id=vid or None,
         ).first()
         if not inventory or inventory.quantity < qty:
             available = inventory.quantity if inventory else 0
@@ -171,6 +196,7 @@ def create_order():
 
         resolved_items.append({
             "product": product,
+            "variety_id": vid,
             "quantity": qty,
             "price": product.price,
         })
@@ -196,6 +222,7 @@ def create_order():
         oi = OrderItem(
             order_id=order.order_id,
             product_id=ri["product"].product_id,
+            variety_id=ri.get("variety_id"),
             quantity=ri["quantity"],
             price=ri["price"],
         )
@@ -204,6 +231,7 @@ def create_order():
         inv = Inventory.query.filter_by(
             product_id=ri["product"].product_id,
             location_id=resolved_location_id,
+            variety_id=ri.get("variety_id") or None,
         ).first()
         if inv:
             inv.quantity -= ri["quantity"]

@@ -4,7 +4,7 @@ import {
   Tag, Modal, Form, Space, Popconfirm, InputNumber, Spin,
   Dropdown,
 } from 'antd';
-import { PlusOutlined, EditOutlined, CloseOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, CloseOutlined, BgColorsOutlined } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { FABRIC_CATEGORY, qtyLabel } from '../../utils/format.js';
 import ColorPickerModal from '../../components/ColorPickerModal.jsx';
@@ -34,6 +34,9 @@ const Inventory = () => {
   const [isFabricCategory, setIsFabricCategory] = useState(false);
   const [colorPickerVisible, setColorPickerVisible] = useState(false);
   const [selectedColors, setSelectedColors] = useState([]);
+  const [varieties, setVarieties] = useState([]);
+  const [varietyColorPickerVisible, setVarietyColorPickerVisible] = useState(false);
+  const [editingVarietyIndex, setEditingVarietyIndex] = useState(null);
 
   const fetchData = async () => {
     if (!user) return;
@@ -78,6 +81,7 @@ const Inventory = () => {
     productForm.resetFields();
     setIsFabricCategory(false);
     setSelectedColors([]);
+    setVarieties([]);
     setProductModalVisible(true);
   };
 
@@ -92,6 +96,7 @@ const Inventory = () => {
     });
     const cat = categories.find(c => c.category_id === record.category_id);
     setIsFabricCategory(cat?.name === FABRIC_CATEGORY);
+    setVarieties((record.varieties || []).map(v => ({ color: v.color, pattern: v.pattern, variety_sku: v.variety_sku })));
     setProductModalVisible(true);
   };
 
@@ -162,7 +167,12 @@ const Inventory = () => {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...values, usertype: user.usertype, user_id: user.user_id }),
+        body: JSON.stringify({
+          ...values,
+          usertype: user.usertype,
+          user_id: user.user_id,
+          varieties: isFabricCategory ? varieties : [],
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -287,6 +297,25 @@ const Inventory = () => {
                 </div>
               )}
 
+              {product.varieties && product.varieties.length > 0 && (
+                <div style={{ marginBottom: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {product.varieties.map((v) => (
+                    <div key={v.variety_id} title={`${v.color || ''} ${v.pattern || ''}`.trim()}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 3,
+                        padding: '1px 6px', borderRadius: 10, border: '1px solid #d9d9d9',
+                        fontSize: 11, background: '#fafafa',
+                      }}
+                    >
+                      {v.color && (
+                        <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: v.color, display: 'inline-block', border: '1px solid #d9d9d9' }} />
+                      )}
+                      <span>{v.pattern || v.color || '-'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
                 {can('update') && product.is_active && (
                   <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(product)}>
@@ -333,11 +362,11 @@ const Inventory = () => {
       <Modal
         title={selectedRecord ? 'Edit Product' : 'Add Product'}
         open={productModalVisible}
-        onCancel={() => { setProductModalVisible(false); productForm.resetFields(); setIsFabricCategory(false); setSelectedColors([]); }}
+        onCancel={() => { setProductModalVisible(false); productForm.resetFields(); setIsFabricCategory(false); setSelectedColors([]); setVarieties([]); }}
         centered
         width={520}
         footer={[
-          <Button key="cancel" onClick={() => { setProductModalVisible(false); productForm.resetFields(); setIsFabricCategory(false); setSelectedColors([]); }}>Cancel</Button>,
+          <Button key="cancel" onClick={() => { setProductModalVisible(false); productForm.resetFields(); setIsFabricCategory(false); setSelectedColors([]); setVarieties([]); }}>Cancel</Button>,
           <Button key="save" type="primary" onClick={handleSaveProduct}>Save</Button>,
         ]}
       >
@@ -348,6 +377,7 @@ const Inventory = () => {
             if ('category_id' in changedValues) {
               const cat = categories.find(c => c.category_id === changedValues.category_id);
               setIsFabricCategory(cat?.name === FABRIC_CATEGORY);
+              if (cat?.name !== FABRIC_CATEGORY) setVarieties([]);
             }
           }}
         >
@@ -361,43 +391,53 @@ const Inventory = () => {
               ))}
             </Select>
           </Form.Item>
+
           {isFabricCategory && (
-            <Button type="default" style={{ marginBottom: 16 }} onClick={() => setColorPickerVisible(true)}>Colors</Button>
-          )}
-          {selectedColors.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-              {selectedColors.map((hex) => (
-                <div
-                  key={hex}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    borderRadius: 20,
-                    border: '1px solid #d9d9d9',
-                    padding: '3px 10px 3px 6px',
-                    background: '#fafafa',
-                  }}
-                >
-                  <CloseOutlined
-                    style={{ fontSize: 11, cursor: 'pointer', color: '#999', flexShrink: 0 }}
-                    onClick={() => setSelectedColors(selectedColors.filter((c) => c !== hex))}
-                  />
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13 }}>Varieties (Color / Pattern)</div>
+              {varieties.map((v, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
                   <div
+                    onClick={() => { setEditingVarietyIndex(i); setVarietyColorPickerVisible(true); }}
                     style={{
-                      width: 16,
-                      height: 16,
-                      borderRadius: '50%',
-                      backgroundColor: hex,
-                      border: '1px solid #d9d9d9',
-                      flexShrink: 0,
+                      width: 36, height: 36, borderRadius: 4, cursor: 'pointer',
+                      backgroundColor: v.color || '#fff',
+                      border: '2px solid #d9d9d9', display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', flexShrink: 0, fontSize: 10, color: '#999',
                     }}
+                  >
+                    {!v.color && 'Pick'}
+                  </div>
+                  <Input
+                    placeholder="Pattern (e.g. Solid, Striped)"
+                    value={v.pattern || ''}
+                    onChange={(e) => {
+                      const next = [...varieties];
+                      next[i] = { ...next[i], pattern: e.target.value };
+                      setVarieties(next);
+                    }}
+                    style={{ flex: 1 }}
+                    size="small"
                   />
-                  <span style={{ fontSize: 12, fontFamily: 'monospace' }}>{hex}</span>
+                  <CloseOutlined
+                    style={{ color: '#ff4d4f', cursor: 'pointer', flexShrink: 0 }}
+                    onClick={() => setVarieties(varieties.filter((_, j) => j !== i))}
+                  />
                 </div>
               ))}
+              <Button
+                size="small"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setEditingVarietyIndex(varieties.length);
+                  setVarietyColorPickerVisible(true);
+                }}
+              >
+                Add Variety
+              </Button>
             </div>
           )}
+
           {!selectedRecord && (
             <Form.Item name="sku" label="SKU">
               <Input placeholder="Auto-generated if empty" />
@@ -423,9 +463,18 @@ const Inventory = () => {
       </Modal>
 
       <ColorPickerModal
-        visible={colorPickerVisible}
-        onClose={() => { setColorPickerVisible(false); }}
-        onColorSelect={(colors) => setSelectedColors(colors)}
+        visible={varietyColorPickerVisible}
+        onClose={() => { setVarietyColorPickerVisible(false); setEditingVarietyIndex(null); }}
+        onColorSelect={(colors) => {
+          if (editingVarietyIndex != null && colors.length > 0) {
+            const next = [...varieties];
+            const existing = next[editingVarietyIndex] || {};
+            next[editingVarietyIndex] = { ...existing, color: colors[0] };
+            setVarieties(next);
+          }
+          setVarietyColorPickerVisible(false);
+          setEditingVarietyIndex(null);
+        }}
       />
     </div>
   );

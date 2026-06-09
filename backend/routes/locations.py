@@ -1,5 +1,5 @@
 from flask import Blueprint, request
-from models import db, Location, Inventory, Product
+from models import db, Location, Inventory, Product, ProductVariety
 from utils.response import success_response, error_response
 from utils.validation import validate_required
 from utils.activity_logger import log_activity
@@ -108,6 +108,15 @@ def create_location():
             quantity=0,
         )
         db.session.add(inventory)
+
+        varieties = ProductVariety.query.filter_by(product_id=product.product_id).all()
+        for v in varieties:
+            db.session.add(Inventory(
+                product_id=product.product_id,
+                variety_id=v.variety_id,
+                location_id=location.location_id,
+                quantity=0,
+            ))
 
     db.session.commit()
 

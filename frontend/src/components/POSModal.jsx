@@ -28,6 +28,9 @@ const POSModal = ({
   const [qtyModalVisible, setQtyModalVisible] = useState(false);
   const [qtyModalProduct, setQtyModalProduct] = useState(null);
   const [qtyModalValue, setQtyModalValue] = useState(1);
+  const [varietyModalVisible, setVarietyModalVisible] = useState(false);
+  const [varietyModalProduct, setVarietyModalProduct] = useState(null);
+  const [selectedVariety, setSelectedVariety] = useState(null);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [showPayment, setShowPayment] = useState(false);
   const longPressRef = useRef(null);
@@ -102,21 +105,30 @@ const POSModal = ({
   []);
 
   const handleQuickAdd = useCallback((product) => {
+    const hasVarieties = product.varieties && product.varieties.length > 0;
+    if (hasVarieties) {
+      setVarietyModalProduct(product);
+      setSelectedVariety(null);
+      setVarietyModalVisible(true);
+      return;
+    }
     setCart((prev) => {
-      const existing = prev.find((c) => c.product_id === product.product_id);
+      const existing = prev.find((c) => c.product_id === product.product_id && !c.variety_id);
       if (existing) {
         const maxQty = product.quantity ?? 999;
         const newQty = Math.min(maxQty, existing.quantity + getDefaultQty(product));
         return prev.map((c) =>
-          c.product_id === product.product_id ? { ...c, quantity: newQty } : c,
+          c.product_id === product.product_id && !c.variety_id ? { ...c, quantity: newQty } : c,
         );
       }
       return [...prev, {
         product_id: product.product_id,
+        variety_id: null,
         product_name: product.name,
         quantity: getDefaultQty(product),
         price: product.price,
         is_fabric: product.category === FABRIC_CATEGORY,
+        variety_label: null,
       }];
     });
   }, [getDefaultQty, products]);
@@ -132,25 +144,57 @@ const POSModal = ({
     const product = qtyModalProduct;
     if (!product) return;
     setCart((prev) => {
-      const existing = prev.find((c) => c.product_id === product.product_id);
+      const existing = prev.find((c) => c.product_id === product.product_id && !c.variety_id);
       if (existing) {
         const maxQty = product.quantity ?? 999;
         const newQty = Math.min(maxQty, existing.quantity + qtyModalValue);
         return prev.map((c) =>
-          c.product_id === product.product_id ? { ...c, quantity: newQty } : c,
+          c.product_id === product.product_id && !c.variety_id ? { ...c, quantity: newQty } : c,
         );
       }
       return [...prev, {
         product_id: product.product_id,
+        variety_id: null,
         product_name: product.name,
         quantity: qtyModalValue,
         price: product.price,
         is_fabric: product.category === FABRIC_CATEGORY,
+        variety_label: null,
       }];
     });
     setQtyModalVisible(false);
     setQtyModalProduct(null);
   }, [qtyModalProduct, qtyModalValue, products]);
+
+  const handleAddVarietyToCart = useCallback((variety) => {
+    const product = varietyModalProduct;
+    if (!product) return;
+    setCart((prev) => {
+      const existing = prev.find((c) => c.variety_id === variety.variety_id);
+      if (existing) {
+        const maxQty = product.quantity ?? 999;
+        const newQty = Math.min(maxQty, existing.quantity + getDefaultQty(product));
+        return prev.map((c) =>
+          c.variety_id === variety.variety_id ? { ...c, quantity: newQty } : c,
+        );
+      }
+      const parts = [];
+      if (variety.color) parts.push(variety.color);
+      if (variety.pattern) parts.push(variety.pattern);
+      return [...prev, {
+        product_id: product.product_id,
+        variety_id: variety.variety_id,
+        product_name: product.name,
+        quantity: getDefaultQty(product),
+        price: product.price,
+        is_fabric: product.category === FABRIC_CATEGORY,
+        variety_label: parts.length ? parts.join(', ') : null,
+      }];
+    });
+    setVarietyModalVisible(false);
+    setVarietyModalProduct(null);
+    setSelectedVariety(null);
+  }, [varietyModalProduct, getDefaultQty, products]);
 
   const handlePointerDown = useCallback((product) => {
     isLongPress.current = false;
@@ -185,7 +229,7 @@ const POSModal = ({
     if (!canConfirm) return;
     const payload = {
       usertype,
-      items: cart.map((c) => ({ product_id: c.product_id, quantity: c.quantity })),
+      items: cart.map((c) => ({ product_id: c.product_id, variety_id: c.variety_id, quantity: c.quantity })),
       payment_method: paymentMethod,
       payment_amount: paymentAmount,
       order_date: orderDate.toISOString(),
@@ -371,12 +415,15 @@ const POSModal = ({
                       const maxQty = product?.quantity ?? 999;
                       const minQty = item.is_fabric ? MIN_FABRIC_QTY : 1;
                       return (
-                        <div key={item.product_id} style={{
+                        <div key={item.product_id + (item.variety_id || '')} style={{
                           padding: '8px 0',
                           borderBottom: '1px solid #f0f0f0',
                         }}>
                           <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4, lineHeight: 1.2 }}>
                             {item.product_name}
+                            {item.variety_label && (
+                              <span style={{ fontWeight: 400, color: '#888' }}> — {item.variety_label}</span>
+                            )}
                           </div>
                           <Row align="middle" gutter={4}>
                             <Col style={{ minWidth: 150, maxWidth: 220 }}>
@@ -559,6 +606,63 @@ const POSModal = ({
                 />
               );
             })()}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        title="Select Variety"
+        open={varietyModalVisible}
+        onCancel={() => { setVarietyModalVisible(false); setVarietyModalProduct(null); setSelectedVariety(null); }}
+        footer={[
+          <Button key="cancel" onClick={() => { setVarietyModalVisible(false); setVarietyModalProduct(null); setSelectedVariety(null); }}>Cancel</Button>,
+          <Button key="add" type="primary" onClick={() => { if (selectedVariety) handleAddVarietyToCart(selectedVariety); }} disabled={!selectedVariety}>
+            Add to Cart
+          </Button>,
+        ]}
+        width={400}
+        destroyOnClose
+      >
+        {varietyModalProduct && (
+          <div style={{ padding: '12px 0' }}>
+            <Text strong style={{ fontSize: 16, display: 'block', marginBottom: 16 }}>
+              {varietyModalProduct.name}
+            </Text>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {(varietyModalProduct.varieties || []).map((v) => (
+                <div
+                  key={v.variety_id}
+                  onClick={() => setSelectedVariety(v)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+                    border: selectedVariety?.variety_id === v.variety_id ? '2px solid #5b7ff0' : '1px solid #d9d9d9',
+                    background: selectedVariety?.variety_id === v.variety_id ? '#e6f4ff' : '#fff',
+                  }}
+                >
+                  {v.color && (
+                    <span style={{
+                      width: 28, height: 28, borderRadius: '50%',
+                      backgroundColor: v.color, border: '1px solid #d9d9d9',
+                      flexShrink: 0, display: 'inline-block',
+                    }} />
+                  )}
+                  <div>
+                    <div style={{ fontWeight: 500, fontSize: 14 }}>
+                      {v.pattern || 'Solid'}
+                    </div>
+                    {(v.color || v.pattern) && (
+                      <div style={{ fontSize: 12, color: '#888' }}>
+                        {[v.color, v.pattern].filter(Boolean).join(', ')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {(varietyModalProduct.varieties || []).length === 0 && (
+                <Text type="secondary">No varieties available</Text>
+              )}
+            </div>
           </div>
         )}
       </Modal>
