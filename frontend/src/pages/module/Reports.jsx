@@ -566,7 +566,10 @@ const Reports = () => {
   ];
 
   const inventoryColsLowStock = [
-    { title: 'Product', dataIndex: 'product_name', key: 'product_name', sorter: (a, b) => (a.product_name || '').localeCompare(b.product_name || '') },
+    { title: 'Product', dataIndex: 'product_name', key: 'product_name', render: (_, r) => {
+      const p = [r.color, r.pattern].filter(Boolean);
+      return r.product_name + (p.length ? ` (${p.join(', ')})` : '');
+    }, sorter: (a, b) => (a.product_name || '').localeCompare(b.product_name || '') },
     { title: 'SKU', dataIndex: 'sku', key: 'sku', sorter: (a, b) => (a.sku || '').localeCompare(b.sku || '') },
     { title: 'Branch', dataIndex: 'location_name', key: 'location_name', sorter: (a, b) => (a.location_name || '').localeCompare(b.location_name || '') },
     { title: 'Stock', dataIndex: 'quantity', key: 'quantity', render: (v) => qtyLabel(v), sorter: (a, b) => (a.quantity || 0) - (b.quantity || 0) },

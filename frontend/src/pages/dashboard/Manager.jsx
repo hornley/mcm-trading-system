@@ -97,7 +97,10 @@ const Manager = () => {
   ]
 
   const lowStockColumns = [
-    { title: 'Product Name', dataIndex: 'product_name', key: 'product_name' },
+    { title: 'Product Name', dataIndex: 'product_name', key: 'product_name', render: (_, r) => {
+      const p = [r.color, r.pattern].filter(Boolean);
+      return r.product_name + (p.length ? ` (${p.join(', ')})` : '');
+    } },
     { title: 'Category', dataIndex: 'category', key: 'category' },
     { title: 'Current Stock', dataIndex: 'quantity', key: 'quantity', render: (qty, r) => fmtQty(qty, r.category === FABRIC_CATEGORY) },
     { title: 'Status', key: 'status', render: (_, record) => {
@@ -237,7 +240,10 @@ const Manager = () => {
               dataSource={recent_transactions}
               scroll={{ x: 'max-content' }}
               columns={[
-                { title: 'Product', dataIndex: 'product', key: 'product' },
+                { title: 'Product', dataIndex: 'product', key: 'product', render: (v, r) => {
+                  const p = [r.color, r.pattern].filter(Boolean);
+                  return v + (p.length ? ` (${p.join(', ')})` : '');
+                } },
                 { title: 'Quantity', dataIndex: 'quantity', key: 'quantity', render: (qty) => qtyLabel(qty) },
                 { title: 'Amount', dataIndex: 'amount', key: 'amount' },
                 { title: 'Date', dataIndex: 'date', key: 'date' },

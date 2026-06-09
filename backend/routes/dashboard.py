@@ -163,6 +163,8 @@ def dashboard_summary():
                     "branch": order.location.name if order.location else "Unknown",
                     "status": order.status,
                     "date": order.order_date.strftime("%Y-%m-%d") if order.order_date else "",
+                    "color": item.variety.color if item.variety else None,
+                    "pattern": item.variety.pattern if item.variety else None,
                 })
 
         # ── Admin data (only when usertype is admin) ──
@@ -189,6 +191,8 @@ def dashboard_summary():
                     "product_name": inv.product.name if inv.product else "Unknown",
                     "category": inv.product.category.name if inv.product and inv.product.category else "",
                     "quantity": inv.quantity,
+                    "color": inv.variety.color if inv.variety else None,
+                    "pattern": inv.variety.pattern if inv.variety else None,
                 })
 
         return success_response({

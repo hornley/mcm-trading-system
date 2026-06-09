@@ -136,7 +136,10 @@ const Owner = () => {
   }
 
   const inventoryColumns = [
-    { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
+    { title: 'Product', dataIndex: 'product_name', key: 'product_name', render: (_, r) => {
+      const p = [r.color, r.pattern].filter(Boolean);
+      return r.product_name + (p.length ? ` (${p.join(', ')})` : '');
+    } },
     { title: 'SKU', dataIndex: 'sku', key: 'sku' },
     { title: 'Branch', dataIndex: 'location_name', key: 'location_name' },
     { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty) => fmtQty(qty) },
@@ -154,7 +157,10 @@ const Owner = () => {
   ]
 
   const stockAlertColumns = [
-    { title: 'Product Name', dataIndex: 'product_name', key: 'product_name' },
+    { title: 'Product Name', dataIndex: 'product_name', key: 'product_name', render: (_, r) => {
+      const p = [r.color, r.pattern].filter(Boolean);
+      return r.product_name + (p.length ? ` (${p.join(', ')})` : '');
+    } },
     { title: 'Category', dataIndex: 'category', key: 'category' },
     { title: 'Current Stock', dataIndex: 'quantity', key: 'quantity', render: (qty, r) => fmtQty(qty, r.category === FABRIC_CATEGORY) },
     {
@@ -297,7 +303,10 @@ const Owner = () => {
               dataSource={recent_transactions}
               scroll={{ x: 'max-content' }}
               columns={[
-                { title: 'Product', dataIndex: 'product', key: 'product' },
+                { title: 'Product', dataIndex: 'product', key: 'product', render: (v, r) => {
+                  const p = [r.color, r.pattern].filter(Boolean);
+                  return v + (p.length ? ` (${p.join(', ')})` : '');
+                } },
                 { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty) => qtyLabel(qty) },
                 { title: 'Amount', dataIndex: 'amount', key: 'amount' },
                 { title: 'Branch', dataIndex: 'branch', key: 'branch' },
@@ -307,6 +316,35 @@ const Owner = () => {
                     <Tag color={status === 'Completed' ? 'green' : 'orange'}>{status}</Tag>
                   ),
                 },
+              ]}
+              pagination={false}
+              size="small"
+              loading={loading}
+              scroll={{ y: 280 }}
+              onRow={() => ({ style: { cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.5 : 1 }, onClick: () => { if (!loading) fetchSalesToday() } })}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} lg={12}>
+          <Card
+            title={`Low Stock Items${low_stock_items.length > 0 ? ` (${low_stock_items.length})` : ''}`}
+            extra={<Button type="link" onClick={() => setStockAlertModal({ open: true })} disabled={loading}>View All</Button>}
+            styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}
+          >
+            <Table
+              dataSource={low_stock_items}
+              scroll={{ x: 'max-content' }}
+              columns={[
+                { title: 'Product Name', dataIndex: 'product_name', key: 'product_name', render: (_, r) => {
+                  const p = [r.color, r.pattern].filter(Boolean);
+                  return r.product_name + (p.length ? ` (${p.join(', ')})` : '');
+                } },
+                { title: 'Category', dataIndex: 'category', key: 'category' },
+                { title: 'Current Stock', dataIndex: 'quantity', key: 'quantity', render: (qty, r) => fmtQty(qty, r.category === FABRIC_CATEGORY) },
+                { title: 'Status', key: 'status', render: (_, record) => {
+                  const q = Number(record.quantity);
+                  return <Tag color={q === 0 ? 'red' : 'orange'}>{q === 0 ? 'Out of Stock' : 'Low Stock'}</Tag>;
+                }},
               ]}
               pagination={false}
               size="small"
