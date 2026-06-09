@@ -233,7 +233,7 @@ const Sales = () => {
     if (lastOrder && receiptRef.current) generateReceiptPDF(receiptRef.current, lastOrder.order_id);
   };
 
-  const isVoided = (record) => record.status === 'voided';
+  const isVoided = (record) => record.status === 'voided' || record.status === 'cancelled';
 
   const showBranchCol = selectedLocationId === "all";
   const columns = [
@@ -290,9 +290,11 @@ const Sales = () => {
     },
     {
       title: 'Status', dataIndex: 'status', key: 'status',
-      render: (status) => (
-        <Tag color={status === 'completed' ? 'green' : 'red'}>{status === 'completed' ? 'Completed' : 'Voided'}</Tag>
-      ),
+      render: (status) => {
+        const map = { completed: { color: 'green', label: 'Completed' }, voided: { color: 'red', label: 'Voided' } };
+        const s = map[status] || { color: 'orange', label: status ? status.charAt(0).toUpperCase() + status.slice(1) : status };
+        return <Tag color={s.color}>{s.label}</Tag>;
+      },
       sorter: (a, b) => a.status.localeCompare(b.status),
     },
     {
@@ -366,9 +368,10 @@ const Sales = () => {
     const grouped = {};
     data.forEach((order) => {
       (order.items || []).forEach((item) => {
+        if (item.is_active === false) return;
         const key = item.product_name;
         if (!grouped[key]) grouped[key] = { product_name: item.product_name, total_qty: 0, total_amount: 0, is_fabric: item.category === FABRIC_CATEGORY };
-        grouped[key].total_qty += Math.floor(item.quantity);
+        grouped[key].total_qty += item.quantity;
         grouped[key].total_amount += item.line_total;
       });
     });
@@ -393,7 +396,7 @@ const Sales = () => {
     },
     {
       title: 'Total Quantity Sold', dataIndex: 'total_qty', key: 'total_qty',
-      render: (qty, record) => fmtQty(Math.floor(qty), record.is_fabric),
+      render: (qty, record) => fmtQty(qty, record.is_fabric),
       sorter: (a, b) => a.total_qty - b.total_qty,
     },
     {

@@ -56,6 +56,7 @@ const StockManagement = () => {
   const [restockQuantities, setRestockQuantities] = useState({});
   const [orderSummaryVisible, setOrderSummaryVisible] = useState(false);
   const [restockSubmitting, setRestockSubmitting] = useState(false);
+  const [adjustSubmitting, setAdjustSubmitting] = useState(false);
   const [requestLogVisible, setRequestLogVisible] = useState(false);
   const [requestLogs, setRequestLogs] = useState([]);
   const [requestLogLoading, setRequestLogLoading] = useState(false);
@@ -279,6 +280,8 @@ const StockManagement = () => {
   };
 
   const handleAdjustSave = async () => {
+    if (adjustSubmitting) return;
+    setAdjustSubmitting(true);
     try {
       const values = await adjustForm.validateFields();
 
@@ -289,6 +292,7 @@ const StockManagement = () => {
           const sourceInv = sourceData.data.find(i => i.location_id === values.from_location_id);
           const sourceQty = sourceInv?.quantity || 0;
           if (Number(sourceQty) < Number(values.quantity)) {
+            setAdjustSubmitting(false);
             adjustForm.setFields([{
               name: 'from_location_id',
               errors: [`Insufficient stock at this branch (available: ${fmtQty(sourceQty, selectedRecord?.category === FABRIC_CATEGORY)})`],
@@ -349,6 +353,8 @@ const StockManagement = () => {
     } catch (err) {
       if (err?.errorFields) return;
       Modal.error({ title: 'Error', content: requestPreset ? 'Failed to submit stock request' : 'Failed to adjust stock', centered: true });
+    } finally {
+      setAdjustSubmitting(false);
     }
   };
 
@@ -999,7 +1005,7 @@ const StockManagement = () => {
         centered
         footer={[
           <Button key="cancel" onClick={() => setAdjustVisible(false)}>Cancel</Button>,
-          <Button key="save" type="primary" onClick={handleAdjustSave}>{requestPreset ? 'Submit Request' : 'Save'}</Button>,
+          <Button key="save" type="primary" loading={adjustSubmitting} onClick={handleAdjustSave}>{requestPreset ? 'Submit Request' : 'Save'}</Button>,
         ]}
       >
         <Form form={adjustForm} layout="vertical">

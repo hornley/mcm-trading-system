@@ -23,8 +23,8 @@ def _ensure_bucket():
     client = _get_client()
     try:
         client.storage.create_bucket(BUCKET_NAME, options={"public": False})
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[backup_storage] Warning: Could not create bucket '{BUCKET_NAME}': {e}")
 
 
 def create_backup(data: dict) -> dict:
@@ -33,11 +33,14 @@ def create_backup(data: dict) -> dict:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"backup_{timestamp}.json"
     content = json.dumps(data, indent=2)
-    client.storage.from_(BUCKET_NAME).upload(
-        path=filename,
-        file=content.encode("utf-8"),
-        file_options={"content-type": "application/json"},
-    )
+    try:
+        client.storage.from_(BUCKET_NAME).upload(
+            path=filename,
+            file=content.encode("utf-8"),
+            file_options={"content-type": "application/json"},
+        )
+    except Exception as e:
+        raise RuntimeError(f"Failed to upload backup to bucket '{BUCKET_NAME}': {e}")
     size = len(content.encode("utf-8"))
     return {"filename": filename, "size": size}
 

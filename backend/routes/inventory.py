@@ -1,7 +1,7 @@
 import math
 from flask import Blueprint, request
 from datetime import datetime
-from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer, StockRequest, Notification
+from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer, StockRequest, OrderItem, Notification
 from utils.response import success_response, error_response
 from utils.validation import validate_required, validate_quantity, is_fabric_category
 from utils.activity_logger import log_activity
@@ -344,6 +344,9 @@ def void_product(product_id):
     if not product:
         return error_response("Product not found", "NOT_FOUND", 404)
 
+    if not product.is_active:
+        return error_response("Product is already voided", "ALREADY_VOIDED", 400)
+
     product.is_active = False
     db.session.commit()
 
@@ -374,6 +377,9 @@ def restore_product(product_id):
     product = Product.query.get(product_id)
     if not product:
         return error_response("Product not found", "NOT_FOUND", 404)
+
+    if product.is_active:
+        return error_response("Product is already active", "ALREADY_ACTIVE", 400)
 
     product.is_active = True
     db.session.commit()
@@ -408,9 +414,18 @@ def delete_product(product_id):
 
     product_name = product.name
 
-    Inventory.query.filter_by(product_id=product_id).delete()
-    db.session.delete(product)
-    db.session.commit()
+    try:
+        OrderItem.query.filter_by(product_id=product_id).delete()
+        StockTransfer.query.filter_by(product_id=product_id).delete()
+        StockAdjustment.query.filter_by(product_id=product_id).delete()
+        StockRequest.query.filter_by(product_id=product_id).delete()
+        Inventory.query.filter_by(product_id=product_id).delete()
+
+        db.session.delete(product)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f"Failed to delete product: {str(e)}", "DELETE_ERROR", 500)
 
     log_activity(
         user_id=data.get("user_id"),
