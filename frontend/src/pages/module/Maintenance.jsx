@@ -503,6 +503,7 @@ const Maintenance = () => {
               <Title level={5}>Table Records</Title>
               <Table
                 dataSource={systemInfo.table_counts}
+                scroll={{ x: 'max-content' }}
                 columns={[
                   {
                     title: 'Table Name', dataIndex: 'name', key: 'name',
@@ -542,6 +543,7 @@ const Maintenance = () => {
             columns={backupColumns}
             rowKey="filename"
             pagination={false}
+            scroll={{ x: 'max-content' }}
             locale={{ emptyText: 'No backups yet' }}
           />
         </>
@@ -636,6 +638,7 @@ const Maintenance = () => {
                     <Table
                       size="small"
                       pagination={false}
+                      scroll={{ x: 'max-content' }}
                       rowKey={(r) => `${r.child_table}.${r.fk_column}`}
                       dataSource={checkResult.checks.orphan_rows.by_table}
                       columns={[

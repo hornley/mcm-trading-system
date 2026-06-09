@@ -653,6 +653,7 @@ const Reports = () => {
                     rowKey="branch"
                     pagination={false}
                     size="small"
+                    scroll={{ x: 'max-content' }}
                   />
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
@@ -719,10 +720,11 @@ const Reports = () => {
           <Card title={isManager ? `Low Stock Items in ${user?.location_name || 'your branch'}` : "Low Stock Items"}>
             <Table
               dataSource={inventorySummary.low_stock}
-              columns={lowStockColumns}
+              columns={inventoryColsLowStock}
               rowKey={(r) => `${r.product_name || ''}-${r.location_name || ''}`}
               pagination={{ pageSize: 10 }}
               size="small"
+              scroll={{ x: 'max-content' }}
             />
           </Card>
         </Spin>
@@ -830,6 +832,7 @@ const Reports = () => {
                   rowKey="product_name"
                   pagination={false}
                   size="small"
+                  scroll={{ x: 'max-content' }}
                 />
               </Card>
             </Col>
@@ -935,6 +938,7 @@ const Reports = () => {
                   rowKey="date"
                   pagination={false}
                   size="small"
+                  scroll={{ x: 'max-content' }}
                 />
               </Card>
             </Col>
@@ -946,6 +950,7 @@ const Reports = () => {
                   rowKey="payment_method"
                   pagination={false}
                   size="small"
+                  scroll={{ x: 'max-content' }}
                 />
               </Card>
             </Col>
@@ -1107,6 +1112,7 @@ const Reports = () => {
                   rowKey="user"
                   pagination={false}
                   size="small"
+                  scroll={{ x: 'max-content' }}
                 />
               </Card>
             </Col>
@@ -1118,6 +1124,7 @@ const Reports = () => {
                   rowKey="module"
                   pagination={false}
                   size="small"
+                  scroll={{ x: 'max-content' }}
                 />
               </Card>
             </Col>
@@ -1127,6 +1134,7 @@ const Reports = () => {
             <Spin spinning={loadingStoreReports}>
               <Table
                 dataSource={storeReports}
+                scroll={{ x: 'max-content' }}
                 columns={[
                   { title: 'User', dataIndex: 'username', key: 'username' },
                   { title: 'Branch', dataIndex: 'location_name', key: 'location_name' },
@@ -1195,12 +1203,13 @@ const Reports = () => {
             </Col>
           </Row>
           <Card title="Backup History" style={{ marginTop: 16 }}>
-            <Table
-              dataSource={systemData.backups}
-              columns={systemColsBackup}
-              rowKey="filename"
-              pagination={{ pageSize: 10 }}
-              size="small"
+          <Table
+            dataSource={systemData.backups}
+            columns={systemColsBackup}
+            rowKey="filename"
+            pagination={{ pageSize: 10 }}
+            size="small"
+            scroll={{ x: 'max-content' }}
             />
           </Card>
         </Spin>

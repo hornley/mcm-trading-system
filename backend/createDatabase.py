@@ -8,18 +8,47 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from app import create_app
 from models import db, User, Location, Category, Product, Order, OrderItem
 from models import Payment, Inventory, StockTransfer, StockAdjustment, ActivityLog, ManualSection
+from models import StockRequest, StoreReport, Notification
 from werkzeug.security import generate_password_hash
+
+# ── Configuration ──
+DB_MODE = os.environ.get("DB_MODE", "local")
+FORCE = os.environ.get("SEED_FORCE", "").lower() in ("1", "true", "yes") or "--force" in sys.argv
+IF_EMPTY = "--if-empty" in sys.argv
+
+SEED_ORDERS = int(os.environ.get("SEED_ORDERS", "500"))
+SEED_TRANSFERS = int(os.environ.get("SEED_TRANSFERS", "100"))
+SEED_ADJUSTMENTS = int(os.environ.get("SEED_ADJUSTMENTS", "75"))
+SEED_ACTIVITY_LOGS = int(os.environ.get("SEED_ACTIVITY_LOGS", "500"))
+SEED_STOCK_REQUESTS = int(os.environ.get("SEED_STOCK_REQUESTS", "15"))
+SEED_STORE_REPORTS = int(os.environ.get("SEED_STORE_REPORTS", "20"))
+
+LOCATION_NAMES = ["Storehouse", "Branch 1", "Branch 2"]
+
+
+def _auto_sku(existing_products):
+    max_num = 0
+    for p in existing_products:
+        if p.sku and p.sku.startswith("PROD-"):
+            try:
+                num = int(p.sku.replace("PROD-", ""))
+                max_num = max(max_num, num)
+            except ValueError:
+                pass
+    return max_num
 
 
 def seed(skip_drop=False):
     app = create_app()
     with app.app_context():
         if not skip_drop:
-            print(f"WARNING: This will DROP all tables and recreate them on {db.engine.url.drivername}")
-            confirm = input("Type 'yes' to continue: ")
-            if confirm.lower() != "yes":
-                print("Aborted.")
-                return
+            interactive = DB_MODE != "remote" and not FORCE
+            if interactive:
+                print(f"WARNING: This will DROP all tables and recreate them on {db.engine.url.drivername}")
+                confirm = input("Type 'yes' to continue: ")
+                if confirm.lower() != "yes":
+                    print("Aborted.")
+                    return
             print("Dropping all tables and recreating...")
             db.drop_all()
             db.create_all()
@@ -27,25 +56,28 @@ def seed(skip_drop=False):
             print(f"Seeding without dropping tables on {db.engine.url.drivername}")
             db.create_all()
 
+        next_sku = _auto_sku(Product.query.all()) + 1
+
         # ── 1. LOCATIONS ──
         print("Seeding Locations...")
         locs = [
-            Location(name="Storehouse", address="123 Industrial Zone, Main City", is_active=True),
+            Location(name="Storehouse", address="123 Industrial Zone, Main City", is_active=True, is_storehouse=True),
             Location(name="Branch 1", address="456 Commercial Ave, Downtown", is_active=True),
             Location(name="Branch 2", address="789 Suburb Road, North District", is_active=True),
         ]
         db.session.add_all(locs)
         db.session.flush()
+        storehouse = locs[0]
 
         # ── 2. USERS ──
-        print("Seeding Users...")
         # usertype: 0=Staff(no access), 1=Owner, 2=Manager, 3=Admin
+        print("Seeding Users...")
         users_data = [
             (1, "owner",    "owner@mcm.com",    "260512001", 0),
-            (2, "manager",  "manager@mcm.com",  "260512002", 2),
-            (2, "manager2", "manager2@mcm.com", "260512007", 1),
-            (3, "admin",    "admin@mcm.com",    "260512003", 1),
-            (3, "admin2",   "admin2@mcm.com",   "260512008", 3),
+            (2, "manager",  "manager@mcm.com",  "260512002", 1),
+            (2, "manager2", "manager2@mcm.com", "260512007", 0),
+            (3, "admin",    "admin@mcm.com",    "260512003", 0),
+            (3, "admin2",   "admin2@mcm.com",   "260512008", 1),
         ]
         users = []
         for ut, uname, email, emp, lid in users_data:
@@ -60,111 +92,166 @@ def seed(skip_drop=False):
 
         # ── 3. CATEGORIES ──
         print("Seeding Categories...")
-        cat = Category(name="Fabrics", description="Fabric materials for upholstery and clothing", is_active=True)
-        db.session.add(cat)
+        cat_all = []
+        for cdef in [
+            ("Fabrics", "Fabric materials for upholstery and clothing"),
+            ("Trims & Accessories", "Trims, buttons, zippers and other accessories"),
+            ("Threads & Sewing", "Threads, needles and sewing supplies"),
+            ("Tools & Equipment", "Cutting tools, rulers and equipment"),
+        ]:
+            c = Category(name=cdef[0], description=cdef[1], is_active=True)
+            db.session.add(c)
+            cat_all.append(c)
         db.session.flush()
-
-        cat2 = Category(name="Trims & Accessories", description="Trims, buttons, zippers and other accessories", is_active=True)
-        db.session.add(cat2)
-        db.session.flush()
-
-        cat3 = Category(name="Threads & Sewing", description="Threads, needles and sewing supplies", is_active=True)
-        db.session.add(cat3)
-        db.session.flush()
-
-        cat4 = Category(name="Tools & Equipment", description="Cutting tools, rulers and equipment", is_active=True)
-        db.session.add(cat4)
-        db.session.flush()
+        cat_fabrics, cat_trims, cat_threads, cat_tools = cat_all
 
         # ── 4. PRODUCTS ──
         print("Seeding Products...")
-        prods = [
-            Product(category_id=cat.category_id, name="FELT HARD 1", price=120, reorder_level="10", sku="PROD-001", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="FELT HARD 2", price=130, reorder_level="10", sku="PROD-002", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="FLEECE", price=180, reorder_level="8", sku="PROD-003", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="HI-PILE", price=250, reorder_level="5", sku="PROD-004", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="12MM CIRCULAR", price=200, reorder_level="10", sku="PROD-005", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="8MM AND 20MM PLUSH", price=220, reorder_level="8", sku="PROD-006", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="7MM AND 20MM PLUSH", price=230, reorder_level="8", sku="PROD-007", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="3MM PRINTED FUR", price=280, reorder_level="5", sku="PROD-008", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="SHAGGY FUR", price=300, reorder_level="5", sku="PROD-009", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="NYLEX 220G", price=90, reorder_level="15", sku="PROD-010", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="VELBOA KOREA", price=350, reorder_level="5", sku="PROD-011", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="LAMB FUR 2323", price=400, reorder_level="3", sku="PROD-012", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="VELVET 1", price=160, reorder_level="10", sku="PROD-013", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="VELVET 2", price=170, reorder_level="10", sku="PROD-014", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="VELBOA SUPER SOFT", price=380, reorder_level="5", sku="PROD-015", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="PRINTED DESIGN", price=150, reorder_level="10", sku="PROD-016", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="SUEDE GAMOSA", price=200, reorder_level="8", sku="PROD-017", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="NEON WOVEN CLOTH", price=100, reorder_level="15", sku="PROD-018", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="FEATHERS", price=50, reorder_level="20", sku="PROD-019", unit="piece", is_active=True),
-            Product(category_id=cat.category_id, name="COTTON CANVAS", price=140, reorder_level="12", sku="PROD-020", unit="meter", is_active=True),
-            Product(category_id=cat.category_id, name="LINEN FABRIC", price=190, reorder_level="10", sku="PROD-021", unit="meter", is_active=True),
-            Product(category_id=cat.category_id, name="DENIM BLUE", price=210, reorder_level="8", sku="PROD-022", unit="meter", is_active=True),
-            Product(category_id=cat.category_id, name="SATIN SILK", price=320, reorder_level="5", sku="PROD-023", unit="meter", is_active=True),
-            Product(category_id=cat.category_id, name="POLYESTER MESH", price=85, reorder_level="20", sku="PROD-024", unit="meter", is_active=True),
-            Product(category_id=cat.category_id, name="LEATHERETTE", price=260, reorder_level="6", sku="PROD-025", unit="meter", is_active=True),
-            Product(category_id=cat.category_id, name="TWEED WOOL", price=340, reorder_level="4", sku="PROD-026", unit="meter", is_active=True),
-            Product(category_id=cat.category_id, name="CHIFFON", price=110, reorder_level="15", sku="PROD-027", unit="meter", is_active=True),
-            Product(category_id=cat.category_id, name="ORGANZA", price=130, reorder_level="12", sku="PROD-028", unit="meter", is_active=True),
-            Product(category_id=cat.category_id, name="BROCADE GOLD", price=450, reorder_level="3", sku="PROD-029", unit="meter", is_active=True),
+        product_defs = [
+            # ── Fabrics (55) ──
+            (cat_fabrics.category_id, "FELT HARD 1", 120, "10", "piece"),
+            (cat_fabrics.category_id, "FELT HARD 2", 130, "10", "piece"),
+            (cat_fabrics.category_id, "FLEECE", 180, "8", "piece"),
+            (cat_fabrics.category_id, "HI-PILE", 250, "5", "piece"),
+            (cat_fabrics.category_id, "12MM CIRCULAR", 200, "10", "piece"),
+            (cat_fabrics.category_id, "8MM AND 20MM PLUSH", 220, "8", "piece"),
+            (cat_fabrics.category_id, "7MM AND 20MM PLUSH", 230, "8", "piece"),
+            (cat_fabrics.category_id, "3MM PRINTED FUR", 280, "5", "piece"),
+            (cat_fabrics.category_id, "SHAGGY FUR", 300, "5", "piece"),
+            (cat_fabrics.category_id, "NYLEX 220G", 90, "15", "piece"),
+            (cat_fabrics.category_id, "VELBOA KOREA", 350, "5", "piece"),
+            (cat_fabrics.category_id, "LAMB FUR 2323", 400, "3", "piece"),
+            (cat_fabrics.category_id, "VELVET 1", 160, "10", "piece"),
+            (cat_fabrics.category_id, "VELVET 2", 170, "10", "piece"),
+            (cat_fabrics.category_id, "VELBOA SUPER SOFT", 380, "5", "piece"),
+            (cat_fabrics.category_id, "PRINTED DESIGN", 150, "10", "piece"),
+            (cat_fabrics.category_id, "SUEDE GAMOSA", 200, "8", "piece"),
+            (cat_fabrics.category_id, "NEON WOVEN CLOTH", 100, "15", "piece"),
+            (cat_fabrics.category_id, "FEATHERS", 50, "20", "piece"),
+            (cat_fabrics.category_id, "COTTON CANVAS", 140, "12", "meter"),
+            (cat_fabrics.category_id, "LINEN FABRIC", 190, "10", "meter"),
+            (cat_fabrics.category_id, "DENIM BLUE", 210, "8", "meter"),
+            (cat_fabrics.category_id, "SATIN SILK", 320, "5", "meter"),
+            (cat_fabrics.category_id, "POLYESTER MESH", 85, "20", "meter"),
+            (cat_fabrics.category_id, "LEATHERETTE", 260, "6", "meter"),
+            (cat_fabrics.category_id, "TWEED WOOL", 340, "4", "meter"),
+            (cat_fabrics.category_id, "CHIFFON", 110, "15", "meter"),
+            (cat_fabrics.category_id, "ORGANZA", 130, "12", "meter"),
+            (cat_fabrics.category_id, "BROCADE GOLD", 450, "3", "meter"),
+            (cat_fabrics.category_id, "JERSEY KNIT", 160, "10", "meter"),
+            (cat_fabrics.category_id, "MUSLIN", 90, "15", "meter"),
+            (cat_fabrics.category_id, "CALICO", 100, "15", "meter"),
+            (cat_fabrics.category_id, "TULLE", 75, "20", "meter"),
+            (cat_fabrics.category_id, "VELVETEEN", 200, "8", "meter"),
+            (cat_fabrics.category_id, "BURLAP", 60, "25", "meter"),
+            (cat_fabrics.category_id, "FELT SOFT", 110, "12", "piece"),
+            (cat_fabrics.category_id, "POLAR FLEECE", 240, "6", "meter"),
+            (cat_fabrics.category_id, "RIPSTOP NYLON", 180, "8", "meter"),
+            (cat_fabrics.category_id, "WATERPROOF FABRIC", 220, "6", "meter"),
+            (cat_fabrics.category_id, "MESH NETTING", 70, "20", "meter"),
+            (cat_fabrics.category_id, "STRETCH VELVET", 190, "8", "meter"),
+            (cat_fabrics.category_id, "PIQUE KNIT", 150, "10", "meter"),
+            (cat_fabrics.category_id, "INTERLOCK COTTON", 140, "12", "meter"),
+            (cat_fabrics.category_id, "OXFORD CLOTH", 170, "10", "meter"),
+            (cat_fabrics.category_id, "POPLIN", 120, "12", "meter"),
+            (cat_fabrics.category_id, "SATEEN WEAVE", 200, "8", "meter"),
+            (cat_fabrics.category_id, "FLANNEL", 160, "10", "meter"),
+            (cat_fabrics.category_id, "JACQUARD", 280, "5", "meter"),
+            (cat_fabrics.category_id, "GEORGETTE", 130, "12", "meter"),
+            (cat_fabrics.category_id, "DOUBLE GAUZE", 110, "15", "meter"),
+            (cat_fabrics.category_id, "TERRY CLOTH", 180, "8", "meter"),
+            (cat_fabrics.category_id, "NEOPRENE", 350, "4", "meter"),
+            (cat_fabrics.category_id, "FAUX LEATHER", 270, "6", "meter"),
+            (cat_fabrics.category_id, "CHENILLE", 220, "7", "meter"),
+            (cat_fabrics.category_id, "HERRINGBONE", 290, "5", "meter"),
+            # ── Trims & Accessories (7) ──
+            (cat_trims.category_id, "Metallic Zipper 20cm", 15, "50", "piece"),
+            (cat_trims.category_id, "Plastic Buttons 20mm", 5, "100", "piece"),
+            (cat_trims.category_id, "Elastic Band 2cm", 8, "80", "meter"),
+            (cat_trims.category_id, "Satin Ribbon 1cm", 12, "60", "meter"),
+            (cat_trims.category_id, "Velcro Tape 5cm", 10, "70", "meter"),
+            (cat_trims.category_id, "Metal Buckle 3cm", 18, "40", "piece"),
+            (cat_trims.category_id, "Snap Fastener Set", 7, "90", "set"),
+            # ── Threads & Sewing (6) ──
+            (cat_threads.category_id, "Polyester Thread White", 3, "200", "spool"),
+            (cat_threads.category_id, "Polyester Thread Black", 3, "200", "spool"),
+            (cat_threads.category_id, "Nylon Thread Clear", 5, "150", "spool"),
+            (cat_threads.category_id, "Sewing Needles Assorted", 6, "100", "pack"),
+            (cat_threads.category_id, "Pins with Glass Heads", 4, "120", "pack"),
+            (cat_threads.category_id, "Tailor's Chalk", 2, "150", "piece"),
+            # ── Tools & Equipment (7) ──
+            (cat_tools.category_id, "Fabric Scissors 10in", 180, "10", "piece"),
+            (cat_tools.category_id, "Measuring Tape 150cm", 15, "40", "piece"),
+            (cat_tools.category_id, "Rotary Cutter 45mm", 220, "8", "piece"),
+            (cat_tools.category_id, "Cutting Mat A2", 350, "5", "piece"),
+            (cat_tools.category_id, "Seam Ripper", 45, "15", "piece"),
+            (cat_tools.category_id, "Pin Cushion", 60, "12", "piece"),
+            (cat_tools.category_id, "Tracing Wheel", 85, "10", "piece"),
         ]
-        db.session.add_all(prods)
-        db.session.flush()
 
-        new_prods = [
-            Product(category_id=cat2.category_id, name="Metallic Zipper 20cm", price=15, reorder_level="50", sku="PROD-030", unit="piece", is_active=True),
-            Product(category_id=cat2.category_id, name="Plastic Buttons 20mm", price=5, reorder_level="100", sku="PROD-031", unit="piece", is_active=True),
-            Product(category_id=cat2.category_id, name="Elastic Band 2cm", price=8, reorder_level="80", sku="PROD-032", unit="meter", is_active=True),
-            Product(category_id=cat2.category_id, name="Satin Ribbon 1cm", price=12, reorder_level="60", sku="PROD-033", unit="meter", is_active=True),
-            Product(category_id=cat2.category_id, name="Velcro Tape 5cm", price=10, reorder_level="70", sku="PROD-034", unit="meter", is_active=True),
-            Product(category_id=cat2.category_id, name="Metal Buckle 3cm", price=18, reorder_level="40", sku="PROD-035", unit="piece", is_active=True),
-            Product(category_id=cat2.category_id, name="Lace Trim 2cm", price=14, reorder_level="50", sku="PROD-036", unit="meter", is_active=True),
-            Product(category_id=cat2.category_id, name="Snap Fastener Set", price=7, reorder_level="90", sku="PROD-037", unit="set", is_active=True),
-            Product(category_id=cat2.category_id, name="Hook & Eye Set", price=4, reorder_level="100", sku="PROD-038", unit="set", is_active=True),
-            Product(category_id=cat2.category_id, name="Bias Binding Tape", price=9, reorder_level="75", sku="PROD-039", unit="meter", is_active=True),
-            Product(category_id=cat3.category_id, name="Polyester Thread White", price=3, reorder_level="200", sku="PROD-040", unit="spool", is_active=True),
-            Product(category_id=cat3.category_id, name="Polyester Thread Black", price=3, reorder_level="200", sku="PROD-041", unit="spool", is_active=True),
-            Product(category_id=cat3.category_id, name="Nylon Thread Clear", price=5, reorder_level="150", sku="PROD-042", unit="spool", is_active=True),
-            Product(category_id=cat3.category_id, name="Sewing Needles Assorted", price=6, reorder_level="100", sku="PROD-043", unit="pack", is_active=True),
-            Product(category_id=cat3.category_id, name="Pins with Glass Heads", price=4, reorder_level="120", sku="PROD-044", unit="pack", is_active=True),
-            Product(category_id=cat3.category_id, name="Tailor's Chalk", price=2, reorder_level="150", sku="PROD-045", unit="piece", is_active=True),
-            Product(category_id=cat3.category_id, name="Thread Holder Box", price=25, reorder_level="30", sku="PROD-046", unit="piece", is_active=True),
-            Product(category_id=cat4.category_id, name="Fabric Scissors 10in", price=180, reorder_level="10", sku="PROD-047", unit="piece", is_active=True),
-            Product(category_id=cat4.category_id, name="Measuring Tape 150cm", price=15, reorder_level="40", sku="PROD-048", unit="piece", is_active=True),
-            Product(category_id=cat4.category_id, name="Rotary Cutter 45mm", price=220, reorder_level="8", sku="PROD-049", unit="piece", is_active=True),
-            Product(category_id=cat4.category_id, name="Cutting Mat A2", price=350, reorder_level="5", sku="PROD-050", unit="piece", is_active=True),
-        ]
-        db.session.add_all(new_prods)
+        all_products = []
+        for cid, name, price, reorder, unit in product_defs:
+            sku = f"PROD-{next_sku:03d}"
+            next_sku += 1
+            p = Product(
+                category_id=cid, name=name, price=price,
+                reorder_level=reorder, sku=sku, unit=unit,
+                is_active=True,
+                auto_restock_source_id=storehouse.location_id,
+            )
+            db.session.add(p)
+            all_products.append(p)
         db.session.flush()
 
         # ── 5. INVENTORY ──
         print("Seeding Inventory...")
-        all_products = prods + new_prods
-        stockhouse_floor = 3
-        branch_floor = 1
+        # Track inventory in memory for order deduction
+        inv_map = {}
         for p in all_products:
-            db.session.add(Inventory(product_id=p.product_id, location_id=locs[0].location_id,
-                                     quantity=random.randint(stockhouse_floor, 50)))
-            for loc in locs[1:]:
-                db.session.add(Inventory(product_id=p.product_id, location_id=loc.location_id,
-                                         quantity=random.randint(branch_floor, 15)))
+            for loc in locs:
+                qty = random.randint(50, 200) if loc == storehouse else random.randint(15, 80)
+                db.session.add(Inventory(product_id=p.product_id, location_id=loc.location_id, quantity=qty))
+                inv_map[(p.product_id, loc.location_id)] = qty
         db.session.flush()
 
-        # ── 6. ORDERS + ITEMS + PAYMENTS ──
+        # ── 6. ORDERS + ITEMS + PAYMENTS (with inventory deduction) ──
         print("Seeding Orders, Items, Payments...")
-        statuses = ["completed", "completed", "completed", "pending", "cancelled"]
+        statuses = ["completed", "completed", "completed", "pending", "cancelled", "voided"]
         methods = ["Cash", "Card", "Bank Transfer", "GCash"]
         now = datetime.now()
 
-        for _ in range(300):
+        for _ in range(SEED_ORDERS):
             loc = random.choice(locs)
-            odate = now - timedelta(days=random.randint(0, 365),
-                                    hours=random.randint(0, 23),
-                                    minutes=random.randint(0, 59))
-            n = random.randint(1, 8)
-            chosen = random.sample(all_products, min(n, len(all_products)))
-            items = [(p.product_id, random.randint(1, 20), p.price) for p in chosen]
+
+            # Skew dates toward recent so dashboards show meaningful data
+            weight = random.random()
+            if weight < 0.10:
+                odate = now - timedelta(hours=random.randint(1, 12), minutes=random.randint(0, 59))
+            elif weight < 0.30:
+                odate = now - timedelta(days=random.randint(1, 7), hours=random.randint(0, 23), minutes=random.randint(0, 59))
+            elif weight < 0.60:
+                odate = now - timedelta(days=random.randint(8, 30), hours=random.randint(0, 23), minutes=random.randint(0, 59))
+            else:
+                odate = now - timedelta(days=random.randint(31, 90), hours=random.randint(0, 23), minutes=random.randint(0, 59))
+
+            available = [p for p in all_products if inv_map.get((p.product_id, loc.location_id), 0) > 1]
+            if not available:
+                continue
+            n = random.randint(1, min(5, len(available)))
+            chosen = random.sample(available, n)
+
+            items = []
+            for p in chosen:
+                max_qty = inv_map.get((p.product_id, loc.location_id), 0)
+                if max_qty < 1:
+                    continue
+                qty = random.randint(1, min(5, max_qty))
+                items.append((p.product_id, qty, p.price))
+                inv_map[(p.product_id, loc.location_id)] -= qty
+
+            if not items:
+                continue
+
             total = sum(q * pr for _, q, pr in items)
 
             order = Order(location_id=loc.location_id, order_date=odate,
@@ -178,20 +265,36 @@ def seed(skip_drop=False):
                                    quantity=sum(q for _, q, _ in items), price=total))
         db.session.flush()
 
+        # Write final inventory quantities back to DB
+        for (pid, lid), qty in inv_map.items():
+            inv_row = Inventory.query.filter_by(product_id=pid, location_id=lid).first()
+            if inv_row:
+                inv_row.quantity = qty
+        db.session.flush()
+
+        # Zero out ~10% of branch entries to simulate out-of-stock scenarios
+        branch_entries = [(pid, lid) for (pid, lid) in inv_map if lid != storehouse.location_id]
+        random.shuffle(branch_entries)
+        to_zero = int(len(branch_entries) * 0.1)
+        for pid, lid in branch_entries[:to_zero]:
+            inv_row = Inventory.query.filter_by(product_id=pid, location_id=lid).first()
+            if inv_row:
+                inv_row.quantity = 0
+        db.session.flush()
+
         # ── 7. STOCK TRANSFERS ──
         print("Seeding Stock Transfers...")
         tstatus = ["pending", "approved", "completed", "cancelled"]
-        for _ in range(50):
+        for _ in range(SEED_TRANSFERS):
             fl, tl = random.sample(locs, 2)
-            st = StockTransfer(
+            db.session.add(StockTransfer(
                 product_id=random.choice(all_products).product_id,
                 from_location_id=fl.location_id, to_location_id=tl.location_id,
                 user_id=random.choice(users).user_id,
                 quantity=random.randint(5, 50),
                 transfer_date=now - timedelta(days=random.randint(0, 180), hours=random.randint(0, 23)),
                 status=random.choice(tstatus),
-            )
-            db.session.add(st)
+            ))
         db.session.flush()
 
         # ── 8. STOCK ADJUSTMENTS ──
@@ -199,19 +302,94 @@ def seed(skip_drop=False):
         reasons = ["Damaged goods", "Inventory count correction", "Sample material",
                     "Quality check removal", "Supplier return", "Damaged in transit",
                     "Employee discount adjustment"]
-        for _ in range(50):
-            sa = StockAdjustment(
+        for _ in range(SEED_ADJUSTMENTS):
+            db.session.add(StockAdjustment(
                 product_id=random.choice(all_products).product_id,
                 location_id=random.choice(locs).location_id,
                 user_id=random.choice(users).user_id,
                 quantity_change=random.choice([-50, -20, -10, -5, -3, 5, 10, 15, 25]),
                 reason=random.choice(reasons),
                 date=now - timedelta(days=random.randint(0, 180), hours=random.randint(0, 23)),
-            )
-            db.session.add(sa)
+            ))
         db.session.flush()
 
-        # ── 9. ACTIVITY LOGS ──
+        # ── 9. STOCK REQUESTS ──
+        print("Seeding Stock Requests...")
+        sreq_statuses = ["pending", "approved", "declined"]
+        branch_users = [u for u in users if u.usertype == 2]
+        for _ in range(SEED_STOCK_REQUESTS):
+            branch_loc = random.choice(locs[1:])  # branch, not storehouse
+            requester = random.choice(branch_users) if branch_users else random.choice(users)
+            status = random.choice(sreq_statuses)
+            created = now - timedelta(days=random.randint(0, 60), hours=random.randint(0, 23))
+            db.session.add(StockRequest(
+                product_id=random.choice(all_products).product_id,
+                from_location_id=storehouse.location_id,
+                to_location_id=branch_loc.location_id,
+                requested_by=requester.user_id,
+                quantity=random.randint(5, 30),
+                description=random.choice([
+                    "Running low on stock",
+                    "Customer demand increased",
+                    "Seasonal restock needed",
+                    "Urgent: nearly out of stock",
+                ]),
+                status=status,
+                created_at=created,
+                updated_at=created,
+            ))
+        db.session.flush()
+
+        # ── 10. STORE REPORTS ──
+        print("Seeding Store Reports...")
+        issue_types = ["store", "materials", "software"]
+        report_statuses = ["pending", "resolved", "voided"]
+        report_titles = [
+            "Broken shelf in storage area",
+            "Air conditioning not working",
+            "Fabric delivery damaged",
+            "Wrong thread colors received",
+            "POS system slow during peak hours",
+            "Lighting fixture needs replacement",
+            "Water leak near storage room",
+            "Inventory count mismatch on trims",
+            "Scanner not reading barcodes",
+            "Safety hazard on cutting table",
+        ]
+        for _ in range(SEED_STORE_REPORTS):
+            loc = random.choice(locs)
+            reporter = random.choice(users)
+            status = random.choice(report_statuses)
+            resolved_by_user = random.choice(users).user_id if status == "resolved" else None
+            resolved_at = now - timedelta(days=random.randint(1, 30)) if resolved_by_user else None
+            db.session.add(StoreReport(
+                user_id=reporter.user_id,
+                location_id=loc.location_id,
+                title=random.choice(report_titles),
+                issue_type=random.choice(issue_types),
+                description=f"Reported issue at {loc.name}. Needs attention from the team.",
+                status=status,
+                resolved_by=resolved_by_user,
+                resolved_at=resolved_at,
+                created_at=now - timedelta(days=random.randint(0, 60), hours=random.randint(0, 23)),
+            ))
+        db.session.flush()
+
+        # ── 11. NOTIFICATIONS (linked to pending stock requests) ──
+        print("Seeding Notifications...")
+        pending_requests = StockRequest.query.filter_by(status="pending").all()
+        for sr in pending_requests:
+            db.session.add(Notification(
+                location_id=storehouse.location_id,
+                type="stock_request",
+                message=f"Stock request for {sr.quantity} units",
+                request_id=sr.request_id,
+                is_read=False,
+                created_at=sr.created_at,
+            ))
+        db.session.flush()
+
+        # ── 12. ACTIVITY LOGS ──
         print("Seeding Activity Logs...")
         activities = [
             ("auth", "login", "Logged in"),
@@ -224,22 +402,26 @@ def seed(skip_drop=False):
             ("inventory", "adjust", "Stock adjustment"),
             ("products", "update", "Updated product price"),
             ("inventory", "adjust", "Inventory count correction"),
+            ("orders", "create", "Created order"),
+            ("orders", "complete", "Completed order"),
+            ("reports", "create", "Filed store report"),
+            ("stock", "transfer", "Transferred stock"),
         ]
-        for _ in range(200):
+        for _ in range(SEED_ACTIVITY_LOGS):
             mod, typ, act = random.choice(activities)
             db.session.add(ActivityLog(
                 user_id=random.choice(users).user_id,
-                module=mod,
-                action_type=typ,
-                action=act,
+                module=mod, action_type=typ, action=act,
                 timestamp=now - timedelta(days=random.randint(0, 180),
                                           hours=random.randint(0, 23),
                                           minutes=random.randint(0, 59)),
             ))
         db.session.flush()
 
-        # ── 10. MANUAL SECTIONS (Owner) ──
+        # ── 13. MANUAL SECTIONS ──
         seed_manual_sections()
+        seed_manager_manual()
+        seed_admin_manual()
         db.session.flush()
 
         db.session.commit()
@@ -247,13 +429,16 @@ def seed(skip_drop=False):
         print(f"  Locations:       {len(locs)}")
         print(f"  Users:           {len(users_data)}")
         print(f"  Categories:      4")
-        print(f"  Products:        {len(prods) + len(new_prods)}")
-        print(f"  Inventory:       {(len(prods) + len(new_prods)) * len(locs)}")
-        print(f"  Orders:          300")
-        print(f"  Transfers:       50")
-        print(f"  Adjustments:     50")
-        print(f"  Activity Logs:   200")
-        print(f"  Manual Sections: {len(owner_sections)}")
+        print(f"  Products:        {len(all_products)}")
+        print(f"  Inventory:       {len(all_products) * len(locs)}")
+        print(f"  Orders:          {SEED_ORDERS}")
+        print(f"  Transfers:       {SEED_TRANSFERS}")
+        print(f"  Adjustments:     {SEED_ADJUSTMENTS}")
+        print(f"  Stock Requests:  {SEED_STOCK_REQUESTS}")
+        print(f"  Store Reports:   {SEED_STORE_REPORTS}")
+        print(f"  Notifications:   {len(pending_requests)}")
+        print(f"  Activity Logs:   {SEED_ACTIVITY_LOGS}")
+        print(f"  Manual Sections: {ManualSection.query.count()} (owner: {len(owner_sections)}, manager, admin)")
 
 
 def seed_manual_sections():
@@ -826,7 +1011,7 @@ If you forget your password, click the **Forgot Password?** link to receive a re
 - Affects all text throughout the system.
 
 Click **Save Preferences** to persist your choices."""),
-        ]
+    ]
 
     db.session.add_all(owner_sections)
     db.session.commit()
@@ -1431,19 +1616,101 @@ Click **Save Preferences** to persist your choices."""),
     print(f"  Admin Manual Sections: {len(sections)}")
 
 
+def seed_missing_models(locs, users, all_products):
+    now = datetime.now()
+    seeded_any = False
+
+    if StockRequest.query.count() == 0:
+        print("  Seeding StockRequest...")
+        branch_users = [u for u in users if u.usertype == 2]
+        sreq_statuses = ["pending", "approved", "declined"]
+        for _ in range(SEED_STOCK_REQUESTS):
+            branch_loc = random.choice(locs[1:])
+            requester = random.choice(branch_users) if branch_users else random.choice(users)
+            status = random.choice(sreq_statuses)
+            created = now - timedelta(days=random.randint(0, 60), hours=random.randint(0, 23))
+            db.session.add(StockRequest(
+                product_id=random.choice(all_products).product_id,
+                from_location_id=locs[0].location_id,
+                to_location_id=branch_loc.location_id,
+                requested_by=requester.user_id,
+                quantity=random.randint(5, 30),
+                description=random.choice([
+                    "Running low on stock", "Customer demand increased",
+                    "Seasonal restock needed", "Urgent: nearly out of stock",
+                ]),
+                status=status, created_at=created, updated_at=created,
+            ))
+        db.session.flush()
+        seeded_any = True
+
+    if StoreReport.query.count() == 0:
+        print("  Seeding StoreReport...")
+        issue_types = ["store", "materials", "software"]
+        report_statuses = ["pending", "resolved", "voided"]
+        report_titles = [
+            "Broken shelf in storage area", "Air conditioning not working",
+            "Fabric delivery damaged", "Wrong thread colors received",
+            "POS system slow during peak hours", "Lighting fixture needs replacement",
+            "Water leak near storage room", "Inventory count mismatch on trims",
+            "Scanner not reading barcodes", "Safety hazard on cutting table",
+        ]
+        for _ in range(SEED_STORE_REPORTS):
+            loc = random.choice(locs)
+            reporter = random.choice(users)
+            status = random.choice(report_statuses)
+            resolved_by_user = random.choice(users).user_id if status == "resolved" else None
+            resolved_at = now - timedelta(days=random.randint(1, 30)) if resolved_by_user else None
+            db.session.add(StoreReport(
+                user_id=reporter.user_id, location_id=loc.location_id,
+                title=random.choice(report_titles), issue_type=random.choice(issue_types),
+                description=f"Reported issue at {loc.name}. Needs attention from the team.",
+                status=status, resolved_by=resolved_by_user, resolved_at=resolved_at,
+                created_at=now - timedelta(days=random.randint(0, 60), hours=random.randint(0, 23)),
+            ))
+        db.session.flush()
+        seeded_any = True
+
+    if Notification.query.count() == 0:
+        print("  Seeding Notification...")
+        pending_requests = StockRequest.query.filter_by(status="pending").all()
+        for sr in pending_requests:
+            db.session.add(Notification(
+                location_id=locs[0].location_id, type="stock_request",
+                message=f"Stock request for {sr.quantity} units",
+                request_id=sr.request_id, is_read=False, created_at=sr.created_at,
+            ))
+        db.session.flush()
+        seeded_any = True
+
+    return seeded_any
+
+
 def seed_if_empty():
     app = create_app()
     with app.app_context():
         existing = db.session.query(User.user_id).limit(1).first()
         if existing:
-            print("[OK] Remote DB already has data. Skipping main seed.")
+            print("[OK] Remote DB already has data. Checking for missing tables...")
+            locs = Location.query.all()
+            users = User.query.all()
+            all_products = Product.query.all()
+            seeded = seed_missing_models(locs, users, all_products)
+            if seeded:
+                db.session.commit()
             seed_manual_sections()
             seed_manager_manual()
             seed_admin_manual()
             return
+
     print("[OK] Remote DB empty. Seeding without dropping tables.")
     seed(skip_drop=True)
 
 
 if __name__ == "__main__":
-    seed()
+    if IF_EMPTY:
+        seed_if_empty()
+    elif DB_MODE == "remote" or FORCE:
+        seed(skip_drop=False)
+    else:
+        seed()
