@@ -8,7 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import aliased
 from models import db, User, Product, Location, Category, Inventory
 from models import StockTransfer, StockAdjustment, ActivityLog, Order, OrderItem, Payment
-from models import PasswordResetToken, StockRequest, StoreReport, ManualSection
+from models import PasswordResetToken, StockRequest, StoreReport, ManualSection, ProductVariety
 from utils.sorting import quick_sort
 from utils.activity_logger import log_activity
 from utils.backup_storage import (
@@ -32,6 +32,7 @@ BACKUP_MODELS = [
     ("Stock Requests", StockRequest),
     ("Store Reports", StoreReport),
     ("Manual Sections", ManualSection),
+    ("Product Varieties", ProductVariety),
 ]
 
 # (child_table, child_fk_column, parent_table, parent_pk_column, is_nullable)
@@ -60,6 +61,12 @@ FK_RELATIONSHIPS = [
     ("StoreReports", "location_id", "Locations", "location_id", False),
     ("StoreReports", "resolved_by", "Users", "user_id", True),
     ("ManualSections", "parent_id", "ManualSections", "section_id", True),
+    ("ProductVarieties", "product_id", "Products", "product_id", False),
+    ("Inventory", "variety_id", "ProductVarieties", "variety_id", True),
+    ("OrderItems", "variety_id", "ProductVarieties", "variety_id", True),
+    ("StockTransfers", "variety_id", "ProductVarieties", "variety_id", True),
+    ("StockAdjustments", "variety_id", "ProductVarieties", "variety_id", True),
+    ("StockRequests", "variety_id", "ProductVarieties", "variety_id", True),
 ]
 
 

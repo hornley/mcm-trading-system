@@ -295,6 +295,7 @@ const Owner = () => {
           >
             <Table
               dataSource={recent_transactions}
+              scroll={{ x: 'max-content' }}
               columns={[
                 { title: 'Product', dataIndex: 'product', key: 'product' },
                 { title: 'Qty', dataIndex: 'quantity', key: 'quantity', render: (qty) => qtyLabel(qty) },
@@ -323,6 +324,7 @@ const Owner = () => {
           >
             <Table
               dataSource={low_stock_items}
+              scroll={{ x: 'max-content' }}
               columns={[
                 { title: 'Product Name', dataIndex: 'product_name', key: 'product_name' },
                 { title: 'Category', dataIndex: 'category', key: 'category' },
@@ -359,7 +361,7 @@ const Owner = () => {
           loading={inventoryModal.loading}
           pagination={{ pageSize: 10 }}
           size="small"
-          scroll={{ y: 400 }}
+          scroll={{ x: 'max-content', y: 400 }}
           locale={{ emptyText: inventoryModal.loading ? '' : 'No inventory items found' }}
         />
       </Modal>
@@ -378,8 +380,7 @@ const Owner = () => {
           loading={salesModal.loading}
           pagination={{ pageSize: 10 }}
           size="small"
-          scroll={{ y: 400 }}
-          locale={{ emptyText: salesModal.loading ? '' : 'No sales recorded today' }}
+          scroll={{ x: 'max-content' }}
         />
       </Modal>
 
@@ -396,7 +397,7 @@ const Owner = () => {
           rowKey="key"
           pagination={{ pageSize: 10 }}
           size="small"
-          scroll={{ y: 400 }}
+          scroll={{ x: 'max-content', y: 400 }}
           locale={{ emptyText: 'No stock alerts — all items are healthy' }}
         />
       </Modal>

@@ -235,6 +235,7 @@ const Manager = () => {
           >
             <Table
               dataSource={recent_transactions}
+              scroll={{ x: 'max-content' }}
               columns={[
                 { title: 'Product', dataIndex: 'product', key: 'product' },
                 { title: 'Quantity', dataIndex: 'quantity', key: 'quantity', render: (qty) => qtyLabel(qty) },
@@ -257,7 +258,7 @@ const Manager = () => {
               dataSource={low_stock_items}
               columns={lowStockColumns}
               pagination={false} size="small" loading={loading}
-              scroll={{ y: 280 }}
+              scroll={{ x: 'max-content', y: 280 }}
               rowClassName={(record) => {
                 const q = Number(record.quantity);
                 return q === 0 ? 'voided-row' : q <= 5 ? 'low-stock-warn' : '';

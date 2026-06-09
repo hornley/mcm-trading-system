@@ -23,7 +23,7 @@ from models import db
 from models import (
     User, Location, Category, Product, Order, OrderItem,
     Payment, Inventory, StockTransfer, StockAdjustment, ActivityLog,
-    PasswordResetToken, StoreReport,
+    PasswordResetToken, StoreReport, StockRequest, Notification, ManualSection,
 )
 
 ALL_MODELS = [
@@ -31,6 +31,7 @@ ALL_MODELS = [
     Order, OrderItem, Payment, Inventory,
     StockTransfer, StockAdjustment, ActivityLog,
     PasswordResetToken, StoreReport,
+    StockRequest, Notification, ManualSection,
 ]
 
 DB_PATH = os.path.join(

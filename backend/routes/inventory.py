@@ -1,7 +1,7 @@
 import math
 from flask import Blueprint, request
 from datetime import datetime
-from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer, StockRequest, OrderItem, Notification
+from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer, StockRequest, OrderItem, Notification, ProductVariety
 from utils.response import success_response, error_response
 from utils.validation import validate_required, validate_quantity, is_fabric_category
 from utils.activity_logger import log_activity
@@ -87,6 +87,7 @@ def _generate_sku():
 
 
 def _serialize_product(product, include_inventory=False):
+    varieties = ProductVariety.query.filter_by(product_id=product.product_id).all()
     data = {
         "product_id": product.product_id,
         "name": product.name,
@@ -101,6 +102,15 @@ def _serialize_product(product, include_inventory=False):
         "is_active": product.is_active,
         "created_at": product.created_at.isoformat() if product.created_at else None,
         "updated_at": product.updated_at.isoformat() if product.updated_at else None,
+        "varieties": [
+            {
+                "variety_id": v.variety_id,
+                "variety_sku": v.variety_sku,
+                "color": v.color,
+                "pattern": v.pattern,
+            }
+            for v in varieties
+        ],
     }
     if include_inventory:
         inventory = Inventory.query.filter_by(product_id=product.product_id).all()
@@ -110,6 +120,7 @@ def _serialize_product(product, include_inventory=False):
                 "location_id": inv.location_id,
                 "location_name": inv.location.name if inv.location else None,
                 "quantity": inv.quantity,
+                "variety_id": inv.variety_id,
             }
             for inv in inventory
         ]
@@ -259,6 +270,23 @@ def create_product():
         )
         db.session.add(inventory)
 
+    varieties_data = data.get("varieties", [])
+    for v in varieties_data:
+        color = v.get("color")
+        pattern = v.get("pattern")
+        vs = v.get("variety_sku", "").strip()
+        if not vs:
+            vs = f"{sku}-{ProductVariety.query.count() + 1:02d}"
+        existing_v = ProductVariety.query.filter_by(variety_sku=vs).first()
+        if existing_v:
+            return error_response(f"Variety SKU {vs} already exists", "DUPLICATE_VARIETY_SKU", 409)
+        db.session.add(ProductVariety(
+            product_id=product.product_id,
+            variety_sku=vs,
+            color=color or None,
+            pattern=pattern or None,
+        ))
+
     db.session.commit()
 
     log_activity(
@@ -313,6 +341,24 @@ def update_product(product_id):
         if existing and existing.product_id != product_id:
             return error_response("SKU already exists", "DUPLICATE_SKU", 409)
         product.sku = new_sku
+
+    if "varieties" in data:
+        ProductVariety.query.filter_by(product_id=product_id).delete()
+        for v in data["varieties"]:
+            color = v.get("color")
+            pattern = v.get("pattern")
+            vs = v.get("variety_sku", "").strip()
+            if not vs:
+                vs = f"{product.sku}-{ProductVariety.query.count() + 1:02d}"
+            existing_v = ProductVariety.query.filter_by(variety_sku=vs).first()
+            if existing_v and existing_v.product_id != product_id:
+                return error_response(f"Variety SKU {vs} already exists", "DUPLICATE_VARIETY_SKU", 409)
+            db.session.add(ProductVariety(
+                product_id=product_id,
+                variety_sku=vs,
+                color=color or None,
+                pattern=pattern or None,
+            ))
 
     db.session.commit()
 
@@ -420,6 +466,7 @@ def delete_product(product_id):
         StockAdjustment.query.filter_by(product_id=product_id).delete()
         StockRequest.query.filter_by(product_id=product_id).delete()
         Inventory.query.filter_by(product_id=product_id).delete()
+        ProductVariety.query.filter_by(product_id=product_id).delete()
 
         db.session.delete(product)
         db.session.commit()

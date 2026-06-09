@@ -70,6 +70,16 @@ class Product(db.Model):
     category = db.relationship("Category", backref="products")
 
 
+class ProductVariety(db.Model):
+    __tablename__ = "Product_Varieties"
+    variety_id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
+    variety_sku = db.Column(db.String, unique=True, nullable=False)
+    color = db.Column(db.String, nullable=True)
+    pattern = db.Column(db.String, nullable=True)
+    product = db.relationship("Product", backref="varieties")
+
+
 class Order(db.Model):
     __tablename__ = "Orders"
     order_id = db.Column(db.Integer, primary_key=True)
@@ -85,10 +95,12 @@ class OrderItem(db.Model):
     order_item_id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey("Orders.order_id"), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
+    variety_id = db.Column(db.Integer, db.ForeignKey("Product_Varieties.variety_id"), nullable=True)
     quantity = db.Column(db.Float, nullable=False)
     price = db.Column(db.Integer, nullable=False)
     order = db.relationship("Order", backref="items")
     product = db.relationship("Product")
+    variety = db.relationship("ProductVariety")
 
 
 class Payment(db.Model):
@@ -105,17 +117,20 @@ class Inventory(db.Model):
     __tablename__ = "Inventory"
     inventory_id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
+    variety_id = db.Column(db.Integer, db.ForeignKey("Product_Varieties.variety_id"), nullable=True)
     location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
     quantity = db.Column(db.Float, nullable=False, default=0.0)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
     product = db.relationship("Product")
     location = db.relationship("Location")
+    variety = db.relationship("ProductVariety")
 
 
 class StockTransfer(db.Model):
     __tablename__ = "Stock_Transfers"
     transfer_id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
+    variety_id = db.Column(db.Integer, db.ForeignKey("Product_Varieties.variety_id"), nullable=True)
     from_location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
     to_location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
@@ -124,6 +139,7 @@ class StockTransfer(db.Model):
     status = db.Column(db.String, nullable=False, default="completed")
     remarks = db.Column(db.String)
     product = db.relationship("Product")
+    variety = db.relationship("ProductVariety")
     from_location = db.relationship("Location", foreign_keys=[from_location_id])
     to_location = db.relationship("Location", foreign_keys=[to_location_id])
     user = db.relationship("User")
@@ -133,12 +149,14 @@ class StockAdjustment(db.Model):
     __tablename__ = "Stock_Adjustments"
     adjustment_id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
+    variety_id = db.Column(db.Integer, db.ForeignKey("Product_Varieties.variety_id"), nullable=True)
     location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
     quantity_change = db.Column(db.Float, nullable=False)
     reason = db.Column(db.String)
     date = db.Column(db.DateTime, nullable=False, default=datetime.now)
     product = db.relationship("Product")
+    variety = db.relationship("ProductVariety")
     location = db.relationship("Location")
     user = db.relationship("User")
 
@@ -159,6 +177,7 @@ class StockRequest(db.Model):
     __tablename__ = "Stock_Requests"
     request_id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
+    variety_id = db.Column(db.Integer, db.ForeignKey("Product_Varieties.variety_id"), nullable=True)
     from_location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
     to_location_id = db.Column(db.Integer, db.ForeignKey("Locations.location_id"), nullable=False)
     requested_by = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
@@ -168,6 +187,7 @@ class StockRequest(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
     product = db.relationship("Product")
+    variety = db.relationship("ProductVariety")
     from_location = db.relationship("Location", foreign_keys=[from_location_id])
     to_location = db.relationship("Location", foreign_keys=[to_location_id])
     requester = db.relationship("User", foreign_keys=[requested_by])
