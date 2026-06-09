@@ -5,6 +5,18 @@ export default defineConfig({
   build: {
     target: 'es2020',
     cssTarget: 'firefox100',
+    minify: 'esbuild',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          antd: ['antd'],
+          recharts: ['recharts'],
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          query: ['@tanstack/react-query'],
+        },
+      },
+    },
   },
   plugins: [
     react(),
