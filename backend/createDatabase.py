@@ -108,7 +108,7 @@ def seed(skip_drop=False):
         # ── 4. PRODUCTS ──
         print("Seeding Products...")
         product_defs = [
-            # ── Fabrics (40) ──
+            # ── Fabrics (55) ──
             (cat_fabrics.category_id, "FELT HARD 1", 120, "10", "piece"),
             (cat_fabrics.category_id, "FELT HARD 2", 130, "10", "piece"),
             (cat_fabrics.category_id, "FLEECE", 180, "8", "piece"),
@@ -149,49 +149,44 @@ def seed(skip_drop=False):
             (cat_fabrics.category_id, "RIPSTOP NYLON", 180, "8", "meter"),
             (cat_fabrics.category_id, "WATERPROOF FABRIC", 220, "6", "meter"),
             (cat_fabrics.category_id, "MESH NETTING", 70, "20", "meter"),
-            # ── Trims & Accessories (15) ──
+            (cat_fabrics.category_id, "STRETCH VELVET", 190, "8", "meter"),
+            (cat_fabrics.category_id, "PIQUE KNIT", 150, "10", "meter"),
+            (cat_fabrics.category_id, "INTERLOCK COTTON", 140, "12", "meter"),
+            (cat_fabrics.category_id, "OXFORD CLOTH", 170, "10", "meter"),
+            (cat_fabrics.category_id, "POPLIN", 120, "12", "meter"),
+            (cat_fabrics.category_id, "SATEEN WEAVE", 200, "8", "meter"),
+            (cat_fabrics.category_id, "FLANNEL", 160, "10", "meter"),
+            (cat_fabrics.category_id, "JACQUARD", 280, "5", "meter"),
+            (cat_fabrics.category_id, "GEORGETTE", 130, "12", "meter"),
+            (cat_fabrics.category_id, "DOUBLE GAUZE", 110, "15", "meter"),
+            (cat_fabrics.category_id, "TERRY CLOTH", 180, "8", "meter"),
+            (cat_fabrics.category_id, "NEOPRENE", 350, "4", "meter"),
+            (cat_fabrics.category_id, "FAUX LEATHER", 270, "6", "meter"),
+            (cat_fabrics.category_id, "CHENILLE", 220, "7", "meter"),
+            (cat_fabrics.category_id, "HERRINGBONE", 290, "5", "meter"),
+            # ── Trims & Accessories (7) ──
             (cat_trims.category_id, "Metallic Zipper 20cm", 15, "50", "piece"),
             (cat_trims.category_id, "Plastic Buttons 20mm", 5, "100", "piece"),
             (cat_trims.category_id, "Elastic Band 2cm", 8, "80", "meter"),
             (cat_trims.category_id, "Satin Ribbon 1cm", 12, "60", "meter"),
             (cat_trims.category_id, "Velcro Tape 5cm", 10, "70", "meter"),
             (cat_trims.category_id, "Metal Buckle 3cm", 18, "40", "piece"),
-            (cat_trims.category_id, "Lace Trim 2cm", 14, "50", "meter"),
             (cat_trims.category_id, "Snap Fastener Set", 7, "90", "set"),
-            (cat_trims.category_id, "Hook & Eye Set", 4, "100", "set"),
-            (cat_trims.category_id, "Bias Binding Tape", 9, "75", "meter"),
-            (cat_trims.category_id, "Drawstring Cord 3mm", 6, "80", "meter"),
-            (cat_trims.category_id, "Zipper Slider Pack", 11, "60", "pack"),
-            (cat_trims.category_id, "Rivets Set", 8, "70", "set"),
-            (cat_trims.category_id, "Eyelet Kit", 13, "50", "kit"),
-            (cat_trims.category_id, "Shoulder Pad Set", 16, "40", "pair"),
-            # ── Threads & Sewing (12) ──
+            # ── Threads & Sewing (6) ──
             (cat_threads.category_id, "Polyester Thread White", 3, "200", "spool"),
             (cat_threads.category_id, "Polyester Thread Black", 3, "200", "spool"),
             (cat_threads.category_id, "Nylon Thread Clear", 5, "150", "spool"),
             (cat_threads.category_id, "Sewing Needles Assorted", 6, "100", "pack"),
             (cat_threads.category_id, "Pins with Glass Heads", 4, "120", "pack"),
             (cat_threads.category_id, "Tailor's Chalk", 2, "150", "piece"),
-            (cat_threads.category_id, "Thread Holder Box", 25, "30", "piece"),
-            (cat_threads.category_id, "Quilting Thread", 4, "150", "spool"),
-            (cat_threads.category_id, "Elastic Thread", 5, "120", "spool"),
-            (cat_threads.category_id, "Metallic Thread", 7, "100", "spool"),
-            (cat_threads.category_id, "Needle Threader", 2, "200", "piece"),
-            (cat_threads.category_id, "Bobbins Set", 8, "80", "set"),
-            # ── Tools & Equipment (13) ──
+            # ── Tools & Equipment (7) ──
             (cat_tools.category_id, "Fabric Scissors 10in", 180, "10", "piece"),
             (cat_tools.category_id, "Measuring Tape 150cm", 15, "40", "piece"),
             (cat_tools.category_id, "Rotary Cutter 45mm", 220, "8", "piece"),
             (cat_tools.category_id, "Cutting Mat A2", 350, "5", "piece"),
             (cat_tools.category_id, "Seam Ripper", 45, "15", "piece"),
-            (cat_tools.category_id, "Thimble", 30, "20", "piece"),
             (cat_tools.category_id, "Pin Cushion", 60, "12", "piece"),
             (cat_tools.category_id, "Tracing Wheel", 85, "10", "piece"),
-            (cat_tools.category_id, "Pattern Paper Roll", 95, "8", "roll"),
-            (cat_tools.category_id, "Awl Tool", 55, "15", "piece"),
-            (cat_tools.category_id, "Dress Form Adjustable", 1200, "2", "piece"),
-            (cat_tools.category_id, "Iron-on Patch Set", 25, "30", "set"),
-            (cat_tools.category_id, "Embroidery Hoop 20cm", 70, "10", "piece"),
         ]
 
         all_products = []
@@ -208,48 +203,49 @@ def seed(skip_drop=False):
             all_products.append(p)
         db.session.flush()
 
-        # Storehouse products do NOT need auto-restock source
-        for p in all_products:
-            if p.category_id == cat_fabrics.category_id:
-                pass
-        # No-op: all products set to storehouse source above;
-        # the storehouse itself doesn't need restock (it's the top).
-
         # ── 5. INVENTORY ──
         print("Seeding Inventory...")
         # Track inventory in memory for order deduction
         inv_map = {}
         for p in all_products:
             for loc in locs:
-                qty = random.randint(50, 200) if loc == storehouse else random.randint(5, 30)
+                qty = random.randint(50, 200) if loc == storehouse else random.randint(15, 80)
                 db.session.add(Inventory(product_id=p.product_id, location_id=loc.location_id, quantity=qty))
                 inv_map[(p.product_id, loc.location_id)] = qty
         db.session.flush()
 
         # ── 6. ORDERS + ITEMS + PAYMENTS (with inventory deduction) ──
         print("Seeding Orders, Items, Payments...")
-        statuses = ["completed", "completed", "completed", "pending", "cancelled"]
+        statuses = ["completed", "completed", "completed", "pending", "cancelled", "voided"]
         methods = ["Cash", "Card", "Bank Transfer", "GCash"]
         now = datetime.now()
 
         for _ in range(SEED_ORDERS):
             loc = random.choice(locs)
-            odate = now - timedelta(days=random.randint(0, 365),
-                                    hours=random.randint(0, 23),
-                                    minutes=random.randint(0, 59))
+
+            # Skew dates toward recent so dashboards show meaningful data
+            weight = random.random()
+            if weight < 0.10:
+                odate = now - timedelta(hours=random.randint(1, 12), minutes=random.randint(0, 59))
+            elif weight < 0.30:
+                odate = now - timedelta(days=random.randint(1, 7), hours=random.randint(0, 23), minutes=random.randint(0, 59))
+            elif weight < 0.60:
+                odate = now - timedelta(days=random.randint(8, 30), hours=random.randint(0, 23), minutes=random.randint(0, 59))
+            else:
+                odate = now - timedelta(days=random.randint(31, 90), hours=random.randint(0, 23), minutes=random.randint(0, 59))
 
             available = [p for p in all_products if inv_map.get((p.product_id, loc.location_id), 0) > 1]
             if not available:
                 continue
-            n = random.randint(1, min(8, len(available)))
+            n = random.randint(1, min(5, len(available)))
             chosen = random.sample(available, n)
 
             items = []
             for p in chosen:
-                max_qty = inv_map.get((p.product_id, loc.location_id), 0) - 1
+                max_qty = inv_map.get((p.product_id, loc.location_id), 0)
                 if max_qty < 1:
                     continue
-                qty = random.randint(1, min(20, max_qty))
+                qty = random.randint(1, min(5, max_qty))
                 items.append((p.product_id, qty, p.price))
                 inv_map[(p.product_id, loc.location_id)] -= qty
 
