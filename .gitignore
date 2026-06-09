@@ -153,6 +153,8 @@ env/
 *.egg-info/
 *.sqlite3
 *.db
+*.db-shm
+*.db-wal
 instance/
 
 # Database backups

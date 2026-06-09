@@ -4,9 +4,10 @@ import {
   Tag, Modal, Form, Space, Popconfirm, InputNumber, Spin,
   Dropdown,
 } from 'antd';
-import { PlusOutlined, EditOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, CloseOutlined } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { FABRIC_CATEGORY, qtyLabel } from '../../utils/format.js';
+import ColorPickerModal from '../../components/ColorPickerModal.jsx';
 
 const { Search } = Input;
 const { TextArea } = Input;
@@ -30,6 +31,9 @@ const Inventory = () => {
   const [searchText, setSearchText] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(null);
   const [productForm] = Form.useForm();
+  const [isFabricCategory, setIsFabricCategory] = useState(false);
+  const [colorPickerVisible, setColorPickerVisible] = useState(false);
+  const [selectedColors, setSelectedColors] = useState([]);
 
   const fetchData = async () => {
     if (!user) return;
@@ -72,6 +76,8 @@ const Inventory = () => {
   const handleAdd = () => {
     setSelectedRecord(null);
     productForm.resetFields();
+    setIsFabricCategory(false);
+    setSelectedColors([]);
     setProductModalVisible(true);
   };
 
@@ -84,6 +90,8 @@ const Inventory = () => {
       unit: record.unit,
       description: record.description,
     });
+    const cat = categories.find(c => c.category_id === record.category_id);
+    setIsFabricCategory(cat?.name === FABRIC_CATEGORY);
     setProductModalVisible(true);
   };
 
@@ -161,6 +169,8 @@ const Inventory = () => {
         Modal.success({ title: 'Success', content: isEdit ? 'Product updated' : 'Product created', centered: true });
         setProductModalVisible(false);
         productForm.resetFields();
+        setIsFabricCategory(false);
+        setSelectedColors([]);
         fetchData();
       } else {
         Modal.error({ title: 'Error', content: data.message, centered: true });
@@ -323,15 +333,24 @@ const Inventory = () => {
       <Modal
         title={selectedRecord ? 'Edit Product' : 'Add Product'}
         open={productModalVisible}
-        onCancel={() => { setProductModalVisible(false); productForm.resetFields(); }}
+        onCancel={() => { setProductModalVisible(false); productForm.resetFields(); setIsFabricCategory(false); setSelectedColors([]); }}
         centered
         width={520}
         footer={[
-          <Button key="cancel" onClick={() => { setProductModalVisible(false); productForm.resetFields(); }}>Cancel</Button>,
+          <Button key="cancel" onClick={() => { setProductModalVisible(false); productForm.resetFields(); setIsFabricCategory(false); setSelectedColors([]); }}>Cancel</Button>,
           <Button key="save" type="primary" onClick={handleSaveProduct}>Save</Button>,
         ]}
       >
-        <Form form={productForm} layout="vertical">
+        <Form
+          form={productForm}
+          layout="vertical"
+          onValuesChange={(changedValues) => {
+            if ('category_id' in changedValues) {
+              const cat = categories.find(c => c.category_id === changedValues.category_id);
+              setIsFabricCategory(cat?.name === FABRIC_CATEGORY);
+            }
+          }}
+        >
           <Form.Item name="name" label="Product Name" rules={[{ required: true, message: 'Please enter product name' }]}>
             <Input placeholder="Enter product name" />
           </Form.Item>
@@ -342,6 +361,43 @@ const Inventory = () => {
               ))}
             </Select>
           </Form.Item>
+          {isFabricCategory && (
+            <Button type="default" style={{ marginBottom: 16 }} onClick={() => setColorPickerVisible(true)}>Colors</Button>
+          )}
+          {selectedColors.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+              {selectedColors.map((hex) => (
+                <div
+                  key={hex}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    borderRadius: 20,
+                    border: '1px solid #d9d9d9',
+                    padding: '3px 10px 3px 6px',
+                    background: '#fafafa',
+                  }}
+                >
+                  <CloseOutlined
+                    style={{ fontSize: 11, cursor: 'pointer', color: '#999', flexShrink: 0 }}
+                    onClick={() => setSelectedColors(selectedColors.filter((c) => c !== hex))}
+                  />
+                  <div
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: '50%',
+                      backgroundColor: hex,
+                      border: '1px solid #d9d9d9',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span style={{ fontSize: 12, fontFamily: 'monospace' }}>{hex}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {!selectedRecord && (
             <Form.Item name="sku" label="SKU">
               <Input placeholder="Auto-generated if empty" />
@@ -365,6 +421,12 @@ const Inventory = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      <ColorPickerModal
+        visible={colorPickerVisible}
+        onClose={() => { setColorPickerVisible(false); }}
+        onColorSelect={(colors) => setSelectedColors(colors)}
+      />
     </div>
   );
 };
