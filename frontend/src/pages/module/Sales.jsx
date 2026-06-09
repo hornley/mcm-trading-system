@@ -40,6 +40,7 @@ const Sales = () => {
 
   const [searchText, setSearchText] = useState('');
   const [dateRange, setDateRange] = useState(null);
+  const [periodPreset, setPeriodPreset] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [locations, setLocations] = useState([]);
   const [branchLocations, setBranchLocations] = useState([]);
@@ -60,6 +61,37 @@ const Sales = () => {
   const usertype = user?.usertype;
   const userId = user?.user_id;
   const locationId = isManager ? user?.location_id : undefined;
+
+  const presetToRange = (preset) => {
+    const today = dayjs();
+    switch (preset) {
+      case 'today': return [today.startOf('day'), today.endOf('day')];
+      case 'yesterday': {
+        const y = today.subtract(1, 'day');
+        return [y.startOf('day'), y.endOf('day')];
+      }
+      case 'this-week': return [today.startOf('week'), today.endOf('week')];
+      case 'last-week': {
+        const lw = today.subtract(1, 'week');
+        return [lw.startOf('week'), lw.endOf('week')];
+      }
+      case 'this-month': return [today.startOf('month'), today.endOf('month')];
+      case 'last-month': {
+        const lm = today.subtract(1, 'month');
+        return [lm.startOf('month'), lm.endOf('month')];
+      }
+      default: return null;
+    }
+  };
+
+  const handlePeriodPresetChange = (val) => {
+    setPeriodPreset(val);
+    if (val === 'custom') {
+      setDateRange(null);
+    } else {
+      setDateRange(presetToRange(val));
+    }
+  };
 
   const effectiveBranchId = isOwner && branchFilter !== 'all' ? branchFilter : (selectedLocationId && selectedLocationId !== 'all' ? selectedLocationId : undefined);
   const apiParams = `usertype=${usertype}&user_id=${userId}` + (effectiveBranchId ? `&location_id=${effectiveBranchId}` : '');
@@ -129,7 +161,10 @@ const Sales = () => {
 
   const fetchDashboardStats = async () => {
     try {
-      const res = await fetch(`/api/dashboard/summary?${apiParams}`);
+      let url = `/api/dashboard/summary?${apiParams}`;
+      if (dateRange && dateRange[0]) url += `&date_from=${dateRange[0].toISOString()}`;
+      if (dateRange && dateRange[1]) url += `&date_to=${dateRange[1].toISOString()}`;
+      const res = await fetch(url);
       const json = await res.json();
       if (json.success) setDashboardStats(json.data.stats || {});
     } catch (e) { /* ignore */ }
@@ -233,7 +268,7 @@ const Sales = () => {
     if (lastOrder && receiptRef.current) generateReceiptPDF(receiptRef.current, lastOrder.order_id);
   };
 
-  const isVoided = (record) => record.status === 'voided';
+  const isVoided = (record) => record.status === 'voided' || record.status === 'cancelled';
 
   const showBranchCol = selectedLocationId === "all";
   const columns = [
@@ -290,9 +325,11 @@ const Sales = () => {
     },
     {
       title: 'Status', dataIndex: 'status', key: 'status',
-      render: (status) => (
-        <Tag color={status === 'completed' ? 'green' : 'red'}>{status === 'completed' ? 'Completed' : 'Voided'}</Tag>
-      ),
+      render: (status) => {
+        const map = { completed: { color: 'green', label: 'Completed' }, voided: { color: 'red', label: 'Voided' } };
+        const s = map[status] || { color: 'orange', label: status ? status.charAt(0).toUpperCase() + status.slice(1) : status };
+        return <Tag color={s.color}>{s.label}</Tag>;
+      },
       sorter: (a, b) => a.status.localeCompare(b.status),
     },
     {
@@ -366,9 +403,10 @@ const Sales = () => {
     const grouped = {};
     data.forEach((order) => {
       (order.items || []).forEach((item) => {
+        if (item.is_active === false) return;
         const key = item.product_name;
         if (!grouped[key]) grouped[key] = { product_name: item.product_name, total_qty: 0, total_amount: 0, is_fabric: item.category === FABRIC_CATEGORY };
-        grouped[key].total_qty += Math.floor(item.quantity);
+        grouped[key].total_qty += item.quantity;
         grouped[key].total_amount += item.line_total;
       });
     });
@@ -393,7 +431,7 @@ const Sales = () => {
     },
     {
       title: 'Total Quantity Sold', dataIndex: 'total_qty', key: 'total_qty',
-      render: (qty, record) => fmtQty(Math.floor(qty), record.is_fabric),
+      render: (qty, record) => fmtQty(qty, record.is_fabric),
       sorter: (a, b) => a.total_qty - b.total_qty,
     },
     {
@@ -518,19 +556,24 @@ const Sales = () => {
   return (
     <div>
       <Row gutter={[16, 16]}>
-        <Col xs={24} sm={8}>
+        <Col xs={12} sm={6}>
           <Card>
-            <Statistic title="Total Sales Today" value={`₱${(dashboardStats.sales_today || 0).toLocaleString()}`} />
+            <Statistic title="Total Sales" value={`₱${(dashboardStats.sales_today || 0).toLocaleString()}`} />
           </Card>
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={12} sm={6}>
           <Card>
-            <Statistic title="Total Sales This Month" value={`₱${(dashboardStats.month_sales || 0).toLocaleString()}`} />
+            <Statistic title="Total Transactions" value={dashboardStats.transactions_today || 0} />
           </Card>
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={12} sm={6}>
           <Card>
-            <Statistic title="Total Transactions Today" value={dashboardStats.transactions_today || 0} />
+            <Statistic title="Low Stock Items" value={dashboardStats.low_stock_count || 0} valueStyle={{ color: '#fa8c16' }} />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card>
+            <Statistic title="Out of Stock Items" value={dashboardStats.out_of_stock_count || 0} valueStyle={{ color: '#ff4d4f' }} />
           </Card>
         </Col>
       </Row>
@@ -571,7 +614,25 @@ const Sales = () => {
                 </Button>
               </Dropdown>
             )}
-            <RangePicker onChange={(dates) => setDateRange(dates)} />
+            <Select
+              value={periodPreset}
+              onChange={handlePeriodPresetChange}
+              style={{ width: 150 }}
+              placeholder="Period"
+              allowClear
+              onClear={() => { setPeriodPreset(null); setDateRange(null); }}
+            >
+              <Select.Option value="today">Today</Select.Option>
+              <Select.Option value="yesterday">Yesterday</Select.Option>
+              <Select.Option value="this-week">This Week</Select.Option>
+              <Select.Option value="last-week">Last Week</Select.Option>
+              <Select.Option value="this-month">This Month</Select.Option>
+              <Select.Option value="last-month">Last Month</Select.Option>
+              <Select.Option value="custom">Custom Range</Select.Option>
+            </Select>
+            {periodPreset === 'custom' && (
+              <RangePicker onChange={(dates) => setDateRange(dates)} />
+            )}
             {isOwner && (
               <Select
                 placeholder="Filter by branch"

@@ -44,7 +44,7 @@ const StockManagement = () => {
   const [restocking, setRestocking] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [pageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(10);
   const [movementsCache, setMovementsCache] = useState({});
   const [stats, setStats] = useState({ total_items: 0, low_stock_count: 0, out_of_stock_count: 0, pending_request_count: 0 });
   const [sortBy, setSortBy] = useState('quantity');
@@ -56,6 +56,7 @@ const StockManagement = () => {
   const [restockQuantities, setRestockQuantities] = useState({});
   const [orderSummaryVisible, setOrderSummaryVisible] = useState(false);
   const [restockSubmitting, setRestockSubmitting] = useState(false);
+  const [adjustSubmitting, setAdjustSubmitting] = useState(false);
   const [requestLogVisible, setRequestLogVisible] = useState(false);
   const [requestLogs, setRequestLogs] = useState([]);
   const [requestLogLoading, setRequestLogLoading] = useState(false);
@@ -68,11 +69,12 @@ const StockManagement = () => {
   const [storehouseStockFilter, setStorehouseStockFilter] = useState('all');
   const receiptCaptureRef = useRef(null);
 
-  const fetchData = async (page, sortOverrides) => {
+  const fetchData = async (page, sortOverrides, sizeOverride) => {
     if (!user) return;
     const p = page || currentPage;
     const sb = sortOverrides?.sortBy || sortBy;
     const so = sortOverrides?.sortOrder || sortOrder;
+    const ps = sizeOverride || pageSize;
     setLoading(true);
     try {
       const locationParam = selectedLocationId !== "all" ? `&location_id=${selectedLocationId}` : '';
@@ -82,7 +84,7 @@ const StockManagement = () => {
       const statusParam = statusFilter ? `&status=${statusFilter}` : '';
 
       const [invRes, locRes, countRes] = await Promise.all([
-        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=${p}&limit=${pageSize}${searchParam}${sortParam}${statusParam}`),
+        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=${p}&limit=${ps}${searchParam}${sortParam}${statusParam}`),
         fetch(`/api/locations?usertype=${user.usertype}`),
         fetch(`/api/inventory/counts?usertype=${user.usertype}${locationParam}${userIdParam}`),
       ]);
@@ -279,6 +281,8 @@ const StockManagement = () => {
   };
 
   const handleAdjustSave = async () => {
+    if (adjustSubmitting) return;
+    setAdjustSubmitting(true);
     try {
       const values = await adjustForm.validateFields();
 
@@ -289,6 +293,7 @@ const StockManagement = () => {
           const sourceInv = sourceData.data.find(i => i.location_id === values.from_location_id);
           const sourceQty = sourceInv?.quantity || 0;
           if (Number(sourceQty) < Number(values.quantity)) {
+            setAdjustSubmitting(false);
             adjustForm.setFields([{
               name: 'from_location_id',
               errors: [`Insufficient stock at this branch (available: ${fmtQty(sourceQty, selectedRecord?.category === FABRIC_CATEGORY)})`],
@@ -349,6 +354,8 @@ const StockManagement = () => {
     } catch (err) {
       if (err?.errorFields) return;
       Modal.error({ title: 'Error', content: requestPreset ? 'Failed to submit stock request' : 'Failed to adjust stock', centered: true });
+    } finally {
+      setAdjustSubmitting(false);
     }
   };
 
@@ -931,7 +938,7 @@ const StockManagement = () => {
                 fetchData(1, { sortBy: newSortBy, sortOrder: newSortOrder });
               }
             }}
-            pagination={{ current: currentPage, pageSize, total: totalCount, showSizeChanger: false, onChange: (p) => fetchData(p) }}
+            pagination={{ current: currentPage, pageSize, total: totalCount, showSizeChanger: true, pageSizeOptions: [10, 50, 100, 200], onShowSizeChange: (_, size) => { setPageSize(size); fetchData(1, { sortBy, sortOrder }, size); }, onChange: (p) => fetchData(p) }}
           />
         </>
       )}
@@ -999,7 +1006,7 @@ const StockManagement = () => {
         centered
         footer={[
           <Button key="cancel" onClick={() => setAdjustVisible(false)}>Cancel</Button>,
-          <Button key="save" type="primary" onClick={handleAdjustSave}>{requestPreset ? 'Submit Request' : 'Save'}</Button>,
+          <Button key="save" type="primary" loading={adjustSubmitting} onClick={handleAdjustSave}>{requestPreset ? 'Submit Request' : 'Save'}</Button>,
         ]}
       >
         <Form form={adjustForm} layout="vertical">

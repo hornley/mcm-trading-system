@@ -11,6 +11,14 @@ import { FABRIC_CATEGORY } from '../../utils/format.js';
 const { Search } = Input;
 const { TextArea } = Input;
 
+const getStockStatus = (qty, reorderLevel) => {
+  const n = Number(qty);
+  if (n === 0) return { tag: <Tag color="red">Out of Stock</Tag>, color: '#ff4d4f' };
+  if (reorderLevel && n <= Number(reorderLevel)) return { tag: <Tag color="orange">Low Stock</Tag>, color: '#fa8c16' };
+  if (n <= 10) return { tag: <Tag color="orange">Low Stock</Tag>, color: '#fa8c16' };
+  return { tag: <Tag color="green">In Stock</Tag>, color: '#52c41a' };
+};
+
 const Inventory = () => {
   const { user, can, selectedLocationId, setSelectedLocationId, setIsStorehouse } = useAuth();
   const [products, setProducts] = useState([]);
@@ -256,9 +264,18 @@ const Inventory = () => {
               <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>
                 {product.category === FABRIC_CATEGORY ? 'yards' : (product.unit || '-')}
               </div>
-              <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>
-                Stock: {product.quantity != null ? product.quantity : '-'}
-              </div>
+              {product.quantity != null ? (
+                <Space style={{ marginBottom: 8 }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: getStockStatus(product.quantity, product.reorder_level).color }}>
+                    {product.quantity}
+                  </span>
+                  {getStockStatus(product.quantity, product.reorder_level).tag}
+                </Space>
+              ) : (
+                <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>
+                  Stock: -
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
                 {can('update') && product.is_active && (

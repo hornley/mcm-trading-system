@@ -34,6 +34,9 @@ def dashboard_summary():
         now = datetime.now()
         today = now.date()
 
+        date_from = request.args.get("date_from")
+        date_to = request.args.get("date_to")
+
         # ── Stats ──
         inv_query = Inventory.query.join(Product).filter(Product.is_active == True)
         if location_id:
@@ -42,7 +45,10 @@ def dashboard_summary():
         total_items = sum(inv.quantity for inv in all_inv)
 
         low_stock_count = 0
+        out_of_stock_count = 0
         for inv in all_inv:
+            if inv.quantity == 0:
+                out_of_stock_count += 1
             try:
                 rl = int(inv.product.reorder_level) if inv.product and inv.product.reorder_level else 0
             except (ValueError, TypeError):
@@ -51,21 +57,29 @@ def dashboard_summary():
                 low_stock_count += 1
 
         sales_query = db.session.query(func.coalesce(func.sum(Order.total_amount), 0))
-        sales_query = sales_query.filter(
-            Order.status == "completed",
-            func.date(Order.order_date) == today
-        )
+        sales_query = sales_query.filter(Order.status == "completed")
+        if date_from:
+            sales_query = sales_query.filter(Order.order_date >= datetime.fromisoformat(date_from))
+        else:
+            sales_query = sales_query.filter(func.date(Order.order_date) == today)
+        if date_to:
+            sales_query = sales_query.filter(Order.order_date <= datetime.fromisoformat(date_to))
         if location_id:
             sales_query = sales_query.filter(Order.location_id == location_id)
-        sales_today = sales_query.scalar()
+        sales_period = sales_query.scalar()
 
-        transactions_today_query = db.session.query(func.count(Order.order_id)).filter(
-            Order.status == "completed",
-            func.date(Order.order_date) == today
+        transactions_query = db.session.query(func.count(Order.order_id)).filter(
+            Order.status == "completed"
         )
+        if date_from:
+            transactions_query = transactions_query.filter(Order.order_date >= datetime.fromisoformat(date_from))
+        else:
+            transactions_query = transactions_query.filter(func.date(Order.order_date) == today)
+        if date_to:
+            transactions_query = transactions_query.filter(Order.order_date <= datetime.fromisoformat(date_to))
         if location_id:
-            transactions_today_query = transactions_today_query.filter(Order.location_id == location_id)
-        transactions_today = transactions_today_query.scalar()
+            transactions_query = transactions_query.filter(Order.location_id == location_id)
+        transactions_period = transactions_query.scalar()
 
         month_start = today.replace(day=1)
         month_sales_query = db.session.query(func.coalesce(func.sum(Order.total_amount), 0)).filter(
@@ -180,10 +194,11 @@ def dashboard_summary():
         return success_response({
             "stats": {
                 "total_items": total_items,
-                "sales_today": sales_today,
+                "sales_today": sales_period,
                 "month_sales": month_sales,
-                "transactions_today": transactions_today,
+                "transactions_today": transactions_period,
                 "low_stock_count": low_stock_count,
+                "out_of_stock_count": out_of_stock_count,
                 "active_users": active_users,
             },
             "stock_by_category": pie_data,
