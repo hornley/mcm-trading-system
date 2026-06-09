@@ -75,7 +75,7 @@ def seed(skip_drop=False):
         users_data = [
             (1, "owner",    "owner@mcm.com",    "260512001", 0),
             (2, "manager",  "manager@mcm.com",  "260512002", 1),
-            (2, "manager2", "manager2@mcm.com", "260512007", 2),
+            (2, "manager2", "manager2@mcm.com", "260512007", 0),
             (3, "admin",    "admin@mcm.com",    "260512003", 0),
             (3, "admin2",   "admin2@mcm.com",   "260512008", 1),
         ]
