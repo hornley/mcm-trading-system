@@ -14,6 +14,15 @@ import receiptConfig from '../../config/receipt.json';
 
 const { Search, TextArea } = Input;
 
+const productLabel = (item) => {
+  if (!item) return '';
+  const name = item.product_name || '';
+  const parts = [];
+  if (item.color) parts.push(item.color);
+  if (item.pattern) parts.push(item.pattern);
+  return parts.length ? `${name} (${parts.join(', ')})` : name;
+};
+
 const getStockStatus = (qty) => {
   const n = Number(qty);
   if (n === 0) return { tag: <Tag color="red">Out of Stock</Tag>, label: 'out' };
@@ -582,6 +591,7 @@ const StockManagement = () => {
   const columns = [
     {
       title: 'Product Name', dataIndex: 'product_name', key: 'product_name',
+      render: (_, record) => productLabel(record),
       sorter: true,
       defaultSortOrder: sortBy === 'product_name' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
     },
@@ -955,7 +965,7 @@ const StockManagement = () => {
       )}
 
       <Modal
-        title={`${selectedRecord?.product_name} - Stock Details`}
+        title={`${productLabel(selectedRecord)} - Stock Details`}
         open={detailVisible}
         onCancel={() => setDetailVisible(false)}
         footer={[<Button key="close" type="primary" onClick={() => setDetailVisible(false)}>Close</Button>]}
@@ -963,7 +973,7 @@ const StockManagement = () => {
         centered
       >
         <Descriptions column={2} bordered style={{ marginBottom: 16 }}>
-          <Descriptions.Item label="Product Name">{selectedRecord?.product_name}</Descriptions.Item>
+          <Descriptions.Item label="Product Name">{productLabel(selectedRecord)}</Descriptions.Item>
           <Descriptions.Item label="SKU">{selectedRecord?.sku}</Descriptions.Item>
           <Descriptions.Item label="Branch">{selectedRecord?.location_name}</Descriptions.Item>
           <Descriptions.Item label="Current Stock Quantity">{fmtQty(selectedRecord?.quantity, selectedRecord?.category === FABRIC_CATEGORY, selectedRecord?.category === FABRIC_CATEGORY ? 'yds' : 'pcs')}</Descriptions.Item>
@@ -985,7 +995,7 @@ const StockManagement = () => {
       </Modal>
 
       <Modal
-        title={`Set Reorder Level - ${selectedRecord?.product_name}`}
+        title={`Set Reorder Level - ${productLabel(selectedRecord)}`}
         open={reorderVisible}
         onCancel={() => setReorderVisible(false)}
         centered
@@ -1012,7 +1022,7 @@ const StockManagement = () => {
       </Modal>
 
       <Modal
-        title={requestPreset ? `Request Stock - ${selectedRecord?.product_name}` : `Adjust Stock - ${selectedRecord?.product_name}`}
+        title={requestPreset ? `Request Stock - ${productLabel(selectedRecord)}` : `Adjust Stock - ${productLabel(selectedRecord)}`}
         open={adjustVisible}
         onCancel={() => setAdjustVisible(false)}
         centered
@@ -1070,7 +1080,7 @@ const StockManagement = () => {
       </Modal>
 
       <Modal
-        title={`Transfer Stock - ${selectedRecord?.product_name}`}
+        title={`Transfer Stock - ${productLabel(selectedRecord)}`}
         open={transferVisible}
         onCancel={() => { setTransferVisible(false); setFromLocationId(null); }}
         centered
@@ -1148,7 +1158,7 @@ const StockManagement = () => {
                     />
                   ),
                 },
-                { title: 'Product Name', dataIndex: 'product_name', key: 'product_name', sorter: (a, b) => a.product_name.localeCompare(b.product_name) },
+                { title: 'Product Name', dataIndex: 'product_name', key: 'product_name', render: (_, r) => productLabel(r), sorter: (a, b) => a.product_name.localeCompare(b.product_name) },
                 { title: 'Category', dataIndex: 'category', key: 'category', sorter: (a, b) => (a.category || '').localeCompare(b.category || '') },
                 {
                   title: 'Status', key: 'status', width: 130,
@@ -1202,7 +1212,7 @@ const StockManagement = () => {
                 bordered
                 scroll={{ x: 'max-content' }}
                 columns={[
-                  { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
+            { title: 'Product', dataIndex: 'product_name', key: 'product_name', render: (_, r) => productLabel(r) },
                   { title: 'Category', dataIndex: 'category', key: 'category' },
                   {
                     title: 'Current Qty', dataIndex: 'quantity', key: 'quantity', width: 100,
@@ -1237,7 +1247,7 @@ const StockManagement = () => {
           pagination={{ pageSize: 10 }}
           columns={[
             { title: 'Branch', key: 'branch', render: (_, r) => `${r.from_location_name} → ${r.to_location_name}` },
-            { title: 'Product', dataIndex: 'product_name', key: 'product' },
+            { title: 'Product', dataIndex: 'product_name', key: 'product', render: (_, r) => productLabel(r) },
             {
               title: 'Quantity', dataIndex: 'quantity', key: 'quantity',
               render: (qty, r) => fmtQty(qty, r.is_fabric),
@@ -1306,7 +1316,7 @@ const StockManagement = () => {
           ) : (
             receiptItems.map((item) => (
               <div key={item.product_id} className="receipt-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, borderBottom: '1px dotted #ddd' }}>
-                <span style={{ flex: 1, paddingRight: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.product_name}</span>
+                <span style={{ flex: 1, paddingRight: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{productLabel(item)}</span>
                 <span style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtQty(restockQuantities[item.product_id] || 0, item.category === FABRIC_CATEGORY)}</span>
               </div>
             ))
