@@ -1,6 +1,7 @@
 import math
 from flask import Blueprint, request
 from datetime import datetime
+from sqlalchemy.orm import selectinload, joinedload
 from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer, StockRequest, OrderItem, Notification, ProductVariety
 from utils.response import success_response, error_response
 from utils.validation import validate_required, validate_quantity, is_fabric_category
@@ -35,7 +36,9 @@ def check_and_auto_restock(location_id):
     location = Location.query.get(location_id)
     if not location:
         return
-    inventory_list = Inventory.query.filter_by(location_id=location_id).all()
+    inventory_list = Inventory.query.options(
+        joinedload(Inventory.product),
+    ).filter_by(location_id=location_id).all()
     for inv in inventory_list:
         product = inv.product
         if not product or not product.auto_restock_source_id:
@@ -86,7 +89,9 @@ def _generate_sku():
     return f"PROD-{count + 1:03d}"
 
 
-def _get_variety_stock(variety_id, location_id=None):
+def _get_variety_stock(variety_id, location_id=None, stock_map=None):
+    if stock_map is not None:
+        return stock_map.get(variety_id, 0)
     inv = Inventory.query.filter_by(variety_id=variety_id)
     if location_id:
         inv = inv.filter_by(location_id=location_id)
@@ -94,8 +99,8 @@ def _get_variety_stock(variety_id, location_id=None):
     return total
 
 
-def _serialize_product(product, include_inventory=False, location_id=None):
-    varieties = ProductVariety.query.filter_by(product_id=product.product_id).all()
+def _serialize_product(product, include_inventory=False, location_id=None, variety_stock_map=None, product_qty_cache=None):
+    varieties = product.varieties or []
     data = {
         "product_id": product.product_id,
         "name": product.name,
@@ -116,7 +121,7 @@ def _serialize_product(product, include_inventory=False, location_id=None):
                 "variety_sku": v.variety_sku,
                 "color": v.color,
                 "pattern": v.pattern,
-                "stock": _get_variety_stock(v.variety_id, location_id),
+                "stock": _get_variety_stock(v.variety_id, location_id, variety_stock_map),
             }
             for v in varieties
         ],
@@ -169,20 +174,30 @@ def list_products():
         is_active_val = is_active.lower() == "true"
         query = query.filter_by(is_active=is_active_val)
 
-    products = quick_sort(query.all(), key=sort_by, order=sort_order)
+    products = query.options(
+        selectinload(Product.varieties),
+        selectinload(Product.category),
+    ).all()
+    products = quick_sort(products, key=sort_by, order=sort_order)
+
+    # Bulk-load all variety stock for this location
+    variety_stock_map = {}
+    product_qty_map = {}
+    if resolved_location_id is not None and resolved_location_id != "all":
+        all_inv = Inventory.query.filter(
+            Inventory.location_id == resolved_location_id
+        ).all()
+    else:
+        all_inv = Inventory.query.all()
+    for inv in all_inv:
+        if inv.variety_id is not None:
+            variety_stock_map[inv.variety_id] = variety_stock_map.get(inv.variety_id, 0) + inv.quantity
+        product_qty_map[inv.product_id] = product_qty_map.get(inv.product_id, 0) + inv.quantity
 
     result = []
     for p in products:
-        data = _serialize_product(p, location_id=resolved_location_id)
-        if resolved_location_id is not None and resolved_location_id != "all":
-            inventory = Inventory.query.filter_by(
-                product_id=p.product_id,
-                location_id=resolved_location_id
-            ).first()
-            data["quantity"] = inventory.quantity if inventory else 0
-        else:
-            total = db.session.query(db.func.sum(Inventory.quantity)).filter_by(product_id=p.product_id).scalar()
-            data["quantity"] = total or 0
+        data = _serialize_product(p, location_id=resolved_location_id, variety_stock_map=variety_stock_map)
+        data["quantity"] = product_qty_map.get(p.product_id, 0)
         result.append(data)
 
     return success_response(result)
@@ -201,19 +216,26 @@ def get_product(product_id):
     if error:
         return error
 
-    product = Product.query.get(product_id)
+    product = Product.query.options(
+        selectinload(Product.varieties),
+        selectinload(Product.category),
+    ).get(product_id)
     if not product:
         return error_response("Product not found", "NOT_FOUND", 404)
 
     data = _serialize_product(product)
 
     if resolved_location_id and resolved_location_id != "all":
-        inventory = Inventory.query.filter_by(
+        inventory = Inventory.query.options(
+            joinedload(Inventory.location),
+        ).filter_by(
             product_id=product_id,
             location_id=resolved_location_id
         ).all()
     else:
-        inventory = Inventory.query.filter_by(product_id=product_id).all()
+        inventory = Inventory.query.options(
+            joinedload(Inventory.location),
+        ).filter_by(product_id=product_id).all()
 
     data["inventory"] = [
         {
