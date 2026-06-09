@@ -1,5 +1,30 @@
 # Performance Optimization Plan
 
+## Commits on `perf/optimize-db-queries`
+```
+d3a3e0b perf: fix vite 8 rolldown manualChunks syntax, finalize plan
+98dfea8 perf: enable Vite code splitting + lazy-load all route pages with React.lazy
+d7b53c3 perf: add React Query with caching, refactor dashboard pages to use useQuery
+1686182 docs: update performance plan with completed backend optimizations
+ef95c79 perf: move schema migration checks to standalone migrate.py, strip from cold start
+52fea46 perf: rewrite low_stock and branch_needs with JOIN queries, add eager loading to inventory list and movements
+77c0620 perf: add selectinload to product list serializer and bulk-load inventory/variety stock
+7c316ed perf: add selectinload to order list/detail serializers, remove N+1 queries
+3e9dbc2 perf: add selectinload/joinedload to dashboard summary queries
+04dc58e perf: fix connection pool from 1 to 5 connections
+```
+
+## To Deploy
+1. Merge this branch and deploy to Vercel
+2. **Run the SQL indexes below in Supabase SQL Editor** (one-time)
+3. Run `cd frontend && npm install` to install `@tanstack/react-query`
+
+## What's Left (Future)
+- `@tanstack/react-query` query hooks exist but only dashboard pages use them. Sales, StockManagement, Inventory still use raw `fetch()`. They benefit from being lazy-loaded but would be faster with `useQuery`.
+- `useCreateOrderMutation` is defined but not wired into the Sales POS form yet.
+
+---
+
 ## Baseline (before optimizations)
 | Page | Load Time |
 |------|-----------|
@@ -17,7 +42,7 @@
 
 ### 2. Database Indexes (Supabase SQL Editor)
 **SQL:** Add indexes on FK and sort columns across 6 tables
-**Status:** ⬜ pending — run SQL below in Supabase SQL Editor
+**Status:** ⚠️ pending — run SQL below in Supabase SQL Editor
 
 ### 3. Eager Loading - Dashboard Summary
 **File:** `backend/routes/dashboard.py`
