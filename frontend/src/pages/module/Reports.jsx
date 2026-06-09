@@ -124,7 +124,7 @@ const Reports = () => {
   const mkParams = (extra) => {
     const p = new URLSearchParams({ usertype: user?.usertype });
     if (user?.user_id) p.set('user_id', user.user_id);
-    p.set('location_id', selectedLocationId !== 'all' ? String(selectedLocationId) : 'all');
+    p.set('location_id', selectedLocationId !== 'all' ? String(selectedLocationId) : '-1');
     Object.entries(extra || {}).forEach(([k, v]) => {
       if (v !== undefined && v !== null) p.set(k, v);
     });
@@ -149,11 +149,11 @@ const Reports = () => {
   const fetchInventory = async () => {
     setLoading((prev) => ({ ...prev, inventory: true }));
     try {
-      const locationParam = selectedLocationId !== 'all' ? selectedLocationId : 'all';
+      const locationParam = selectedLocationId !== 'all' ? selectedLocationId : -1;
 
       const [statsRes, allBranchesRes, lowStockRes] = await Promise.all([
         fetch(`/api/reports/inventory/summary?${mkParams({ location_id: locationParam })}`),
-        fetch(`/api/reports/inventory/summary?${mkParams({ location_id: 'all' })}`),
+        fetch(`/api/reports/inventory/summary?${mkParams({ location_id: -1 })}`),
         fetch(`/api/reports/inventory/low-stock?${mkParams({ location_id: locationParam })}`),
       ]);
       const stats = await statsRes.json();
@@ -167,6 +167,10 @@ const Reports = () => {
           low_stock: lowStock.success ? (lowStock.data?.rows || []) : [],
           distribution: allBranches.data?.rows || [],
         });
+        setDistributionData((allBranches.data?.rows || []).map((r) => ({
+          location_name: r.location_name,
+          total_quantity: Math.floor(r.total_quantity),
+        })));
       }
     } catch {
       message.error('Failed to load inventory reports');
@@ -177,7 +181,7 @@ const Reports = () => {
 
   const fetchDistribution = async () => {
     try {
-      const params = { location_id: 'all' };
+      const params = { location_id: -1 };
       if (selectedProduct) params.product_id = selectedProduct;
       const res = await fetch(`/api/reports/inventory/summary?${mkParams(params)}`);
       const data = await res.json();
@@ -282,6 +286,9 @@ const Reports = () => {
       const data = await res.json();
       if (data.success) {
         setStoreReports(data.data || []);
+        if (data.data?.length > 0 && !activeReport) {
+          setActiveReport(data.data[0]);
+        }
       }
     } catch {
       message.error('Failed to load store reports');
@@ -300,7 +307,7 @@ const Reports = () => {
     setEditingReport(report);
     reportForm.setFieldsValue({
       title: report.title,
-      location_id: report.location_id,
+      location_id: user?.role !== 'manager' ? report.location_id : undefined,
       issue_type: report.issue_type,
       description: report.description,
     });
@@ -317,7 +324,7 @@ const Reports = () => {
       const payload = {
         usertype: user?.usertype,
         user_id: user?.user_id,
-        location_id: values.location_id,
+        location_id: user?.role === 'manager' ? user?.location_id : values.location_id,
         title: values.title,
         issue_type: values.issue_type,
         description: values.description,
@@ -425,7 +432,7 @@ const Reports = () => {
     const apiParams = () => {
       const p = new URLSearchParams({ usertype: utype });
       if (uid) p.set('user_id', uid);
-      p.set('location_id', locId !== 'all' ? String(locId) : 'all');
+      p.set('location_id', locId !== 'all' ? String(locId) : '-1');
       return p;
     };
 
@@ -437,7 +444,7 @@ const Reports = () => {
           const withLoc = (loc) => { const p = apiParams(); p.set('location_id', String(loc)); return p.toString(); };
           const [statsRes, allBranchesRes, lowStockRes] = await Promise.all([
             fetch(`/api/reports/inventory/summary?${withLoc(lp)}`),
-            fetch(`/api/reports/inventory/summary?${withLoc('all')}`),
+            fetch(`/api/reports/inventory/summary?${withLoc(-1)}`),
             fetch(`/api/reports/inventory/low-stock?${withLoc(lp)}`),
           ]);
           const stats = await statsRes.json();
@@ -501,6 +508,9 @@ const Reports = () => {
       };
       doFetch();
     }
+    else if (activeTab === 'store-reports') {
+      fetchStoreReports();
+    }
     else if (activeTab === 'activity') {
       setLoading((prev) => ({ ...prev, activity: true }));
       const doFetch = async () => {
@@ -562,6 +572,10 @@ const Reports = () => {
     { title: 'Stock', dataIndex: 'quantity', key: 'quantity', render: (v) => qtyLabel(v), sorter: (a, b) => (a.quantity || 0) - (b.quantity || 0) },
     { title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level', sorter: (a, b) => (a.reorder_level || 0) - (b.reorder_level || 0) },
   ];
+
+  const lowStockColumns = isManager
+    ? inventoryColsLowStock.filter(c => c.dataIndex !== 'location_name')
+    : inventoryColsLowStock;
 
   const salesColsTop = [
     { title: 'Product', dataIndex: 'product_name', key: 'product_name', sorter: (a, b) => (a.product_name || '').localeCompare(b.product_name || '') },
@@ -702,10 +716,10 @@ const Reports = () => {
             </Col>
           </Row>
           <Divider />
-          <Card title="Low Stock Items">
+          <Card title={isManager ? `Low Stock Items in ${user?.location_name || 'your branch'}` : "Low Stock Items"}>
             <Table
               dataSource={inventorySummary.low_stock}
-              columns={inventoryColsLowStock}
+              columns={lowStockColumns}
               rowKey={(r) => `${r.product_name || ''}-${r.location_name || ''}`}
               pagination={{ pageSize: 10 }}
               size="small"
@@ -958,7 +972,7 @@ const Reports = () => {
                 ) : (
                   storeReports.map((report) => {
                     const colors = { pending: 'orange', resolved: 'green', voided: 'red' };
-                    const labels = { store: 'Store Issue', materials: 'Materials Issue', software: 'Software Issue' };
+                    const labels = { store: 'Store Issue', software: 'Software Issue' };
                     return (
                       <div
                         key={report.report_id}
@@ -1117,7 +1131,7 @@ const Reports = () => {
                   { title: 'User', dataIndex: 'username', key: 'username' },
                   { title: 'Branch', dataIndex: 'location_name', key: 'location_name' },
                   { title: 'Issue Type', dataIndex: 'issue_type', key: 'issue_type', render: (v) => {
-                    const labels = { store: 'Store Issue', materials: 'Materials Issue', software: 'Software Issue' };
+                    const labels = { store: 'Store Issue', software: 'Software Issue' };
                     return <Tag>{labels[v] || v}</Tag>;
                   }},
                   { title: 'Status', dataIndex: 'status', key: 'status', render: (v, record) => {
@@ -1213,9 +1227,11 @@ const Reports = () => {
               <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Please enter a title' }]}>
                 <Input placeholder="Enter report title" />
               </Form.Item>
-              <Form.Item name="location_id" label="Branch" rules={[{ required: true, message: 'Please select branch' }]}>
-                <Select placeholder="Select branch" options={locations} />
-              </Form.Item>
+              {user?.role !== 'manager' && (
+                <Form.Item name="location_id" label="Branch" rules={[{ required: true, message: 'Please select branch' }]}>
+                  <Select placeholder="Select branch" options={locations} />
+                </Form.Item>
+              )}
               <Form.Item name="issue_type" label="Issue Type" rules={[{ required: true, message: 'Please select issue type' }]}>
                 <Select placeholder="Select issue type" options={ISSUE_TYPES} />
               </Form.Item>
@@ -1303,7 +1319,7 @@ const Reports = () => {
 
 const ISSUE_TYPES = [
   { value: 'store', label: 'Store Issue' },
-  { value: 'materials', label: 'Materials Issue' },
+
   { value: 'software', label: 'Software Issue' },
 ];
 

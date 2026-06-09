@@ -14,6 +14,8 @@ def _authorized(usertype):
 
 
 def _resolve_location_id(usertype, user_id, requested_location_id):
+    if requested_location_id == -1:
+        return None
     if usertype == 2:
         user = User.query.get(user_id)
         if not user:
@@ -405,7 +407,9 @@ def get_store_reports():
         query = StoreReport.query
 
         if usertype == 2:
-            query = query.filter(StoreReport.user_id == user_id)
+            user = User.query.get(user_id)
+            if user:
+                query = query.filter(StoreReport.location_id == user.location_id)
 
         reports = query.order_by(StoreReport.created_at.desc()).all()
 
@@ -489,6 +493,11 @@ def update_store_report(report_id):
     if usertype == 3 and report.user_id != user_id:
         return jsonify({"success": False, "error": "Cannot update other user's report"}), 403
 
+    if usertype == 2:
+        user = User.query.get(user_id)
+        if not user or report.location_id != user.location_id:
+            return jsonify({"success": False, "error": "Cannot update reports outside your branch"}), 403
+
     try:
         if "title" in data:
             report.title = data["title"]
@@ -533,6 +542,11 @@ def delete_store_report(report_id):
 
     if usertype == 3 and report.user_id != user_id:
         return jsonify({"success": False, "error": "Cannot delete other user's report"}), 403
+
+    if usertype == 2:
+        user = User.query.get(user_id)
+        if not user or report.location_id != user.location_id:
+            return jsonify({"success": False, "error": "Cannot delete reports outside your branch"}), 403
 
     try:
         db.session.delete(report)
