@@ -44,6 +44,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     _engine_options = {
         "pool_size": 1,
+        "max_overflow": 0,
         "pool_recycle": 60,
         "pool_pre_ping": True,
     }

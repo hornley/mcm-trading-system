@@ -117,6 +117,10 @@ def create_app():
             request.environ['PATH_INFO'] = parsed
             print(f"[REQUEST] fixed PATH_INFO to {parsed}", file=sys.stderr)
 
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        db.session.remove()
+
     @app.route("/api/debug", methods=["GET", "POST"])
     def debug_info():
         import sys, os as _os
