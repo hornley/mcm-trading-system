@@ -74,6 +74,7 @@ const Settings = () => {
         body: JSON.stringify({
           user_id: user.user_id,
           usertype: user.usertype,
+          email: values.email,
           phone: phoneValue,
         }),
       });
