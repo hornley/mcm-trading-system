@@ -419,18 +419,125 @@ const Reports = () => {
   }, [activeTab]);
 
   useEffect(() => {
+    const locId = selectedLocationId;
+    const uid = user?.user_id;
+    const utype = user?.usertype;
+    const apiParams = () => {
+      const p = new URLSearchParams({ usertype: utype });
+      if (uid) p.set('user_id', uid);
+      p.set('location_id', locId !== 'all' ? String(locId) : 'all');
+      return p;
+    };
+
     if (activeTab === 'inventory') {
-      fetchInventory();
+      setLoading((prev) => ({ ...prev, inventory: true }));
+      const doFetch = async () => {
+        try {
+          const lp = locId !== 'all' ? locId : 'all';
+          const withLoc = (loc) => { const p = apiParams(); p.set('location_id', String(loc)); return p.toString(); };
+          const [statsRes, allBranchesRes, lowStockRes] = await Promise.all([
+            fetch(`/api/reports/inventory/summary?${withLoc(lp)}`),
+            fetch(`/api/reports/inventory/summary?${withLoc('all')}`),
+            fetch(`/api/reports/inventory/low-stock?${withLoc(lp)}`),
+          ]);
+          const stats = await statsRes.json();
+          const allBranches = await allBranchesRes.json();
+          const lowStock = await lowStockRes.json();
+          if (stats.success && allBranches.success) {
+            setInventorySummary({
+              stats: stats.data?.stats || {},
+              by_branch: allBranches.data?.rows || [],
+              low_stock: lowStock.success ? (lowStock.data?.rows || []) : [],
+              distribution: allBranches.data?.rows || [],
+            });
+          }
+        } catch { message.error('Failed to load inventory reports'); }
+        finally { setLoading((prev) => ({ ...prev, inventory: false })); }
+      };
+      doFetch();
       fetchDistribution();
     }
-    else if (activeTab === 'sales') fetchSales();
-    else if (activeTab === 'financial') fetchFinancial();
+    else if (activeTab === 'sales') {
+      setLoading((prev) => ({ ...prev, sales: true }));
+      const doFetch = async () => {
+        try {
+          const [dailyRes, topRes] = await Promise.all([
+            fetch(`/api/reports/sales/daily?${apiParams()}&days=${salesPeriod}`),
+            fetch(`/api/reports/sales/top-products?${apiParams()}&days=${salesPeriod}&limit=10`),
+          ]);
+          const daily = await dailyRes.json();
+          const top = await topRes.json();
+          if (daily.success) {
+            setSalesData({
+              stats: daily.data.stats || {},
+              daily: daily.data.rows || [],
+              topProducts: top.success ? (top.data.rows || []) : [],
+            });
+          }
+        } catch { message.error('Failed to load sales reports'); }
+        finally { setLoading((prev) => ({ ...prev, sales: false })); }
+      };
+      doFetch();
+    }
+    else if (activeTab === 'financial') {
+      setLoading((prev) => ({ ...prev, financial: true }));
+      const doFetch = async () => {
+        try {
+          const [revenueRes, pmRes] = await Promise.all([
+            fetch(`/api/reports/financial/revenue?${apiParams()}&days=${financialPeriod}`),
+            fetch(`/api/reports/financial/payment-methods?${apiParams()}&days=${financialPeriod}`),
+          ]);
+          const revenue = await revenueRes.json();
+          const pm = await pmRes.json();
+          if (revenue.success) {
+            setFinancialData({
+              stats: revenue.data.stats || {},
+              revenue: revenue.data.rows || [],
+              paymentMethods: pm.success ? (pm.data.rows || []) : [],
+            });
+          }
+        } catch { message.error('Failed to load financial reports'); }
+        finally { setLoading((prev) => ({ ...prev, financial: false })); }
+      };
+      doFetch();
+    }
     else if (activeTab === 'activity') {
-      fetchActivity();
+      setLoading((prev) => ({ ...prev, activity: true }));
+      const doFetch = async () => {
+        try {
+          const res = await fetch(`/api/reports/activity/summary?${apiParams()}&days=${activityPeriod}`);
+          const data = await res.json();
+          if (data.success) {
+            setActivityData({
+              stats: data.data.stats || {},
+              by_user: data.data.by_user || [],
+              by_module: data.data.by_module || [],
+            });
+          }
+        } catch { message.error('Failed to load activity reports'); }
+        finally { setLoading((prev) => ({ ...prev, activity: false })); }
+      };
+      doFetch();
       fetchStoreReports();
     }
-    else if (activeTab === 'system') fetchSystem();
-  }, [activeTab, selectedLocationId, salesPeriod, financialPeriod, activityPeriod]);
+    else if (activeTab === 'system') {
+      setLoading((prev) => ({ ...prev, system: true }));
+      const doFetch = async () => {
+        try {
+          const res = await fetch(`/api/reports/system/summary?${apiParams()}`);
+          const data = await res.json();
+          if (data.success) {
+            setSystemData({
+              stats: data.data.stats || {},
+              backups: data.data.backups || [],
+            });
+          }
+        } catch { message.error('Failed to load system reports'); }
+        finally { setLoading((prev) => ({ ...prev, system: false })); }
+      };
+      doFetch();
+    }
+  }, [activeTab, selectedLocationId, salesPeriod, financialPeriod, activityPeriod, user?.usertype, user?.user_id]);
 
   useEffect(() => {
     if (activeTab === 'inventory') {

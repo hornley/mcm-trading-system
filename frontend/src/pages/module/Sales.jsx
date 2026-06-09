@@ -40,6 +40,7 @@ const Sales = () => {
 
   const [searchText, setSearchText] = useState('');
   const [dateRange, setDateRange] = useState(null);
+  const [periodPreset, setPeriodPreset] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [locations, setLocations] = useState([]);
   const [branchLocations, setBranchLocations] = useState([]);
@@ -60,6 +61,37 @@ const Sales = () => {
   const usertype = user?.usertype;
   const userId = user?.user_id;
   const locationId = isManager ? user?.location_id : undefined;
+
+  const presetToRange = (preset) => {
+    const today = dayjs();
+    switch (preset) {
+      case 'today': return [today.startOf('day'), today.endOf('day')];
+      case 'yesterday': {
+        const y = today.subtract(1, 'day');
+        return [y.startOf('day'), y.endOf('day')];
+      }
+      case 'this-week': return [today.startOf('week'), today.endOf('week')];
+      case 'last-week': {
+        const lw = today.subtract(1, 'week');
+        return [lw.startOf('week'), lw.endOf('week')];
+      }
+      case 'this-month': return [today.startOf('month'), today.endOf('month')];
+      case 'last-month': {
+        const lm = today.subtract(1, 'month');
+        return [lm.startOf('month'), lm.endOf('month')];
+      }
+      default: return null;
+    }
+  };
+
+  const handlePeriodPresetChange = (val) => {
+    setPeriodPreset(val);
+    if (val === 'custom') {
+      setDateRange(null);
+    } else {
+      setDateRange(presetToRange(val));
+    }
+  };
 
   const effectiveBranchId = isOwner && branchFilter !== 'all' ? branchFilter : (selectedLocationId && selectedLocationId !== 'all' ? selectedLocationId : undefined);
   const apiParams = `usertype=${usertype}&user_id=${userId}` + (effectiveBranchId ? `&location_id=${effectiveBranchId}` : '');
@@ -129,7 +161,10 @@ const Sales = () => {
 
   const fetchDashboardStats = async () => {
     try {
-      const res = await fetch(`/api/dashboard/summary?${apiParams}`);
+      let url = `/api/dashboard/summary?${apiParams}`;
+      if (dateRange && dateRange[0]) url += `&date_from=${dateRange[0].toISOString()}`;
+      if (dateRange && dateRange[1]) url += `&date_to=${dateRange[1].toISOString()}`;
+      const res = await fetch(url);
       const json = await res.json();
       if (json.success) setDashboardStats(json.data.stats || {});
     } catch (e) { /* ignore */ }
@@ -521,19 +556,24 @@ const Sales = () => {
   return (
     <div>
       <Row gutter={[16, 16]}>
-        <Col xs={24} sm={8}>
+        <Col xs={12} sm={6}>
           <Card>
-            <Statistic title="Total Sales Today" value={`₱${(dashboardStats.sales_today || 0).toLocaleString()}`} />
+            <Statistic title="Total Sales" value={`₱${(dashboardStats.sales_today || 0).toLocaleString()}`} />
           </Card>
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={12} sm={6}>
           <Card>
-            <Statistic title="Total Sales This Month" value={`₱${(dashboardStats.month_sales || 0).toLocaleString()}`} />
+            <Statistic title="Total Transactions" value={dashboardStats.transactions_today || 0} />
           </Card>
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={12} sm={6}>
           <Card>
-            <Statistic title="Total Transactions Today" value={dashboardStats.transactions_today || 0} />
+            <Statistic title="Low Stock Items" value={dashboardStats.low_stock_count || 0} valueStyle={{ color: '#fa8c16' }} />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card>
+            <Statistic title="Out of Stock Items" value={dashboardStats.out_of_stock_count || 0} valueStyle={{ color: '#ff4d4f' }} />
           </Card>
         </Col>
       </Row>
@@ -574,7 +614,25 @@ const Sales = () => {
                 </Button>
               </Dropdown>
             )}
-            <RangePicker onChange={(dates) => setDateRange(dates)} />
+            <Select
+              value={periodPreset}
+              onChange={handlePeriodPresetChange}
+              style={{ width: 150 }}
+              placeholder="Period"
+              allowClear
+              onClear={() => { setPeriodPreset(null); setDateRange(null); }}
+            >
+              <Select.Option value="today">Today</Select.Option>
+              <Select.Option value="yesterday">Yesterday</Select.Option>
+              <Select.Option value="this-week">This Week</Select.Option>
+              <Select.Option value="last-week">Last Week</Select.Option>
+              <Select.Option value="this-month">This Month</Select.Option>
+              <Select.Option value="last-month">Last Month</Select.Option>
+              <Select.Option value="custom">Custom Range</Select.Option>
+            </Select>
+            {periodPreset === 'custom' && (
+              <RangePicker onChange={(dates) => setDateRange(dates)} />
+            )}
             {isOwner && (
               <Select
                 placeholder="Filter by branch"
