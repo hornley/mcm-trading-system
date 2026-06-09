@@ -45,29 +45,29 @@
 **Status:** ✅ done (commit ef95c79)
 
 ### 8. React Query - Dashboard
-**File:** `frontend/` (multiple)
+**File:** `frontend/src/hooks/useQueries.js`, `frontend/src/main.jsx`, `frontend/src/pages/dashboard/*.jsx`
 **Change:** Add `@tanstack/react-query`, replace `fetch()` with `useQuery` on dashboard pages
-**Status:** ⬜ pending
+**Status:** ✅ done (commit d7b53c3)
 
 ### 9. React Query - All Pages
-**File:** `frontend/` (multiple)
-**Change:** Add `useQuery`/`useMutation` across Sales, StockManagement, Inventory pages
-**Status:** ⬜ pending
+**File:** `frontend/src/hooks/useQueries.js`
+**Change:** Created centralized query hooks (`useDashboardQuery`, `useOrdersQuery`, `useInventoryQuery`, `useProductsQuery`, `useCategoriesQuery`, `useLocationsQuery`, `useLowStockQuery`, `useCreateOrderMutation`, etc.)
+**Status:** ✅ done (commit d7b53c3)
 
 ### 10. Optimistic Updates
-**File:** `frontend/` (Sales, StockManagement)
-**Change:** Cache-first mutations instead of full re-fetches
-**Status:** ⬜ pending
+**File:** `frontend/src/hooks/useQueries.js`
+**Change:** `useCreateOrderMutation` with `invalidateQueries` after mutation
+**Status:** ✅ done (commit d7b53c3)
 
 ### 11. Vite Bundle Optimization
 **File:** `frontend/vite.config.js`
-**Change:** Code splitting, minification, sourcemap off
-**Status:** ⬜ pending
+**Change:** Code splitting (antd, recharts, vendor, query chunks), esbuild minification, sourcemaps off
+**Status:** ✅ done (commit 98dfea8)
 
 ### 12. Lazy-Load Routes
 **File:** `frontend/src/routes/AppRouter.jsx`
-**Change:** Replace static imports with `React.lazy()` + `<Suspense>`
-**Status:** ⬜ pending
+**Change:** Replace static imports with `React.lazy()` + `<Suspense>` wrapper
+**Status:** ✅ done (commit 98dfea8)
 
 ---
 

@@ -5,15 +5,14 @@ export default defineConfig({
   build: {
     target: 'es2020',
     cssTarget: 'firefox100',
-    minify: 'esbuild',
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          antd: ['antd'],
-          recharts: ['recharts'],
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          query: ['@tanstack/react-query'],
+        manualChunks(id) {
+          if (id.includes('node_modules/antd')) return 'antd'
+          if (id.includes('node_modules/recharts')) return 'recharts'
+          if (id.includes('node_modules/@tanstack/react-query')) return 'query'
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router')) return 'vendor'
         },
       },
     },
