@@ -48,6 +48,7 @@ def _serialize_order_detail(order):
                 "product_id": item.product_id,
                 "product_name": item.product.name if item.product else "Unknown",
                 "category": item.product.category.name if item.product and item.product.category else None,
+                "is_active": item.product.is_active if item.product else True,
                 "quantity": item.quantity,
                 "price": item.price,
                 "line_total": item.quantity * item.price,
