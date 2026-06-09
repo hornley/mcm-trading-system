@@ -70,6 +70,16 @@ class Product(db.Model):
     category = db.relationship("Category", backref="products")
 
 
+class ProductVariety(db.Model):
+    __tablename__ = "Product_Varieties"
+    variety_id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
+    variety_sku = db.Column(db.String, unique=True, nullable=False)
+    color = db.Column(db.String, nullable=True)
+    pattern = db.Column(db.String, nullable=True)
+    product = db.relationship("Product", backref="varieties")
+
+
 class Order(db.Model):
     __tablename__ = "Orders"
     order_id = db.Column(db.Integer, primary_key=True)
