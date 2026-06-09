@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, Row, Col, Statistic, Table, Tag, Typography, Button, Space, Modal } from 'antd'
 import { ArrowUpOutlined, ArrowDownOutlined, RightCircleOutlined } from '@ant-design/icons'
 import {
@@ -6,6 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { useDashboardQuery } from '../../hooks/useQueries'
 import { FABRIC_CATEGORY, fmtQty, qtyLabel } from '../../utils/format.js'
 
 const { Title, Text } = Typography
@@ -20,41 +21,28 @@ const computeTrend = (current) => {
 
 const Owner = () => {
   const { user, selectedLocationId } = useAuth()
-  const [loading, setLoading] = useState(true)
+  const { data: rawData, isLoading } = useDashboardQuery(selectedLocationId)
   const [lastUpdated, setLastUpdated] = useState(null)
-  const [data, setData] = useState({
-    stats: { total_items: 0, sales_today: 0, low_stock_count: 0, active_users: 0 },
-    stock_by_category: [],
-    stock_movement: [],
-    recent_transactions: [],
-    low_stock_items: [],
-  })
+
+  useEffect(() => {
+    if (rawData) setLastUpdated(new Date().toLocaleTimeString())
+  }, [rawData])
+
+  const data = useMemo(() => {
+    if (!rawData) return { stats: { total_items: 0, sales_today: 0, low_stock_count: 0, active_users: 0 }, stock_by_category: [], stock_movement: [], recent_transactions: [], low_stock_items: [] }
+    const d = { ...rawData }
+    if (d.stock_by_category) {
+      d.stock_by_category = d.stock_by_category.map((c) => ({ ...c, value: Math.floor(c.value) }))
+    }
+    if (d.stats) {
+      d.stats = { ...d.stats, total_items: Math.floor(d.stats.total_items) }
+    }
+    return d
+  }, [rawData])
 
   const [inventoryModal, setInventoryModal] = useState({ open: false, data: [], loading: false })
   const [salesModal, setSalesModal] = useState({ open: false, data: [], loading: false })
   const [stockAlertModal, setStockAlertModal] = useState({ open: false })
-
-  const fetchData = () => {
-    setLoading(true)
-    const params = new URLSearchParams({ usertype: user?.usertype, location_id: selectedLocationId })
-    fetch(`/api/dashboard/summary?${params}`)
-      .then((res) => res.json())
-      .then((res) => {
-        if (res.success) {
-          const d = res.data;
-          if (d.stock_by_category) {
-            d.stock_by_category = d.stock_by_category.map((c) => ({ ...c, value: Math.floor(c.value) }));
-          }
-          if (d.stats) d.stats.total_items = Math.floor(d.stats.total_items);
-          setData(d);
-          setLastUpdated(new Date().toLocaleTimeString());
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => { if (user) fetchData() }, [user, selectedLocationId])
 
   const { stats, stock_by_category, stock_movement, recent_transactions, low_stock_items } = data
 
@@ -187,7 +175,7 @@ const Owner = () => {
               style={{ height: '100%' }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <Statistic title={stat.title} value={stat.value} valueStyle={stat.valueStyle} loading={loading} />
+                <Statistic title={stat.title} value={stat.value} valueStyle={stat.valueStyle} loading={isLoading} />
                 <div style={{ flex: 1 }} />
                 {stat.trend && (
                   <Space>
@@ -199,7 +187,7 @@ const Owner = () => {
                   </Space>
                 )}
                 {stat.action && (
-                  <Button type="link" size="small" icon={<RightCircleOutlined />} onClick={stat.action} disabled={loading} style={{ padding: 0, marginTop: 8 }}>
+                  <Button type="link" size="small" icon={<RightCircleOutlined />} onClick={stat.action} disabled={isLoading} style={{ padding: 0, marginTop: 8 }}>
                     View {stat.title.replace(/^(Total |Low )/, '')}
                   </Button>
                 )}
@@ -296,7 +284,7 @@ const Owner = () => {
         <Col xs={24} lg={12}>
           <Card
             title="Recent Transactions"
-            extra={<Button type="link" onClick={() => fetchSalesToday()} disabled={loading}>View All Sales</Button>}
+            extra={<Button type="link" onClick={() => fetchSalesToday()} disabled={isLoading}>View All Sales</Button>}
             styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}
           >
             <Table
@@ -319,16 +307,16 @@ const Owner = () => {
               ]}
               pagination={false}
               size="small"
-              loading={loading}
+              loading={isLoading}
               scroll={{ y: 280 }}
-              onRow={() => ({ style: { cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.5 : 1 }, onClick: () => { if (!loading) fetchSalesToday() } })}
+              onRow={() => ({ style: { cursor: isLoading ? 'default' : 'pointer', opacity: isLoading ? 0.5 : 1 }, onClick: () => { if (!isLoading) fetchSalesToday() } })}
             />
           </Card>
         </Col>
         <Col xs={24} lg={12}>
           <Card
             title={`Low Stock Items${low_stock_items.length > 0 ? ` (${low_stock_items.length})` : ''}`}
-            extra={<Button type="link" onClick={() => setStockAlertModal({ open: true })} disabled={loading}>View All</Button>}
+            extra={<Button type="link" onClick={() => setStockAlertModal({ open: true })} disabled={isLoading}>View All</Button>}
             styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}
           >
             <Table
@@ -348,16 +336,16 @@ const Owner = () => {
               ]}
               pagination={false}
               size="small"
-              loading={loading}
+              loading={isLoading}
               scroll={{ y: 280 }}
-              onRow={() => ({ style: { cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.5 : 1 }, onClick: () => { if (!loading) fetchSalesToday() } })}
+              onRow={() => ({ style: { cursor: isLoading ? 'default' : 'pointer', opacity: isLoading ? 0.5 : 1 }, onClick: () => { if (!isLoading) fetchSalesToday() } })}
             />
           </Card>
         </Col>
         <Col xs={24} lg={12}>
           <Card
             title={`Low Stock Items${low_stock_items.length > 0 ? ` (${low_stock_items.length})` : ''}`}
-            extra={<Button type="link" onClick={() => setStockAlertModal({ open: true })} disabled={loading}>View All</Button>}
+            extra={<Button type="link" onClick={() => setStockAlertModal({ open: true })} disabled={isLoading}>View All</Button>}
             styles={{ header: { borderBottom: '1px solid #f0f0f0' } }}
           >
             <Table
@@ -374,7 +362,7 @@ const Owner = () => {
               ]}
               pagination={false}
               size="small"
-              loading={loading}
+              loading={isLoading}
               scroll={{ y: 280 }}
               rowClassName={(record) => {
                 const q = Number(record.quantity);

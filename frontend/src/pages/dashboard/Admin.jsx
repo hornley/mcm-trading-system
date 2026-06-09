@@ -1,30 +1,14 @@
-import { useState, useEffect } from 'react'
-import { Row, Col, Card, Statistic, Table, Tag, Descriptions, Typography } from 'antd'
+import { Row, Col, Card, Statistic, Tag, Descriptions, Typography } from 'antd'
 import { UserOutlined, CalendarOutlined, CheckCircleOutlined } from '@ant-design/icons'
-import { useAuth } from '../../context/AuthContext.jsx'
+import { useDashboardQuery } from '../../hooks/useQueries'
 
 const { Title } = Typography
 
 const Admin = () => {
-  const { user } = useAuth()
-  const [loading, setLoading] = useState(true)
-  const [data, setData] = useState({
-    stats: { total_items: 0, sales_today: 0, low_stock_count: 0, active_users: 0 },
-    admin_stats: { total_users: 0, last_maintenance: '', system_operational: true, activity_7d: 0 },
-  })
+  const { data, isLoading } = useDashboardQuery(null)
 
-  const fetchData = () => {
-    setLoading(true)
-    fetch(`/api/dashboard/summary?usertype=${user?.usertype}`)
-      .then((res) => res.json())
-      .then((res) => { if (res.success) setData(res.data) })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => { if (user) fetchData() }, [user])
-
-  const { stats, admin_stats } = data
+  const stats = data?.stats || { total_items: 0, sales_today: 0, low_stock_count: 0, active_users: 0 }
+  const admin_stats = data?.admin_stats || { total_users: 0, last_maintenance: '', system_operational: true, activity_7d: 0 }
 
   return (
     <div>
@@ -39,7 +23,7 @@ const Admin = () => {
         ].map((stat, i) => (
           <Col xs={24} sm={12} lg={6} key={i}>
             <Card styles={{ body: { padding: '20px 24px' } }}>
-              <Statistic {...stat} loading={loading} />
+              <Statistic {...stat} loading={isLoading} />
             </Card>
           </Col>
         ))}
