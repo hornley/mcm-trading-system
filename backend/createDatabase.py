@@ -30,7 +30,7 @@ def seed(skip_drop=False):
         # ── 1. LOCATIONS ──
         print("Seeding Locations...")
         locs = [
-            Location(name="Storehouse", address="123 Industrial Zone, Main City", is_active=True),
+            Location(name="Storehouse", address="123 Industrial Zone, Main City", is_active=True, is_storehouse=True),
             Location(name="Branch 1", address="456 Commercial Ave, Downtown", is_active=True),
             Location(name="Branch 2", address="789 Suburb Road, North District", is_active=True),
         ]
@@ -141,6 +141,12 @@ def seed(skip_drop=False):
         # ── 5. INVENTORY ──
         print("Seeding Inventory...")
         all_products = prods + new_prods
+
+        # Assign auto-restock source (Storehouse) to ~40% of products
+        for p in all_products:
+            if p.reorder_level and random.random() < 0.4:
+                p.auto_restock_source_id = locs[0].location_id
+        db.session.flush()
         stockhouse_floor = 3
         branch_floor = 1
         for p in all_products:

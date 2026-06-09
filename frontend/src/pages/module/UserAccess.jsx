@@ -255,6 +255,7 @@ const UserAccess = () => {
           columns={columns}
           rowKey="user_id"
           loading={loading}
+          scroll={{ x: 'max-content' }}
           pagination={{ pageSize: 10 }}
           onChange={(_pagination, _filters, sorter) => {
             if (Array.isArray(sorter)) sorter = sorter[0];

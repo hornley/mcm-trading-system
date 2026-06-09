@@ -874,6 +874,7 @@ const StockManagement = () => {
 
       {isStorehouse ? (
         <Table
+          scroll={{ x: 'max-content' }}
           dataSource={branchNeeds.filter((r) => {
             if (searchText && !r.product_name.toLowerCase().includes(searchText.toLowerCase())) return false;
             if (branchFilter !== 'all' && String(r.branch_id) !== branchFilter) return false;
@@ -932,6 +933,7 @@ const StockManagement = () => {
             columns={visibleColumns}
             rowKey="inventory_id"
             loading={loading}
+            scroll={{ x: 'max-content' }}
             rowClassName={(record) => {
               const q = Number(record.quantity);
               if (q === 0) return 'row-out-of-stock';
@@ -977,6 +979,7 @@ const StockManagement = () => {
           rowKey={(row, idx) => `${row.type}-${idx}`}
           size="small"
           pagination={false}
+          scroll={{ x: 'max-content' }}
           bordered
         />
       </Modal>
@@ -1134,6 +1137,7 @@ const StockManagement = () => {
               pagination={false}
               size="small"
               bordered
+              scroll={{ x: 'max-content' }}
               columns={[
                 {
                   title: 'Select', key: 'select', width: 60,
@@ -1196,6 +1200,7 @@ const StockManagement = () => {
                 pagination={false}
                 size="small"
                 bordered
+                scroll={{ x: 'max-content' }}
                 columns={[
                   { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
                   { title: 'Category', dataIndex: 'category', key: 'category' },
@@ -1228,6 +1233,7 @@ const StockManagement = () => {
           loading={isStorehouse ? storehousePendingLoading : requestLogLoading}
           size="small"
           bordered
+          scroll={{ x: 'max-content' }}
           pagination={{ pageSize: 10 }}
           columns={[
             { title: 'Branch', key: 'branch', render: (_, r) => `${r.from_location_name} → ${r.to_location_name}` },

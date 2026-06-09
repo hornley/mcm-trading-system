@@ -676,6 +676,7 @@ const Sales = () => {
         columns={columns}
         rowKey="order_id"
         loading={loading}
+        scroll={{ x: 'max-content' }}
         expandable={{ expandedRowRender, expandedRowKeys, onExpand: (expanded, record) => {
           setExpandedRowKeys((prev) =>
             expanded
@@ -748,6 +749,7 @@ const Sales = () => {
             columns={totalSalesColumns}
             rowKey="product_name"
             pagination={false}
+            scroll={{ x: 'max-content' }}
             size="small"
             loading={totalSalesLoading}
             summary={totalSalesSummary}
