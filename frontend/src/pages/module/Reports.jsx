@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Card, Typography, Row, Col, Table, Tabs, Statistic,
   Select, Spin, Space, message, Divider, Button, Modal, Form,
-  Input, Tag, List, Badge, Tooltip,
+  Input, Tag, List, Badge, Tooltip, Dropdown,
 } from 'antd';
 import {
   PieChart, Pie, Cell, BarChart, Bar,
@@ -11,8 +11,10 @@ import {
 import {
   DatabaseOutlined, ShoppingCartOutlined, DollarOutlined,
   UserOutlined, SettingOutlined, PlusOutlined, EditOutlined, DeleteOutlined,
-  EyeOutlined,
+  EyeOutlined, FileTextOutlined, DownloadOutlined,
 } from '@ant-design/icons';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { qtyLabel } from '../../utils/format.js';
 
@@ -35,7 +37,8 @@ const formatFileSize = (bytes) => {
 };
 
 const Reports = () => {
-  const { user, selectedLocationId } = useAuth();
+  const { user, theme, selectedLocationId, setSelectedLocationId, setIsStorehouse } = useAuth();
+  const isDark = theme === 'dark';
   const [activeTab, setActiveTab] = useState(user?.role === 'admin' ? 'activity' : 'inventory');
   const [inventoryPeriod, setInventoryPeriod] = useState(30);
   const [salesPeriod, setSalesPeriod] = useState(7);
@@ -54,20 +57,74 @@ const Reports = () => {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewingReport, setViewingReport] = useState(null);
+  const [activeReport, setActiveReport] = useState(null);
   const [reportForm] = Form.useForm();
   const [editingReport, setEditingReport] = useState(null);
   const [locations, setLocations] = useState([]);
 
+  const [branchLocations, setBranchLocations] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productsList, setProductsList] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [distributionData, setDistributionData] = useState([]);
   const [stockLevelsView, setStockLevelsView] = useState('table');
 
+  const exportCSV = (data, title, columnDefs) => {
+    if (!data || data.length === 0) {
+      message.warning('No data to export');
+      return;
+    }
+    const headers = columnDefs.map(c => c.label).join(',');
+    const rows = data.map(row =>
+      columnDefs.map(c => {
+        const val = c.accessor(row);
+        const str = val !== null && val !== undefined ? String(val) : '';
+        return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str.replace(/"/g, '""')}"` : str;
+      }).join(',')
+    );
+    const csv = '\uFEFF' + [headers, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title.replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportPDF = (data, title, subtitle, columnDefs, filename) => {
+    if (!data || data.length === 0) {
+      message.warning('No data to export');
+      return;
+    }
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    doc.setFontSize(14);
+    doc.text(title, 14, 20);
+    doc.setFontSize(10);
+    let startY = 27;
+    if (subtitle) {
+      doc.text(subtitle, 14, startY);
+      startY = 33;
+    }
+    doc.setFontSize(9);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, startY);
+    autoTable(doc, {
+      startY: startY + 5,
+      head: [columnDefs.map(c => c.label)],
+      body: data.map(row => columnDefs.map(c => c.accessor(row))),
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [22, 119, 255], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+    doc.save(`${(filename || title).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`);
+  };
+
   const mkParams = (extra) => {
     const p = new URLSearchParams({ usertype: user?.usertype });
     if (user?.user_id) p.set('user_id', user.user_id);
-    p.set('location_id', 'all');
+    p.set('location_id', selectedLocationId !== 'all' ? String(selectedLocationId) : 'all');
     Object.entries(extra || {}).forEach(([k, v]) => {
       if (v !== undefined && v !== null) p.set(k, v);
     });
@@ -346,6 +403,7 @@ const Reports = () => {
       const data = await res.json();
       if (data.success) {
         setLocations(data.data.map((l) => ({ label: l.name, value: l.location_id })));
+        setBranchLocations(data.data.filter((l) => l.is_active));
       }
     } catch {
       message.error('Failed to load locations');
@@ -357,7 +415,10 @@ const Reports = () => {
   }, []);
 
   useEffect(() => {
-    fetchProducts();
+    if (activeTab === 'inventory') fetchProducts();
+  }, [activeTab]);
+
+  useEffect(() => {
     if (activeTab === 'inventory') {
       fetchInventory();
       fetchDistribution();
@@ -369,19 +430,13 @@ const Reports = () => {
       fetchStoreReports();
     }
     else if (activeTab === 'system') fetchSystem();
-  }, [activeTab]);
+  }, [activeTab, selectedLocationId, salesPeriod, financialPeriod, activityPeriod]);
 
   useEffect(() => {
     if (activeTab === 'inventory') {
       fetchDistribution();
     }
   }, [selectedProduct]);
-
-  useEffect(() => {
-    if (activeTab === 'inventory') {
-      fetchInventory();
-    }
-  }, [selectedLocationId]);
 
   const isOwner = user?.role === 'owner';
   const isAdmin = user?.role === 'admin';
@@ -437,7 +492,7 @@ const Reports = () => {
 
   const tabs = [];
 
-  if (isOwner) {
+  if (isOwner || isManager) {
     tabs.push({
       key: 'inventory',
       label: <span><DatabaseOutlined /> Inventory</span>,
@@ -558,14 +613,68 @@ const Reports = () => {
       label: <span><ShoppingCartOutlined /> Sales</span>,
       children: (
         <Spin spinning={loading.sales}>
-          <Space style={{ marginBottom: 16 }}>
-            <span>Period:</span>
-            <Select value={salesPeriod} onChange={(v) => setSalesPeriod(v)} style={{ width: 120 }}>
-              <Select.Option value={7}>7 days</Select.Option>
-              <Select.Option value={30}>30 days</Select.Option>
-              <Select.Option value={90}>90 days</Select.Option>
-            </Select>
-          </Space>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+            <Space>
+              {user && (user.usertype === 1 || user.usertype === 3) && (
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'all', label: 'All Locations' },
+                      ...branchLocations.map(loc => ({ key: String(loc.location_id), label: loc.name })),
+                    ],
+                    onClick: ({ key }) => {
+                      if (key === 'all') {
+                        setSelectedLocationId('all');
+                        setIsStorehouse(false);
+                      } else {
+                        setSelectedLocationId(Number(key));
+                        const loc = branchLocations.find(l => l.location_id === Number(key));
+                        setIsStorehouse(loc ? loc.is_storehouse : false);
+                      }
+                    },
+                  }}
+                >
+                  <Button type={selectedLocationId !== 'all' ? 'primary' : 'default'}>
+                    {selectedLocationId !== 'all'
+                      ? (branchLocations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
+                      : 'All Locations'}
+                  </Button>
+                </Dropdown>
+              )}
+              <span>Period:</span>
+              <Select value={salesPeriod} onChange={(v) => setSalesPeriod(v)} style={{ width: 120 }}>
+                <Select.Option value={7}>7 days</Select.Option>
+                <Select.Option value={30}>30 days</Select.Option>
+                <Select.Option value={90}>90 days</Select.Option>
+              </Select>
+            </Space>
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: 'csv',
+                    label: 'CSV',
+                    onClick: () => exportCSV(salesData.topProducts, `Top_Products_${salesPeriod}d`, [
+                      { label: 'Product', accessor: (r) => r.product_name },
+                      { label: 'Qty Sold', accessor: (r) => r.total_quantity },
+                      { label: 'Total Revenue', accessor: (r) => r.total_revenue },
+                    ]),
+                  },
+                  {
+                    key: 'pdf',
+                    label: 'PDF',
+                    onClick: () => exportPDF(salesData.topProducts, `Top Products - ${salesPeriod} days`, null, [
+                      { label: 'Product', accessor: (r) => r.product_name },
+                      { label: 'Qty Sold', accessor: (r) => r.total_quantity },
+                      { label: 'Total Revenue', accessor: (r) => r.total_revenue },
+                    ], `Top_Products_${salesPeriod}d`),
+                  },
+                ],
+              }}
+            >
+              <Button icon={<DownloadOutlined />}>Export</Button>
+            </Dropdown>
+          </div>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={8}>
               <Card><Statistic title="Total Orders" value={salesData.stats.total_orders ?? 0} /></Card>
@@ -609,20 +718,85 @@ const Reports = () => {
     });
   }
 
-  if (isOwner) {
+  if (isOwner || isManager) {
     tabs.push({
       key: 'financial',
       label: <span><DollarOutlined /> Financial</span>,
       children: (
         <Spin spinning={loading.financial}>
-          <Space style={{ marginBottom: 16 }}>
-            <span>Period:</span>
-            <Select value={financialPeriod} onChange={(v) => setFinancialPeriod(v)} style={{ width: 120 }}>
-              <Select.Option value={30}>30 days</Select.Option>
-              <Select.Option value={90}>90 days</Select.Option>
-              <Select.Option value={365}>365 days</Select.Option>
-            </Select>
-          </Space>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+            <Space>
+              {user && (user.usertype === 1 || user.usertype === 3) && (
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'all', label: 'All Locations' },
+                      ...branchLocations.map(loc => ({ key: String(loc.location_id), label: loc.name })),
+                    ],
+                    onClick: ({ key }) => {
+                      if (key === 'all') {
+                        setSelectedLocationId('all');
+                        setIsStorehouse(false);
+                      } else {
+                        setSelectedLocationId(Number(key));
+                        const loc = branchLocations.find(l => l.location_id === Number(key));
+                        setIsStorehouse(loc ? loc.is_storehouse : false);
+                      }
+                    },
+                  }}
+                >
+                  <Button type={selectedLocationId !== 'all' ? 'primary' : 'default'}>
+                    {selectedLocationId !== 'all'
+                      ? (branchLocations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
+                      : 'All Locations'}
+                  </Button>
+                </Dropdown>
+              )}
+              <span>Period:</span>
+              <Select value={financialPeriod} onChange={(v) => setFinancialPeriod(v)} style={{ width: 120 }}>
+                <Select.Option value={30}>30 days</Select.Option>
+                <Select.Option value={90}>90 days</Select.Option>
+                <Select.Option value={365}>365 days</Select.Option>
+              </Select>
+            </Space>
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: 'csv',
+                    label: 'CSV',
+                    onClick: () => exportCSV(financialData.revenue, `Revenue_by_Date_${financialPeriod}d`, [
+                      { label: 'Date', accessor: (r) => r.date },
+                      { label: 'Orders', accessor: (r) => r.order_count },
+                      { label: 'Revenue', accessor: (r) => r.revenue },
+                    ]),
+                  },
+                  {
+                    key: 'pdf',
+                    label: 'PDF',
+                    onClick: () => {
+                      const branchName = selectedLocationId !== 'all'
+                        ? (branchLocations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
+                        : 'All Locations';
+                      exportPDF(
+                        financialData.revenue,
+                        branchName,
+                        `Revenue - ${financialPeriod} days`,
+                        [
+                          { label: 'Date', accessor: (r) => r.date },
+                          { label: 'Orders', accessor: (r) => r.order_count },
+                          { label: 'Revenue', accessor: (r) => r.revenue },
+                        ],
+                        `Revenue_${branchName.replace(/\s+/g, '_')}_${financialPeriod}d`
+                      );
+                    },
+                  },
+                ],
+              }}
+            >
+              <Button icon={<DownloadOutlined />}>Export</Button>
+            </Dropdown>
+          </div>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12}>
               <Card><Statistic title="Total Revenue" value={formatCurrency(financialData.stats.total_revenue)} /></Card>
@@ -653,6 +827,127 @@ const Reports = () => {
                   size="small"
                 />
               </Card>
+            </Col>
+          </Row>
+        </Spin>
+      ),
+    });
+  }
+
+  if (isManager) {
+    tabs.push({
+      key: 'store-reports',
+      label: <span><FileTextOutlined /> Store Reports</span>,
+      children: (
+        <Spin spinning={loadingStoreReports}>
+          <div style={{ marginBottom: 16, textAlign: 'right' }}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateReport}>New Report</Button>
+          </div>
+          <Row gutter={16} style={{ height: 'calc(100vh - 280px)' }}>
+            <Col xs={24} md={10}>
+              <div style={{ height: '100%', overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 6 }}>
+                {storeReports.length === 0 ? (
+                  <div style={{ padding: 24, textAlign: 'center', color: '#8c8c8c' }}>No reports yet</div>
+                ) : (
+                  storeReports.map((report) => {
+                    const colors = { pending: 'orange', resolved: 'green', voided: 'red' };
+                    const labels = { store: 'Store Issue', materials: 'Materials Issue', software: 'Software Issue' };
+                    return (
+                      <div
+                        key={report.report_id}
+                        onClick={() => setActiveReport(report)}
+                        style={{
+                          padding: '12px 16px',
+                          cursor: 'pointer',
+                          borderBottom: '1px solid #f0f0f0',
+                          background: activeReport?.report_id === report.report_id ? (isDark ? '#1d1d1d' : '#e6f4ff') : 'transparent',
+                          borderLeft: activeReport?.report_id === report.report_id ? '3px solid #1677ff' : '3px solid transparent',
+                        }}
+                      >
+                        <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>{report.title}</div>
+                        <Space size={4}>
+                          <Tag color={colors[report.status]}>{report.status}</Tag>
+                          <Tag>{labels[report.issue_type] || report.issue_type}</Tag>
+                        </Space>
+                        <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 4 }}>
+                          {report.username} · {report.created_at ? new Date(report.created_at).toLocaleDateString() : ''}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </Col>
+            <Col xs={24} md={14}>
+              <div style={{ height: '100%', overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 6, padding: 24 }}>
+                {!activeReport ? (
+                  <div style={{ textAlign: 'center', paddingTop: 80, color: '#8c8c8c' }}>
+                    Select a report to view details
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>{activeReport.title}</div>
+                    <Row gutter={[16, 12]}>
+                      <Col xs={24} sm={12}>
+                        <div style={{ color: '#888', fontSize: 12 }}>Branch</div>
+                        <div>{activeReport.location_name}</div>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <div style={{ color: '#888', fontSize: 12 }}>Issue Type</div>
+                        <div>
+                          <Tag color="blue">{ISSUE_TYPES.find((t) => t.value === activeReport.issue_type)?.label}</Tag>
+                        </div>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <div style={{ color: '#888', fontSize: 12 }}>Status</div>
+                        <div>
+                          <Tag color={activeReport.status === 'resolved' ? 'green' : activeReport.status === 'voided' ? 'red' : 'orange'}>
+                            {activeReport.status}
+                          </Tag>
+                        </div>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <div style={{ color: '#888', fontSize: 12 }}>Submitted By</div>
+                        <div>{activeReport.username}</div>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <div style={{ color: '#888', fontSize: 12 }}>Date Submitted</div>
+                        <div>{activeReport.created_at ? new Date(activeReport.created_at).toLocaleString() : ''}</div>
+                      </Col>
+                      {activeReport.status === 'resolved' && activeReport.resolved_by_username && (
+                        <>
+                          <Col xs={24} sm={12}>
+                            <div style={{ color: '#888', fontSize: 12 }}>Resolved By</div>
+                            <div>{activeReport.resolved_by_username}</div>
+                          </Col>
+                          <Col xs={24} sm={12}>
+                            <div style={{ color: '#888', fontSize: 12 }}>Resolved At</div>
+                            <div>{activeReport.resolved_at ? new Date(activeReport.resolved_at).toLocaleString() : ''}</div>
+                          </Col>
+                        </>
+                      )}
+                      <Col xs={24}>
+                        <div style={{ color: '#888', fontSize: 12 }}>Description</div>
+                        <div style={{ whiteSpace: 'pre-wrap', background: '#fafafa', padding: 12, borderRadius: 4, marginTop: 4 }}>
+                          {activeReport.description}
+                        </div>
+                      </Col>
+                    </Row>
+                    <Divider />
+                    <Space>
+                      {activeReport.status === 'pending' && user?.user_id === activeReport.user_id && (
+                        <>
+                          <Button icon={<EditOutlined />} onClick={() => { setEditingReport(activeReport); reportForm.setFieldsValue({ title: activeReport.title, issue_type: activeReport.issue_type, description: activeReport.description }); setReportModalOpen(true); }}>Edit</Button>
+                          <Button danger icon={<DeleteOutlined />} onClick={() => handleVoidReport(activeReport.report_id)}>Void</Button>
+                        </>
+                      )}
+                      {activeReport.status === 'pending' && (
+                        <Button type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} onClick={() => handleUpdateStatus(activeReport.report_id, 'resolved')}>Mark Resolved</Button>
+                      )}
+                    </Space>
+                  </div>
+                )}
+              </div>
             </Col>
           </Row>
         </Spin>
@@ -792,15 +1087,10 @@ const Reports = () => {
     });
   }
 
-  if (isManager) {
-    return <ManagerReports user={user} selectedLocationId={selectedLocationId} />;
-  }
-
-  const isOwnerOrAdmin = user?.role === 'owner' || user?.role === 'admin';
+  const isOwnerOrAdmin = user?.role === 'owner' || user?.role === 'admin' || user?.role === 'manager';
 
   return (
     <div>
-      <Title level={4} style={{ marginBottom: 16 }}>Reports</Title>
       <Card styles={{ body: { padding: '16px 24px' } }}>
         <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabs} />
       </Card>
@@ -916,6 +1206,7 @@ const STATUS_COLORS = {
   voided: 'red',
 };
 
+// kept for potential future use — standalone store reports view for managers
 const ManagerReports = ({ user, selectedLocationId }) => {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
