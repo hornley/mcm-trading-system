@@ -611,7 +611,7 @@ const POSModal = ({
       </Modal>
 
       <Modal
-        title={`Select Pattern — ${varietyModalProduct?.name || ''}`}
+        title={`Select Variety — ${varietyModalProduct?.name || ''}`}
         open={varietyModalVisible}
         onCancel={() => { setVarietyModalVisible(false); setVarietyModalProduct(null); setSelectedVariety(null); }}
         footer={[
@@ -647,6 +647,7 @@ const POSModal = ({
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 500, fontSize: 14 }}>
                       {v.pattern || 'Default'}
+                      <Tag style={{ marginLeft: 8, fontSize: 10 }}>Stock: {v.stock ?? '?'}</Tag>
                     </div>
                     <div style={{ fontSize: 11, color: '#888' }}>
                       {v.color && <span style={{ color: v.color, fontWeight: 600 }}>{v.color}</span>}

@@ -86,7 +86,15 @@ def _generate_sku():
     return f"PROD-{count + 1:03d}"
 
 
-def _serialize_product(product, include_inventory=False):
+def _get_variety_stock(variety_id, location_id=None):
+    inv = Inventory.query.filter_by(variety_id=variety_id)
+    if location_id:
+        inv = inv.filter_by(location_id=location_id)
+    total = sum(i.quantity for i in inv.all())
+    return total
+
+
+def _serialize_product(product, include_inventory=False, location_id=None):
     varieties = ProductVariety.query.filter_by(product_id=product.product_id).all()
     data = {
         "product_id": product.product_id,
@@ -108,6 +116,7 @@ def _serialize_product(product, include_inventory=False):
                 "variety_sku": v.variety_sku,
                 "color": v.color,
                 "pattern": v.pattern,
+                "stock": _get_variety_stock(v.variety_id, location_id),
             }
             for v in varieties
         ],
@@ -164,7 +173,7 @@ def list_products():
 
     result = []
     for p in products:
-        data = _serialize_product(p)
+        data = _serialize_product(p, location_id=resolved_location_id)
         if resolved_location_id is not None and resolved_location_id != "all":
             inventory = Inventory.query.filter_by(
                 product_id=p.product_id,

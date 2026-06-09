@@ -309,6 +309,9 @@ const Inventory = () => {
                         <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: v.color, display: 'inline-block', border: '1px solid #d9d9d9' }} />
                       )}
                       {v.pattern && <span>{v.pattern}</span>}
+                      <span style={{ color: '#888', marginLeft: 2 }}>
+                        {v.stock != null ? `(${v.stock})` : ''}
+                      </span>
                     </div>
                   ))}
                 </div>
