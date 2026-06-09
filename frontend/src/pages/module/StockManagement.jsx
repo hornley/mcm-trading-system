@@ -109,9 +109,13 @@ const StockManagement = () => {
         for (const g of Object.values(groups)) {
           if (g.parent) {
             g.parent.varietiesList = g.varieties;
+            if (g.varieties.length > 0) {
+              g.parent.quantity = g.varieties.reduce((sum, v) => sum + (v.quantity || 0), 0);
+            }
             merged.push(g.parent);
           } else if (g.varieties.length > 0) {
             g.varieties[0].varietiesList = g.varieties;
+            g.varieties[0].quantity = g.varieties.reduce((sum, v) => sum + (v.quantity || 0), 0);
             merged.push(g.varieties[0]);
           }
         }
