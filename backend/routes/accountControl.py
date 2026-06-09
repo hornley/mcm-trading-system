@@ -1,6 +1,6 @@
 from datetime import datetime
 from flask import Blueprint, request, jsonify
-from models import db, User
+from models import db, User, ActivityLog
 
 account_bp = Blueprint("account", __name__)
 
@@ -56,6 +56,7 @@ def list_users():
             "username": u.username,
             "usertype": u.usertype,
             "location": _location_name(u.location_id),
+            "is_active": u.is_active,
         }
         for u in users
     ])
@@ -92,4 +93,41 @@ def edit_user_access(target_id):
         "username": target.username,
         "usertype": target.usertype,
         "location": _location_name(target.location_id),
+    })
+
+
+@account_bp.route("/api/account/users/<int:target_id>/void", methods=["PUT"])
+def void_user(target_id):
+    data = request.get_json()
+    requester_usertype = data.get("requester_usertype") if data else None
+    if requester_usertype is None:
+        return jsonify({"error": "requester_usertype is required"}), 400
+    if not _check_access(requester_usertype):
+        return jsonify({"error": "Forbidden"}), 403
+
+    target = User.query.get(target_id)
+    if not target:
+        return jsonify({"error": "User not found"}), 404
+
+    if not target.is_active:
+        return jsonify({"error": "User is already voided"}), 400
+
+    target.is_active = False
+    db.session.commit()
+
+    log = ActivityLog(
+        user_id=data.get("requester_id", 0),
+        module="User Access",
+        action_type="void",
+        action=f"Voided user {target.username} ({target.employee_code})",
+        details=f"User {target.user_id} voided by usertype {requester_usertype}",
+    )
+    db.session.add(log)
+    db.session.commit()
+
+    return jsonify({
+        "message": "User voided successfully",
+        "user_id": target.user_id,
+        "employee_code": target.employee_code,
+        "username": target.username,
     })

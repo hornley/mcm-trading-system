@@ -14,6 +14,7 @@ class User(db.Model):
     password = db.Column(db.String, nullable=False)
     location_id = db.Column(db.Integer, nullable=False, default=0)
     employee_code = db.Column(db.String, nullable=False, unique=True)
+    is_active = db.Column(db.Boolean, default=True)
     theme = db.Column(db.String, default= "light")
     fontsize = db.Column(db.String, default= "medium") 
     # profile_picture = db.Column(db.String, nullable=True)
