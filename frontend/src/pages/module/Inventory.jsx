@@ -282,39 +282,37 @@ const Inventory = () => {
               <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>
                 {product.category === FABRIC_CATEGORY ? 'yards' : (product.unit || '-')}
               </div>
-              {product.quantity != null ? (
-                <Space style={{ marginBottom: 8 }}>
-                  <span style={{ fontSize: 16, fontWeight: 700, color: getStockStatus(product.quantity, product.reorder_level).color }}>
-                    {qtyLabel(product.quantity)}
-                  </span>
-                  {getStockStatus(product.quantity, product.reorder_level).tag}
-                </Space>
+              {product.varieties && product.varieties.length > 0 ? (
+                <div style={{ marginBottom: 8 }}>
+                  <Select
+                    style={{ width: '100%' }}
+                    size="small"
+                    placeholder="Select variety to view stock"
+                    options={product.varieties.map((v) => ({
+                      label: (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {v.color && <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: v.color, display: 'inline-block', border: '1px solid #d9d9d9' }} />}
+                          <span>{v.pattern || 'Default'}</span>
+                          <span style={{ color: '#888', fontSize: 11 }}>{v.stock != null ? `(${v.stock})` : ''}</span>
+                        </span>
+                      ),
+                      value: v.variety_id,
+                    }))}
+                  />
+                </div>
               ) : (
-                <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>
-                  Stock: -
-                </div>
-              )}
-
-              {product.varieties && product.varieties.length > 0 && (
-                <div style={{ marginBottom: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                  {product.varieties.map((v) => (
-                    <div key={v.variety_id} title={`${v.color || ''} ${v.pattern || ''}`.trim()}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 3,
-                        padding: '1px 6px', borderRadius: 10, border: '1px solid #d9d9d9',
-                        fontSize: 11, background: '#fafafa',
-                      }}
-                    >
-                      {v.color && (
-                        <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: v.color, display: 'inline-block', border: '1px solid #d9d9d9' }} />
-                      )}
-                      {v.pattern && <span>{v.pattern}</span>}
-                      <span style={{ color: '#888', marginLeft: 2 }}>
-                        {v.stock != null ? `(${v.stock})` : ''}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                product.quantity != null ? (
+                  <Space style={{ marginBottom: 8 }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: getStockStatus(product.quantity, product.reorder_level).color }}>
+                      {qtyLabel(product.quantity)}
+                    </span>
+                    {getStockStatus(product.quantity, product.reorder_level).tag}
+                  </Space>
+                ) : (
+                  <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>
+                    Stock: -
+                  </div>
+                )
               )}
 
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
