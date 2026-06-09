@@ -35,6 +35,19 @@ const Inventory = () => {
   const [varieties, setVarieties] = useState([]);
   const [varietyColorPickerVisible, setVarietyColorPickerVisible] = useState(false);
   const [editingVarietyIndex, setEditingVarietyIndex] = useState(null);
+  const [activeColorProductId, setActiveColorProductId] = useState(null);
+
+  const toggleColorBubble = (productId) => {
+    setActiveColorProductId((prev) => (prev === productId ? null : productId));
+  };
+
+  useEffect(() => {
+    if (activeColorProductId !== null) {
+      const handler = () => setActiveColorProductId(null);
+      document.addEventListener('click', handler);
+      return () => document.removeEventListener('click', handler);
+    }
+  }, [activeColorProductId]);
 
   const fetchData = async () => {
     if (!user) return;
@@ -267,6 +280,7 @@ const Inventory = () => {
                 borderColor: product.is_active ? '#52c41a' : '#ff4d4f',
                 borderWidth: 2,
                 height: '100%',
+                overflow: 'visible',
               }}
               styles={{ body: { padding: 16 } }}
             >
@@ -282,42 +296,100 @@ const Inventory = () => {
               <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>
                 {product.category === FABRIC_CATEGORY ? 'yards' : (product.unit || '-')}
               </div>
-              {product.varieties && product.varieties.length > 0 ? (
-                <div style={{ marginBottom: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                  {product.varieties.map((v) => (
-                    <div key={v.variety_id} title={`${v.color || ''} ${v.pattern || ''}`.trim()}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 3,
-                        padding: '1px 6px', borderRadius: 10, border: '1px solid #d9d9d9',
-                        fontSize: 11, background: '#fafafa',
-                      }}
-                    >
-                      {v.color && (
-                        <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: v.color, display: 'inline-block', border: '1px solid #d9d9d9' }} />
-                      )}
-                      {v.pattern && <span>{v.pattern}</span>}
-                      <span style={{ color: '#888', marginLeft: 2 }}>
-                        {v.stock != null ? `(${v.stock})` : ''}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                product.quantity != null ? (
+              {(() => {
+                const totalQty = product.varieties?.length
+                  ? product.varieties.reduce((s, v) => s + (Number(v.stock) || 0), 0)
+                  : product.quantity;
+                const status = totalQty != null ? getStockStatus(totalQty, product.reorder_level) : null;
+                return totalQty != null ? (
                   <Space style={{ marginBottom: 8 }}>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: getStockStatus(product.quantity, product.reorder_level).color }}>
-                      {qtyLabel(product.quantity)}
+                    <span style={{ fontSize: 16, fontWeight: 700, color: status?.color }}>
+                      {qtyLabel(totalQty)}
                     </span>
-                    {getStockStatus(product.quantity, product.reorder_level).tag}
+                    {status?.tag}
                   </Space>
                 ) : (
-                  <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>
-                    Stock: -
-                  </div>
-                )
-              )}
+                  <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>Stock: -</div>
+                );
+              })()}
 
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
+                {product.varieties?.length > 0 && (
+                  <div style={{ position: 'relative', display: 'inline-flex' }}>
+                    <div
+                      onClick={(e) => { e.stopPropagation(); toggleColorBubble(product.product_id); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 3,
+                        borderRadius: 20, border: '1px solid #d9d9d9',
+                        padding: '1px 8px 1px 4px', height: 24, cursor: 'pointer',
+                        background: '#fafafa',
+                      }}
+                    >
+                      {product.varieties.slice(0, 4).map((v) => (
+                        <div
+                          key={v.variety_id}
+                          style={{
+                            width: 14, height: 14, borderRadius: '50%',
+                            backgroundColor: activeColorProductId === product.product_id ? '#888' : (v.color || '#eee'),
+                            border: '1px solid #d9d9d9', flexShrink: 0,
+                          }}
+                        />
+                      ))}
+                      {product.varieties.length > 4 && (
+                        <span style={{ fontSize: 10, color: activeColorProductId === product.product_id ? '#ccc' : '#888', lineHeight: 1 }}>
+                          +{product.varieties.length - 4}
+                        </span>
+                      )}
+                    </div>
+
+                    {activeColorProductId === product.product_id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          position: 'absolute',
+                          bottom: '100%',
+                          left: 0,
+                          marginBottom: 10,
+                          backgroundColor: '#fff',
+                          border: '1px solid #e8e8e8',
+                          borderRadius: 10,
+                          boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
+                          padding: '14px 16px',
+                          minWidth: 240,
+                          zIndex: 20,
+                        }}
+                      >
+                        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, color: '#333' }}>
+                          Varieties ({product.varieties.length})
+                        </div>
+                        {product.varieties.map((v) => (
+                          <div
+                            key={v.variety_id}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 10,
+                              padding: '6px 0',
+                              borderBottom: '1px solid #f0f0f0',
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 22, height: 22, borderRadius: '50%',
+                                backgroundColor: v.color || '#eee',
+                                border: '1px solid #d9d9d9', flexShrink: 0,
+                              }}
+                            />
+                            <span style={{ fontSize: 13, flex: 1, color: '#444' }}>
+                              {v.pattern || v.color || '—'}
+                            </span>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>
+                              {v.stock != null ? qtyLabel(v.stock) : 0}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {can('update') && product.is_active && (
                   <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(product)}>
                     Edit
