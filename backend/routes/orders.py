@@ -27,7 +27,7 @@ def _resolve_location_id(usertype, user_id, requested_location_id):
     if usertype in [1, 3]:
         user = User.query.get(user_id)
         if user:
-            return user.location_id or requested_location_id, None
+            return user.location_id if user.location_id is not None else requested_location_id, None
     return requested_location_id, None
 
 
@@ -129,7 +129,7 @@ def create_order():
     if err:
         return err
 
-    if not resolved_location_id:
+    if resolved_location_id is None:
         return error_response("location_id is required", "MISSING_PARAM", 400)
 
     location = Location.query.get(resolved_location_id)
@@ -290,7 +290,7 @@ def list_orders():
 
     query = Order.query
 
-    if resolved_location_id and resolved_location_id != "all":
+    if resolved_location_id is not None and resolved_location_id != "all":
         query = query.filter(Order.location_id == resolved_location_id)
 
     if status:

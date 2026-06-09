@@ -165,7 +165,7 @@ def list_products():
     result = []
     for p in products:
         data = _serialize_product(p)
-        if resolved_location_id and resolved_location_id != "all":
+        if resolved_location_id is not None and resolved_location_id != "all":
             inventory = Inventory.query.filter_by(
                 product_id=p.product_id,
                 location_id=resolved_location_id
@@ -1050,7 +1050,7 @@ def get_low_stock():
             continue
 
         query = Inventory.query.filter_by(product_id=product.product_id)
-        if resolved_location_id and resolved_location_id != "all":
+        if resolved_location_id is not None and resolved_location_id != "all":
             query = query.filter_by(location_id=resolved_location_id)
 
         store_qty = 0
