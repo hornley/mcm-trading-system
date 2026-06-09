@@ -67,6 +67,7 @@ const StockManagement = () => {
   const [storehousePendingLoading, setStorehousePendingLoading] = useState(false);
   const [branchFilter, setBranchFilter] = useState('all');
   const [storehouseStockFilter, setStorehouseStockFilter] = useState('all');
+  const [expandedRowKeys, setExpandedRowKeys] = useState([]);
   const receiptCaptureRef = useRef(null);
 
   const fetchData = async (page, sortOverrides, sizeOverride) => {
@@ -615,24 +616,16 @@ const StockManagement = () => {
       render: (qty, record) => {
         const varieties = record.varietiesList;
         if (varieties && varieties.length > 0) {
+          const isExpanded = expandedRowKeys.includes(record.inventory_id);
           return (
-            <Select
-              size="small"
-              style={{ width: 160 }}
-              defaultValue="all"
-              options={[
-                { label: `Total: ${fmtQty(qty, record.category === FABRIC_CATEGORY)}`, value: 'all' },
-                ...varieties.map((v) => ({
-                  label: (
-                    <span>
-                      {v.color && <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', marginRight: 4 }} />}
-                      {v.pattern || 'Default'}: {fmtQty(v.quantity, record.category === FABRIC_CATEGORY)}
-                    </span>
-                  ),
-                  value: v.variety_id,
-                })),
-              ]}
-            />
+            <span>
+              <span style={{ fontSize: 10, marginRight: 4, cursor: 'pointer' }} onClick={() => {
+                setExpandedRowKeys((prev) =>
+                  isExpanded ? prev.filter((id) => id !== record.inventory_id) : [...prev, record.inventory_id]
+                );
+              }}>{isExpanded ? '▼' : '▶'}</span>
+              {fmtQty(qty, record.category === FABRIC_CATEGORY)}
+            </span>
           );
         }
         return fmtQty(qty, record.category === FABRIC_CATEGORY);
@@ -984,6 +977,33 @@ const StockManagement = () => {
               if (q === 0) return 'row-out-of-stock';
               if (q <= 10) return 'row-low-stock';
               return '';
+            }}
+            expandable={{
+              expandedRowRender: (record) => {
+                const varieties = record.varietiesList;
+                if (!varieties || varieties.length === 0) return null;
+                return (
+                  <div style={{ padding: '8px 0 8px 40px' }}>
+                    {varieties.map((v) => (
+                      <div key={v.variety_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0', fontSize: 13 }}>
+                        {v.color && (
+                          <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', border: '1px solid #d9d9d9' }} />
+                        )}
+                        <span style={{ width: 100 }}>{v.pattern || 'Default'}</span>
+                        <span style={{ color: '#888' }}>{v.color || ''}</span>
+                        <Tag>{fmtQty(v.quantity, record.category === FABRIC_CATEGORY)}</Tag>
+                      </div>
+                    ))}
+                  </div>
+                );
+              },
+              expandedRowKeys,
+              onExpand: (expanded, record) => {
+                setExpandedRowKeys((prev) =>
+                  expanded ? [...prev, record.inventory_id] : prev.filter((id) => id !== record.inventory_id)
+                );
+              },
+              showExpandColumn: false,
             }}
             onChange={(pagination, filters, sorter) => {
               if (sorter.field) {

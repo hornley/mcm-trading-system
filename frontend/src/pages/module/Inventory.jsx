@@ -282,20 +282,7 @@ const Inventory = () => {
               <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>
                 {product.category === FABRIC_CATEGORY ? 'yards' : (product.unit || '-')}
               </div>
-              {product.quantity != null ? (
-                <Space style={{ marginBottom: 8 }}>
-                  <span style={{ fontSize: 16, fontWeight: 700, color: getStockStatus(product.quantity, product.reorder_level).color }}>
-                    {qtyLabel(product.quantity)}
-                  </span>
-                  {getStockStatus(product.quantity, product.reorder_level).tag}
-                </Space>
-              ) : (
-                <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>
-                  Stock: -
-                </div>
-              )}
-
-              {product.varieties && product.varieties.length > 0 && (
+              {product.varieties && product.varieties.length > 0 ? (
                 <div style={{ marginBottom: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                   {product.varieties.map((v) => (
                     <div key={v.variety_id} title={`${v.color || ''} ${v.pattern || ''}`.trim()}
@@ -315,6 +302,19 @@ const Inventory = () => {
                     </div>
                   ))}
                 </div>
+              ) : (
+                product.quantity != null ? (
+                  <Space style={{ marginBottom: 8 }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: getStockStatus(product.quantity, product.reorder_level).color }}>
+                      {qtyLabel(product.quantity)}
+                    </span>
+                    {getStockStatus(product.quantity, product.reorder_level).tag}
+                  </Space>
+                ) : (
+                  <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>
+                    Stock: -
+                  </div>
+                )
               )}
 
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
