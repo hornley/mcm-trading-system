@@ -93,7 +93,28 @@ const StockManagement = () => {
       const countData = await countRes.json();
 
       if (invData.success) {
-        setInventory(invData.data.data || []);
+        const raw = invData.data.data || [];
+        const groups = {};
+        for (const row of raw) {
+          const key = `${row.product_id}-${row.location_id}`;
+          if (!groups[key]) groups[key] = { parent: null, varieties: [] };
+          if (row.variety_id && (row.color || row.pattern)) {
+            groups[key].varieties.push(row);
+          } else {
+            groups[key].parent = row;
+          }
+        }
+        const merged = [];
+        for (const g of Object.values(groups)) {
+          if (g.parent) {
+            g.parent.varietiesList = g.varieties;
+            merged.push(g.parent);
+          } else if (g.varieties.length > 0) {
+            g.varieties[0].varietiesList = g.varieties;
+            merged.push(g.varieties[0]);
+          }
+        }
+        setInventory(merged);
         setTotalCount(invData.data.total_count || 0);
         setCurrentPage(invData.data.page || p);
       }
@@ -591,7 +612,31 @@ const StockManagement = () => {
     }] : []),
     {
       title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
-      render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
+      render: (qty, record) => {
+        const varieties = record.varietiesList;
+        if (varieties && varieties.length > 0) {
+          return (
+            <Select
+              size="small"
+              style={{ width: 160 }}
+              defaultValue="all"
+              options={[
+                { label: `Total: ${fmtQty(qty, record.category === FABRIC_CATEGORY)}`, value: 'all' },
+                ...varieties.map((v) => ({
+                  label: (
+                    <span>
+                      {v.color && <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', marginRight: 4 }} />}
+                      {v.pattern || 'Default'}: {fmtQty(v.quantity, record.category === FABRIC_CATEGORY)}
+                    </span>
+                  ),
+                  value: v.variety_id,
+                })),
+              ]}
+            />
+          );
+        }
+        return fmtQty(qty, record.category === FABRIC_CATEGORY);
+      },
       sorter: true,
     },
     {
