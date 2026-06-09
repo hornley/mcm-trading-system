@@ -7,7 +7,7 @@ import {
 import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js';
-import { RightCircleOutlined } from '@ant-design/icons';
+import { EllipsisOutlined, RightCircleOutlined } from '@ant-design/icons';
 import QtyInput from '../../components/QtyInput.jsx';
 import logoImage from '../../../images/Logo.png';
 import receiptConfig from '../../config/receipt.json';
@@ -619,39 +619,48 @@ const StockManagement = () => {
       },
     },
     {
-      title: 'Actions',
+      title: '',
       key: 'actions',
-      width: 240,
+      width: 60,
       render: (_, record) => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Space size={4}>
-            {can('update') && (
-              <Button type="link" size="small" disabled={selectedLocationId === "all"} onClick={() => handleRequestStock(record)}>
-                Request
-              </Button>
-            )}
-            {can('update') && (
-              <Button type="link" size="small" disabled={selectedLocationId === "all"} onClick={() => handleSetReorder(record)}>
-                Reorder
-              </Button>
-            )}
-            {can('update') && (
-              <Button type="link" size="small" disabled={selectedLocationId === "all"} onClick={() => handleAdjustStock(record)}>
-                Adjust
-              </Button>
-            )}
-          </Space>
-          <Space size={4}>
-            {can('update') && (
-              <Button type="link" size="small" disabled={selectedLocationId === "all" || record.quantity === 0} onClick={() => handleTransferStock(record)}>
-                Transfer
-              </Button>
-            )}
-            <Button type="link" size="small" onClick={() => handleViewDetails(record)}>
-              Details
-            </Button>
-          </Space>
-        </div>
+        <Dropdown
+          menu={{
+            items: [
+              ...(can('update') ? [{
+                key: 'request',
+                label: 'Request',
+                disabled: selectedLocationId === 'all',
+                onClick: () => handleRequestStock(record),
+              }] : []),
+              ...(can('update') ? [{
+                key: 'reorder',
+                label: 'Reorder',
+                disabled: selectedLocationId === 'all',
+                onClick: () => handleSetReorder(record),
+              }] : []),
+              ...(can('update') ? [{
+                key: 'adjust',
+                label: 'Adjust',
+                disabled: selectedLocationId === 'all',
+                onClick: () => handleAdjustStock(record),
+              }] : []),
+              ...(can('update') ? [{
+                key: 'transfer',
+                label: 'Transfer',
+                disabled: selectedLocationId === 'all' || record.quantity === 0,
+                onClick: () => handleTransferStock(record),
+              }] : []),
+              {
+                key: 'details',
+                label: 'Details',
+                onClick: () => handleViewDetails(record),
+              },
+            ],
+          }}
+          trigger={['click']}
+        >
+          <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
+        </Dropdown>
       ),
     },
   ];
