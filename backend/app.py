@@ -77,7 +77,27 @@ def create_app():
             if 'is_active' not in user_cols:
                 db.session.execute(sa.text('ALTER TABLE "Users" ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
                 db.session.commit()
-            if 'Notifications' not in inspector.get_table_names():
+            tables = inspector.get_table_names()
+            if 'Product_Varieties' not in tables:
+                db.create_all()
+                db.session.commit()
+            # Add nullable variety_id FK columns to existing tables
+            mig_tables = [
+                ('Inventory', 'variety_id'),
+                ('Order_Items', 'variety_id'),
+                ('Stock_Transfers', 'variety_id'),
+                ('Stock_Adjustments', 'variety_id'),
+                ('Stock_Requests', 'variety_id'),
+            ]
+            for tname, col in mig_tables:
+                if tname in tables:
+                    existing = [c['name'] for c in inspector.get_columns(tname)]
+                    if col not in existing:
+                        db.session.execute(sa.text(
+                            f'ALTER TABLE "{tname}" ADD COLUMN {col} INTEGER REFERENCES "Product_Varieties"(variety_id)'
+                        ))
+                        db.session.commit()
+            if 'Notifications' not in tables:
                 db.create_all()
                 db.session.commit()
         except Exception as e:
