@@ -577,7 +577,6 @@ def list_inventory():
             {
                 "inventory_id": inv.inventory_id,
                 "product_id": inv.product_id,
-                "variety_id": inv.variety_id,
                 "product_name": inv.product.name,
                 "sku": inv.product.sku,
                 "category_id": inv.product.category_id,
@@ -588,9 +587,6 @@ def list_inventory():
                 "quantity": inv.quantity,
                 "reorder_level": inv.product.reorder_level,
                 "auto_restock_source_id": inv.product.auto_restock_source_id,
-                "color": inv.variety.color if inv.variety else None,
-                "pattern": inv.variety.pattern if inv.variety else None,
-                "variety_sku": inv.variety.variety_sku if inv.variety else None,
             }
             for inv in inventory
         ],
@@ -629,16 +625,12 @@ def get_inventory_by_location(location_id):
         {
             "inventory_id": inv.inventory_id,
             "product_id": inv.product_id,
-            "variety_id": inv.variety_id,
             "product_name": inv.product.name,
             "sku": inv.product.sku,
             "category_id": inv.product.category_id,
             "category": inv.product.category.name if inv.product.category else None,
             "unit": inv.product.unit,
             "quantity": inv.quantity,
-            "color": inv.variety.color if inv.variety else None,
-            "pattern": inv.variety.pattern if inv.variety else None,
-            "variety_sku": inv.variety.variety_sku if inv.variety else None,
         }
         for inv in inventory
     ])
@@ -675,7 +667,6 @@ def get_inventory_by_product(product_id):
         {
             "inventory_id": inv.inventory_id,
             "product_id": product.product_id,
-            "variety_id": inv.variety_id,
             "product_name": product.name,
             "category_id": product.category_id,
             "category": product.category.name if product.category else None,
@@ -683,9 +674,6 @@ def get_inventory_by_product(product_id):
             "location_id": inv.location_id,
             "location_name": inv.location.name if inv.location else None,
             "quantity": inv.quantity,
-            "color": inv.variety.color if inv.variety else None,
-            "pattern": inv.variety.pattern if inv.variety else None,
-            "variety_sku": inv.variety.variety_sku if inv.variety else None,
         }
         for inv in inventory
     ])
