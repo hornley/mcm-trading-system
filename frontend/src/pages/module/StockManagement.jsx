@@ -467,9 +467,19 @@ const StockManagement = () => {
       const res = await fetch(`/api/inventory/low-stock?usertype=${user.usertype}&location_id=${selectedLocationId}&user_id=${user.user_id}`);
       const data = await res.json();
       if (data.success) {
-        setLowStockItems(data.data || []);
+        const raw = data.data || [];
+        const grouped = {};
+        for (const row of raw) {
+          const pid = row.product_id;
+          if (!grouped[pid]) {
+            grouped[pid] = { ...row, quantity: 0 };
+          }
+          grouped[pid].quantity += row.quantity || 0;
+        }
+        const deduped = Object.values(grouped);
+        setLowStockItems(deduped);
         const defaultQtys = {};
-        (data.data || []).forEach((item) => {
+        deduped.forEach((item) => {
           const deficit = Math.max(0, (item.reorder_level || 0) - item.quantity);
           defaultQtys[item.product_id] = deficit > 0 ? deficit + Math.ceil(deficit / 2) : 0;
         });

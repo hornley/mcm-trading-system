@@ -436,18 +436,8 @@ def seed(skip_drop=False):
         db.session.flush()
 
         # ── 11. NOTIFICATIONS (linked to pending stock requests) ──
-        print("Seeding Notifications...")
-        pending_requests = StockRequest.query.filter_by(status="pending").all()
-        for sr in pending_requests:
-            db.session.add(Notification(
-                location_id=storehouse.location_id,
-                type="stock_request",
-                message=f"Stock request for {sr.quantity} units",
-                request_id=sr.request_id,
-                is_read=False,
-                created_at=sr.created_at,
-            ))
-        db.session.flush()
+        # Notifications are created automatically by check_and_auto_restock()
+        # during order creation. No need to seed them explicitly.
 
         # ── 12. ACTIVITY LOGS ──
         print("Seeding Activity Logs...")
@@ -497,7 +487,7 @@ def seed(skip_drop=False):
         print(f"  Adjustments:     {SEED_ADJUSTMENTS}")
         print(f"  Stock Requests:  {SEED_STOCK_REQUESTS}")
         print(f"  Store Reports:   {SEED_STORE_REPORTS}")
-        print(f"  Notifications:   {len(pending_requests)}")
+        print(f"  Notifications:   {Notification.query.count()} (auto-generated)")
         print(f"  Activity Logs:   {SEED_ACTIVITY_LOGS}")
         print(f"  Manual Sections: {ManualSection.query.count()} (owner: {len(owner_sections)}, manager, admin)")
 
@@ -1728,18 +1718,6 @@ def seed_missing_models(locs, users, all_products):
                 description=f"Reported issue at {loc.name}. Needs attention from the team.",
                 status=status, resolved_by=resolved_by_user, resolved_at=resolved_at,
                 created_at=now - timedelta(days=random.randint(0, 60), hours=random.randint(0, 23)),
-            ))
-        db.session.flush()
-        seeded_any = True
-
-    if Notification.query.count() == 0:
-        print("  Seeding Notification...")
-        pending_requests = StockRequest.query.filter_by(status="pending").all()
-        for sr in pending_requests:
-            db.session.add(Notification(
-                location_id=locs[0].location_id, type="stock_request",
-                message=f"Stock request for {sr.quantity} units",
-                request_id=sr.request_id, is_read=False, created_at=sr.created_at,
             ))
         db.session.flush()
         seeded_any = True

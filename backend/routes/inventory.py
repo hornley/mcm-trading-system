@@ -1474,7 +1474,7 @@ def list_pending_requests():
         "to_location_id": r.to_location_id,
         "to_location_name": r.to_location.name if r.to_location else "Unknown",
         "requested_by": r.requested_by,
-        "requester_name": r.requester.username if r.requester else "Unknown",
+        "requester_name": r.requester.username if r.requester else "System",
         "status": r.status,
         "created_at": r.created_at.isoformat() if r.created_at else None,
     } for r in requests])
@@ -1499,7 +1499,7 @@ def list_request_logs():
         "to_location_id": r.to_location_id,
         "to_location_name": r.to_location.name if r.to_location else "Unknown",
         "requested_by": r.requested_by,
-        "requester_name": r.requester.username if r.requester else "Unknown",
+        "requester_name": r.requester.username if r.requester else "System",
         "status": r.status,
         "created_at": r.created_at.isoformat() if r.created_at else None,
     } for r in requests])
