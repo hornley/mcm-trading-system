@@ -1,6 +1,7 @@
 from flask import Blueprint, request
 from datetime import datetime
 from sqlalchemy import cast, String
+from sqlalchemy.orm import selectinload, joinedload
 from models import db, User, Order, OrderItem, Payment, Product, Inventory, Location, ProductVariety
 from utils.response import success_response, error_response
 from utils.validation import validate_required, validate_quantity
@@ -32,8 +33,6 @@ def _resolve_location_id(usertype, user_id, requested_location_id):
 
 
 def _serialize_order_detail(order):
-    items = OrderItem.query.filter_by(order_id=order.order_id).all()
-    payments = Payment.query.filter_by(order_id=order.order_id).all()
     return {
         "order_id": order.order_id,
         "location_id": order.location_id,
@@ -56,7 +55,7 @@ def _serialize_order_detail(order):
                 "color": item.variety.color if item.variety else None,
                 "pattern": item.variety.pattern if item.variety else None,
             }
-            for item in items
+            for item in (order.items or [])
         ],
         "payments": [
             {
@@ -65,15 +64,16 @@ def _serialize_order_detail(order):
                 "quantity": p.quantity,
                 "price": p.price,
             }
-            for p in payments
+            for p in (order.payments or [])
         ],
-        "item_count": len(items),
+        "item_count": len(order.items) if order.items else 0,
     }
 
 
 def _serialize_order_list(order):
-    first_payment = Payment.query.filter_by(order_id=order.order_id).first()
-    items = OrderItem.query.filter_by(order_id=order.order_id).all()
+    items = order.items or []
+    payments = order.payments or []
+    first_payment = payments[0] if payments else None
     return {
         "order_id": order.order_id,
         "location_id": order.location_id,
@@ -246,6 +246,16 @@ def create_order():
 
     db.session.commit()
 
+    order = Order.query.options(
+        selectinload(Order.items)
+            .selectinload(OrderItem.product)
+            .selectinload(Product.category),
+        selectinload(Order.items)
+            .selectinload(OrderItem.variety),
+        selectinload(Order.payments),
+        selectinload(Order.location),
+    ).get(order.order_id)
+
     check_and_auto_restock(resolved_location_id)
 
     log_activity(
@@ -327,7 +337,15 @@ def list_orders():
     include_items = request.args.get("include_items", "").lower() == "true"
 
     total_count = query.count()
-    orders = query.offset((page - 1) * limit).limit(limit).all()
+    orders = query.options(
+        selectinload(Order.items)
+            .selectinload(OrderItem.product)
+            .selectinload(Product.category),
+        selectinload(Order.items)
+            .selectinload(OrderItem.variety),
+        selectinload(Order.payments),
+        selectinload(Order.location),
+    ).offset((page - 1) * limit).limit(limit).all()
 
     serializer = _serialize_order_detail if include_items else _serialize_order_list
 
@@ -345,7 +363,15 @@ def get_order(order_id):
     if not _authorized(usertype):
         return error_response("Unauthorized", "UNAUTHORIZED", 403)
 
-    order = Order.query.get(order_id)
+    order = Order.query.options(
+        selectinload(Order.items)
+            .selectinload(OrderItem.product)
+            .selectinload(Product.category),
+        selectinload(Order.items)
+            .selectinload(OrderItem.variety),
+        selectinload(Order.payments),
+        selectinload(Order.location),
+    ).get(order_id)
     if not order:
         return error_response("Order not found", "NOT_FOUND", 404)
 
@@ -387,6 +413,16 @@ def void_order(order_id):
 
     order.status = "voided"
     db.session.commit()
+
+    order = Order.query.options(
+        selectinload(Order.items)
+            .selectinload(OrderItem.product)
+            .selectinload(Product.category),
+        selectinload(Order.items)
+            .selectinload(OrderItem.variety),
+        selectinload(Order.payments),
+        selectinload(Order.location),
+    ).get(order.order_id)
 
     log_activity(
         user_id=user_id,
