@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from app import create_app
 from models import db, User, Location, Category, Product, Order, OrderItem
 from models import Payment, Inventory, StockTransfer, StockAdjustment, ActivityLog, ManualSection
-from models import StockRequest, StoreReport, Notification
+from models import StockRequest, StoreReport, Notification, ProductVariety
 from werkzeug.security import generate_password_hash
 
 # ── Configuration ──
@@ -203,15 +203,54 @@ def seed(skip_drop=False):
             all_products.append(p)
         db.session.flush()
 
-        # ── 5. INVENTORY ──
+        # ── 4b. VARIETIES (for fabric products) ──
+        print("Seeding Varieties...")
+        COLORS = [
+            ("#FF0000", "Red"), ("#0070C0", "Blue"), ("#00B050", "Green"),
+            ("#000000", "Black"), ("#FFFFFF", "White"), ("#FFFF00", "Yellow"),
+            ("#7030A0", "Purple"), ("#FF7F00", "Orange"),
+        ]
+        PATTERNS = ["Solid", "Striped", "Polka Dot", "Floral", "Plaid", "Geometric", "Chevron", "Abstract"]
+
+        fabric_products = [p for p in all_products if p.category_id == cat_fabrics.category_id]
+        all_varieties = []
+        for p in fabric_products:
+            n = random.randint(3, 5)
+            chosen_colors = random.sample(COLORS, min(n, len(COLORS)))
+            for i, (hex_val, color_name) in enumerate(chosen_colors):
+                pattern = random.choice(PATTERNS)
+                vs = f"{p.sku}-{i + 1:02d}"
+                v = ProductVariety(
+                    product_id=p.product_id,
+                    variety_sku=vs,
+                    color=color_name,
+                    pattern=pattern,
+                )
+                db.session.add(v)
+                all_varieties.append(v)
+        db.session.flush()
+        fabric_varieties = {p.product_id: [v for v in all_varieties if v.product_id == p.product_id] for p in fabric_products}
         print("Seeding Inventory...")
         # Track inventory in memory for order deduction
         inv_map = {}
         for p in all_products:
+            p_varieties = fabric_varieties.get(p.product_id, [])
             for loc in locs:
                 qty = random.randint(50, 200) if loc == storehouse else random.randint(15, 80)
-                db.session.add(Inventory(product_id=p.product_id, location_id=loc.location_id, quantity=qty))
-                inv_map[(p.product_id, loc.location_id)] = qty
+                if p_varieties:
+                    remaining = qty
+                    per_variety = max(1, qty // (len(p_varieties) + 1))
+                    for v in p_varieties:
+                        v_qty = min(per_variety, remaining)
+                        if v_qty > 0:
+                            db.session.add(Inventory(product_id=p.product_id, variety_id=v.variety_id, location_id=loc.location_id, quantity=v_qty))
+                            inv_map[(p.product_id, loc.location_id, v.variety_id)] = v_qty
+                            remaining -= v_qty
+                    db.session.add(Inventory(product_id=p.product_id, location_id=loc.location_id, quantity=remaining))
+                    inv_map[(p.product_id, loc.location_id)] = remaining
+                else:
+                    db.session.add(Inventory(product_id=p.product_id, location_id=loc.location_id, quantity=qty))
+                    inv_map[(p.product_id, loc.location_id)] = qty
         db.session.flush()
 
         # ── 6. ORDERS + ITEMS + PAYMENTS (with inventory deduction) ──
@@ -242,42 +281,63 @@ def seed(skip_drop=False):
 
             items = []
             for p in chosen:
-                max_qty = inv_map.get((p.product_id, loc.location_id), 0)
-                if max_qty < 1:
-                    continue
-                qty = random.randint(1, min(5, max_qty))
-                items.append((p.product_id, qty, p.price))
-                inv_map[(p.product_id, loc.location_id)] -= qty
+                p_varieties = fabric_varieties.get(p.product_id, [])
+                if p_varieties:
+                    # For fabric products with varieties, pick a random variety
+                    v = random.choice(p_varieties)
+                    max_qty = inv_map.get((p.product_id, loc.location_id, v.variety_id), 0)
+                    if max_qty < 1:
+                        continue
+                    qty = random.randint(1, min(5, max_qty))
+                    items.append((p.product_id, qty, p.price, v.variety_id))
+                    inv_map[(p.product_id, loc.location_id, v.variety_id)] -= qty
+                else:
+                    max_qty = inv_map.get((p.product_id, loc.location_id), 0)
+                    if max_qty < 1:
+                        continue
+                    qty = random.randint(1, min(5, max_qty))
+                    items.append((p.product_id, qty, p.price, None))
+                    inv_map[(p.product_id, loc.location_id)] -= qty
 
             if not items:
                 continue
 
-            total = sum(q * pr for _, q, pr in items)
+            total = sum(q * pr for _, q, pr, _ in items)
 
             order = Order(location_id=loc.location_id, order_date=odate,
                           status=random.choice(statuses), total_amount=total)
             db.session.add(order)
             db.session.flush()
 
-            for pid, qty, pr in items:
-                db.session.add(OrderItem(order_id=order.order_id, product_id=pid, quantity=qty, price=pr))
+            for pid, qty, pr, vid in items:
+                db.session.add(OrderItem(order_id=order.order_id, product_id=pid, variety_id=vid, quantity=qty, price=pr))
             db.session.add(Payment(order_id=order.order_id, payment_method=random.choice(methods),
-                                   quantity=sum(q for _, q, _ in items), price=total))
+                                   quantity=sum(q for _, q, _, _ in items), price=total))
         db.session.flush()
 
         # Write final inventory quantities back to DB
-        for (pid, lid), qty in inv_map.items():
-            inv_row = Inventory.query.filter_by(product_id=pid, location_id=lid).first()
+        for key, qty in inv_map.items():
+            if len(key) == 3:
+                pid, lid, vid = key
+                inv_row = Inventory.query.filter_by(product_id=pid, location_id=lid, variety_id=vid).first()
+            else:
+                pid, lid = key
+                inv_row = Inventory.query.filter_by(product_id=pid, location_id=lid, variety_id=None).first()
             if inv_row:
                 inv_row.quantity = qty
         db.session.flush()
 
         # Zero out ~10% of branch entries to simulate out-of-stock scenarios
-        branch_entries = [(pid, lid) for (pid, lid) in inv_map if lid != storehouse.location_id]
+        branch_entries = [key for key in inv_map if key[1] != storehouse.location_id]
         random.shuffle(branch_entries)
         to_zero = int(len(branch_entries) * 0.1)
-        for pid, lid in branch_entries[:to_zero]:
-            inv_row = Inventory.query.filter_by(product_id=pid, location_id=lid).first()
+        for key in branch_entries[:to_zero]:
+            if len(key) == 3:
+                pid, lid, vid = key
+                inv_row = Inventory.query.filter_by(product_id=pid, location_id=lid, variety_id=vid).first()
+            else:
+                pid, lid = key
+                inv_row = Inventory.query.filter_by(product_id=pid, location_id=lid, variety_id=None).first()
             if inv_row:
                 inv_row.quantity = 0
         db.session.flush()
@@ -430,7 +490,8 @@ def seed(skip_drop=False):
         print(f"  Users:           {len(users_data)}")
         print(f"  Categories:      4")
         print(f"  Products:        {len(all_products)}")
-        print(f"  Inventory:       {len(all_products) * len(locs)}")
+        print(f"  Varieties:       {len(all_varieties)}")
+        print(f"  Inventory:       {len(inv_map)}")
         print(f"  Orders:          {SEED_ORDERS}")
         print(f"  Transfers:       {SEED_TRANSFERS}")
         print(f"  Adjustments:     {SEED_ADJUSTMENTS}")
