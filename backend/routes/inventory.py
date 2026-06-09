@@ -513,9 +513,28 @@ def inventory_counts():
 
     all_inv = query.all()
 
-    total_items = len(all_inv)
-    low_stock_count = sum(1 for i in all_inv if i.quantity > 0 and i.quantity <= 10)
-    out_of_stock_count = sum(1 for i in all_inv if i.quantity == 0)
+    # Group by (product_id, location_id), summing quantities (match frontend grouping)
+    groups = {}
+    for i in all_inv:
+        key = (i.product_id, i.location_id)
+        if key not in groups:
+            groups[key] = {"quantity": 0, "reorder_level": 0}
+            try:
+                groups[key]["reorder_level"] = int(i.product.reorder_level) if i.product and i.product.reorder_level else 0
+            except (ValueError, TypeError):
+                groups[key]["reorder_level"] = 0
+        groups[key]["quantity"] += i.quantity or 0
+
+    total_items = len(groups)
+    low_stock_count = 0
+    out_of_stock_count = 0
+    for g in groups.values():
+        qty = g["quantity"]
+        rl = g["reorder_level"]
+        if qty == 0:
+            out_of_stock_count += 1
+        elif rl > 0 and qty < rl:
+            low_stock_count += 1
 
     pending_request_count = StockRequest.query.filter_by(status="pending", requested_by=user_id).count()
 

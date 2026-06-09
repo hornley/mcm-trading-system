@@ -70,22 +70,19 @@ const StockManagement = () => {
   const [expandedRowKeys, setExpandedRowKeys] = useState([]);
   const receiptCaptureRef = useRef(null);
 
-  const fetchData = async (page, sortOverrides, sizeOverride) => {
+  const fetchData = async () => {
     if (!user) return;
-    const p = page || currentPage;
-    const sb = sortOverrides?.sortBy || sortBy;
-    const so = sortOverrides?.sortOrder || sortOrder;
-    const ps = sizeOverride || pageSize;
+    const ps = pageSize;
     setLoading(true);
     try {
       const locationParam = selectedLocationId !== "all" ? `&location_id=${selectedLocationId}` : '';
       const userIdParam = `&user_id=${user.user_id}`;
       const searchParam = searchText ? `&q=${encodeURIComponent(searchText)}` : '';
-      const sortParam = `&sort_by=${sb}&sort_order=${so}`;
+      const sortParam = `&sort_by=${sortBy}&sort_order=${sortOrder}`;
       const statusParam = statusFilter ? `&status=${statusFilter}` : '';
 
       const [invRes, locRes, countRes] = await Promise.all([
-        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=${p}&limit=${ps}${searchParam}${sortParam}${statusParam}`),
+        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=1&limit=500${searchParam}${sortParam}${statusParam}`),
         fetch(`/api/locations?usertype=${user.usertype}`),
         fetch(`/api/inventory/counts?usertype=${user.usertype}${locationParam}${userIdParam}`),
       ]);
@@ -120,8 +117,8 @@ const StockManagement = () => {
           }
         }
         setInventory(merged);
-        setTotalCount(invData.data.total_count || 0);
-        setCurrentPage(invData.data.page || p);
+        setTotalCount(merged.length);
+        setCurrentPage(1);
       }
       if (countData.success) {
         setStats(countData.data);
@@ -210,7 +207,7 @@ const StockManagement = () => {
   useEffect(() => {
     setCurrentPage(1);
     setMovementsCache({});
-    fetchData(1);
+    fetchData();
   }, [user, selectedLocationId, statusFilter, searchText]);
 
   const handleViewDetails = async (record) => {
@@ -650,7 +647,17 @@ const StockManagement = () => {
       title: 'Stock Status',
       dataIndex: 'quantity',
       key: 'stockStatus',
-      render: (qty) => getStockStatus(qty).tag,
+      render: (qty, record) => {
+        const varieties = record.varietiesList;
+        if (varieties && varieties.length > 0) {
+          const n = Number(qty);
+          const rl = Number(record.reorder_level) || 0;
+          if (n === 0) return <Tag color="red">Out of Stock</Tag>;
+          if (rl > 0 && n < rl) return <Tag color="orange">Low Stock</Tag>;
+          return <Tag color="green">In Stock</Tag>;
+        }
+        return getStockStatus(qty).tag;
+      },
       sorter: true,
     },
     {
@@ -1025,10 +1032,9 @@ const StockManagement = () => {
                 const newSortOrder = sorter.order === 'descend' ? 'desc' : 'asc';
                 setSortBy(newSortBy);
                 setSortOrder(newSortOrder);
-                fetchData(1, { sortBy: newSortBy, sortOrder: newSortOrder });
               }
             }}
-            pagination={{ current: currentPage, pageSize, total: totalCount, showSizeChanger: true, pageSizeOptions: [10, 50, 100, 200], onShowSizeChange: (_, size) => { setPageSize(size); fetchData(1, { sortBy, sortOrder }, size); }, onChange: (p) => fetchData(p) }}
+            pagination={{ current: currentPage, pageSize, total: totalCount, showSizeChanger: true, pageSizeOptions: [10, 50, 100, 200], onShowSizeChange: (_, size) => setPageSize(size), onChange: (p) => setCurrentPage(p) }}
           />
         </>
       )}
