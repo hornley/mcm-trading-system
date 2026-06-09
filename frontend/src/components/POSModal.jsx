@@ -179,7 +179,6 @@ const POSModal = ({
         );
       }
       const parts = [];
-      if (variety.color) parts.push(variety.color);
       if (variety.pattern) parts.push(variety.pattern);
       return [...prev, {
         product_id: product.product_id,
@@ -611,7 +610,7 @@ const POSModal = ({
       </Modal>
 
       <Modal
-        title="Select Variety"
+        title={`Select Pattern — ${varietyModalProduct?.name || ''}`}
         open={varietyModalVisible}
         onCancel={() => { setVarietyModalVisible(false); setVarietyModalProduct(null); setSelectedVariety(null); }}
         footer={[
@@ -625,9 +624,6 @@ const POSModal = ({
       >
         {varietyModalProduct && (
           <div style={{ padding: '12px 0' }}>
-            <Text strong style={{ fontSize: 16, display: 'block', marginBottom: 16 }}>
-              {varietyModalProduct.name}
-            </Text>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {(varietyModalProduct.varieties || []).map((v) => (
                 <div
@@ -640,22 +636,13 @@ const POSModal = ({
                     background: selectedVariety?.variety_id === v.variety_id ? '#e6f4ff' : '#fff',
                   }}
                 >
-                  {v.color && (
-                    <span style={{
-                      width: 28, height: 28, borderRadius: '50%',
-                      backgroundColor: v.color, border: '1px solid #d9d9d9',
-                      flexShrink: 0, display: 'inline-block',
-                    }} />
-                  )}
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 500, fontSize: 14 }}>
-                      {v.pattern || 'Solid'}
+                      {v.pattern || 'Default'}
                     </div>
-                    {(v.color || v.pattern) && (
-                      <div style={{ fontSize: 12, color: '#888' }}>
-                        {[v.color, v.pattern].filter(Boolean).join(', ')}
-                      </div>
-                    )}
+                    <div style={{ fontSize: 11, color: '#888' }}>
+                      SKU: {v.variety_sku || '-'}
+                    </div>
                   </div>
                 </div>
               ))}
