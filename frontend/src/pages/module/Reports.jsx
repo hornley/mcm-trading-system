@@ -432,7 +432,7 @@ const Reports = () => {
     const apiParams = () => {
       const p = new URLSearchParams({ usertype: utype });
       if (uid) p.set('user_id', uid);
-      p.set('location_id', locId !== 'all' ? String(locId) : 'all');
+      p.set('location_id', locId !== 'all' ? String(locId) : '-1');
       return p;
     };
 
@@ -444,7 +444,7 @@ const Reports = () => {
           const withLoc = (loc) => { const p = apiParams(); p.set('location_id', String(loc)); return p.toString(); };
           const [statsRes, allBranchesRes, lowStockRes] = await Promise.all([
             fetch(`/api/reports/inventory/summary?${withLoc(lp)}`),
-            fetch(`/api/reports/inventory/summary?${withLoc('all')}`),
+            fetch(`/api/reports/inventory/summary?${withLoc(-1)}`),
             fetch(`/api/reports/inventory/low-stock?${withLoc(lp)}`),
           ]);
           const stats = await statsRes.json();

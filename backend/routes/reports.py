@@ -14,11 +14,11 @@ def _authorized(usertype):
 
 
 def _resolve_location_id(usertype, user_id, requested_location_id):
+    if requested_location_id == -1:
+        return None
     if usertype == 2:
         user = User.query.get(user_id)
         if not user:
-            return None
-        if requested_location_id == -1:
             return None
         return user.location_id
     return requested_location_id
