@@ -115,6 +115,13 @@ const NotificationModal = ({ open, onClose, onUpdate }) => {
           body: JSON.stringify({ usertype: user.usertype }),
         })
       ))
+      if (action === 'accept') {
+        await fetch('/api/inventory/notify-accepted', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ request_ids: ids }),
+        })
+      }
       setRequests((prev) => prev.filter((r) => !ids.includes(r.request_id)))
       onUpdate?.()
     } catch {}

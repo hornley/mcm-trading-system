@@ -1588,22 +1588,62 @@ def accept_request(request_id):
 
     stock_request.status = "accepted"
 
-    product_name = stock_request.product.name if stock_request.product else "Unknown"
-    variety_label = ""
-    if stock_request.variety:
-        parts = [stock_request.variety.color, stock_request.variety.pattern]
-        variety_label = " (" + " ".join(filter(None, parts)) + ")"
-    notif = Notification(
-        location_id=stock_request.to_location_id,
-        type="restock_accepted",
-        message=f"Your restock request for {stock_request.quantity:.0f} {product_name}{variety_label} has been accepted",
-        request_id=stock_request.request_id,
-    )
-    db.session.add(notif)
-
     db.session.commit()
     check_and_auto_restock(stock_request.from_location_id)
     return success_response({"message": "Request accepted"})
+
+
+@inventory_bp.route("/api/inventory/notify-accepted", methods=["POST"])
+def notify_accepted():
+    data = request.get_json() or {}
+    request_ids = data.get("request_ids", [])
+    if not request_ids:
+        return error_response("request_ids is required", "MISSING_PARAM", 400)
+
+    stock_requests = StockRequest.query.filter(StockRequest.request_id.in_(request_ids)).all()
+    if not stock_requests:
+        return error_response("No requests found", "NOT_FOUND", 404)
+
+    to_location_id = stock_requests[0].to_location_id
+    requester_name = stock_requests[0].requester_name or "A branch"
+    total_qty = sum(r.quantity for r in stock_requests)
+
+    item_lines = []
+    seen = set()
+    for sr in stock_requests:
+        pname = sr.product.name if sr.product else "Unknown"
+        label = pname
+        if sr.variety:
+            parts = [sr.variety.color, sr.variety.pattern]
+            label += " (" + " ".join(filter(None, parts)) + ")"
+        if label not in seen:
+            seen.add(label)
+            item_lines.append(label)
+
+    def trunc(s, n=80):
+        return s if len(s) <= n else s[:n-3] + "..."
+
+    items_str = ", ".join(item_lines)
+    message = f"{requester_name}'s restock request ({total_qty:.0f} units: {items_str}) has been accepted"
+
+    if len(message) > 255:
+        short_items = ", ".join(
+            (pname if len(pname) <= 40 else pname[:37] + "...")
+            for pname in item_lines
+        )
+        message = f"{requester_name}'s restock request ({total_qty:.0f} units: {short_items}) has been accepted"
+        if len(message) > 255:
+            message = message[:252] + "..."
+
+    notif = Notification(
+        location_id=to_location_id,
+        type="restock_accepted",
+        message=message,
+    )
+    db.session.add(notif)
+    db.session.commit()
+
+    return success_response({"message": "Bundled notification sent", "notification_id": notif.notification_id})
 
 
 @inventory_bp.route("/api/inventory/request-stock/<int:request_id>/decline", methods=["PUT"])
