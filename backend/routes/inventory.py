@@ -1048,17 +1048,22 @@ def restock_selected():
             errors.append(f"Product ID {product_id} (not found)")
             continue
 
-        store_inv = Inventory.query.filter_by(
-            product_id=product_id,
-            location_id=storehouse.location_id,
-        ).first()
+        store_filters = {
+            "product_id": product_id,
+            "location_id": storehouse.location_id,
+        }
+        if variety_id:
+            store_filters["variety_id"] = variety_id
+        store_inv = Inventory.query.filter_by(**store_filters).first()
 
         if not store_inv or store_inv.quantity <= 0:
-            errors.append(f"{product.name} (no stock at storehouse)")
+            label = f"{product.name} ({variety_id})" if variety_id else product.name
+            errors.append(f"{label} (no stock at storehouse)")
             continue
 
         if store_inv.quantity < requested_qty:
-            errors.append(f"{product.name} (only {store_inv.quantity:.0f} available, requested {requested_qty:.0f})")
+            label = f"{product.name} ({variety_id})" if variety_id else product.name
+            errors.append(f"{label} (only {store_inv.quantity:.0f} available, requested {requested_qty:.0f})")
             continue
 
         valid_items.append({
@@ -1573,19 +1578,25 @@ def accept_request(request_id):
     if stock_request.status != "pending":
         return error_response("Request already processed", "ALREADY_PROCESSED", 400)
 
-    inventory = Inventory.query.filter_by(
-        product_id=stock_request.product_id,
-        location_id=stock_request.from_location_id,
-    ).first()
+    inv_filters = {
+        "product_id": stock_request.product_id,
+        "location_id": stock_request.from_location_id,
+    }
+    dest_filters = {
+        "product_id": stock_request.product_id,
+        "location_id": stock_request.to_location_id,
+    }
+    if stock_request.variety_id:
+        inv_filters["variety_id"] = stock_request.variety_id
+        dest_filters["variety_id"] = stock_request.variety_id
+
+    inventory = Inventory.query.filter_by(**inv_filters).first()
     if not inventory or inventory.quantity < stock_request.quantity:
         return error_response("Insufficient stock at source location", "INSUFFICIENT_STOCK", 400)
 
     inventory.quantity -= stock_request.quantity
 
-    dest_inv = Inventory.query.filter_by(
-        product_id=stock_request.product_id,
-        location_id=stock_request.to_location_id,
-    ).first()
+    dest_inv = Inventory.query.filter_by(**dest_filters).first()
     if dest_inv:
         dest_inv.quantity = (dest_inv.quantity or 0) + stock_request.quantity
     else:
@@ -1594,6 +1605,8 @@ def accept_request(request_id):
             location_id=stock_request.to_location_id,
             quantity=stock_request.quantity,
         )
+        if stock_request.variety_id:
+            dest_inv.variety_id = stock_request.variety_id
         db.session.add(dest_inv)
 
     stock_request.status = "accepted"
