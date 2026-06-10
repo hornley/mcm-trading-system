@@ -1483,7 +1483,10 @@ def decline_request(request_id):
 @inventory_bp.route("/api/inventory/pending-requests", methods=["GET"])
 def list_pending_requests():
     from_location_id = request.args.get("location_id", type=int)
-    query = StockRequest.query.filter_by(status="pending").order_by(StockRequest.created_at.desc())
+    query = StockRequest.query.filter(
+        StockRequest.status == "pending",
+        StockRequest.from_location_id != StockRequest.to_location_id,
+    ).order_by(StockRequest.created_at.desc())
     if from_location_id:
         query = query.filter_by(from_location_id=from_location_id)
     requests = query.limit(50).all()

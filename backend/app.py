@@ -100,6 +100,12 @@ def create_app():
             if 'Notifications' not in tables:
                 db.create_all()
                 db.session.commit()
+            # Clean up self-referencing pending auto-restock requests
+            if 'Stock_Requests' in tables:
+                db.session.execute(
+                    sa.text("UPDATE Stock_Requests SET status = 'declined' WHERE status = 'pending' AND from_location_id = to_location_id")
+                )
+                db.session.commit()
         except Exception as e:
             print(f"[MIGRATION] {e}", file=sys.stderr)
     print("[CREATE_APP] registering blueprints ...", file=sys.stderr)
