@@ -907,16 +907,16 @@ const StockManagement = () => {
 
   const columns = [
     {
-      title: 'Product Name', dataIndex: 'product_name', key: 'product_name', width: '35%',
+      title: 'Product Name', dataIndex: 'product_name', key: 'product_name',
       sorter: true,
       defaultSortOrder: sortBy === 'product_name' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
     },
     ...(showBranch ? [{
-      title: 'Branch', dataIndex: 'location_name', key: 'location_name', width: '15%',
+      title: 'Branch', dataIndex: 'location_name', key: 'location_name',
       sorter: true,
     }] : []),
     {
-      title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity', width: '20%',
+      title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
       render: (qty, record) => {
         const varieties = record.varietiesList;
         if (varieties && varieties.length > 0) {
@@ -939,7 +939,7 @@ const StockManagement = () => {
     {
       title: 'Stock Status',
       dataIndex: 'quantity',
-      key: 'stockStatus', width: '18%',
+      key: 'stockStatus',
       render: (qty, record) => {
         const varieties = record.varietiesList;
         if (varieties && varieties.length > 0) {
@@ -954,14 +954,14 @@ const StockManagement = () => {
       sorter: true,
     },
     {
-      title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level', width: '15%',
+      title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level',
       render: (val) => (val ? Number(val).toLocaleString() : '-'),
       sorter: true,
     },
     {
       title: '',
       key: 'actions',
-      width: '12%',
+      width: 60,
       render: (_, record) => {
         if (record.varietiesList && record.varietiesList.length > 0) return null;
         return (
@@ -1211,18 +1211,12 @@ const StockManagement = () => {
           />
           <span style={{ fontSize: 13, color: '#888' }}>Expand all</span>
         </Space>
-        <style>{`
-          .ant-table-expanded-row > .ant-table-cell {
-            padding: 0 !important;
-          }
-        `}</style>
         <Table
           dataSource={inventory}
           columns={visibleColumns}
           rowKey="inventory_id"
           loading={loading}
           scroll={{ x: 'max-content' }}
-          tableLayout="fixed"
           rowClassName={(record) => {
             const q = Number(record.quantity);
             if (q === 0) return 'row-out-of-stock';
@@ -1234,61 +1228,39 @@ const StockManagement = () => {
               const varieties = record.varietiesList;
               if (!varieties || varieties.length === 0) return null;
               const isFab = record.category === FABRIC_CATEGORY;
-              const subColumns = [
-                {
-                  title: 'Variety', dataIndex: 'pattern', key: 'pattern', width: '35%',
-                  render: (_, v) => (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {v.color && (
-                        <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', border: '1px solid #d9d9d9', flexShrink: 0 }} />
-                      )}
-                      <span style={{ fontWeight: 500 }}>{v.pattern || 'Default'}</span>
-                      {v.color && <span style={{ color: '#888' }}>{v.color}</span>}
-                    </div>
-                  ),
-                },
-                {
-                  title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity', width: '20%',
-                  render: (qty) => fmtQty(qty, isFab),
-                },
-                {
-                  title: 'Stock Status', dataIndex: 'quantity', key: 'stockStatus', width: '18%',
-                  render: (qty) => {
-                    if (Number(qty) === 0) return <Tag color="red" style={{ margin: 0 }}>Out of Stock</Tag>;
-                    if (Number(qty) <= 10) return <Tag color="orange" style={{ margin: 0 }}>Low Stock</Tag>;
-                    return null;
-                  },
-                },
-                {
-                  title: 'Reorder Level', key: 'reorder_level', width: '15%',
-                },
-                {
-                  title: 'Actions', key: 'actions', width: '12%',
-                  render: (_, v) => (
-                    <Dropdown menu={{
-                      items: [
-                        ...(can('update') ? [{ key: 'request', label: 'Request', disabled: selectedLocationId === 'all', onClick: () => handleRequestStock({ ...record, ...v }) }] : []),
-                        ...(can('update') ? [{ key: 'adjust', label: 'Adjust', disabled: selectedLocationId === 'all', onClick: () => handleAdjustStock({ ...record, ...v }) }] : []),
-                        ...(can('update') ? [{ key: 'transfer', label: 'Transfer', disabled: selectedLocationId === 'all' || v.quantity === 0, onClick: () => handleTransferStock({ ...record, ...v }) }] : []),
-                        { key: 'details', label: 'Details', onClick: () => handleViewDetails({ ...record, ...v }) },
-                      ],
-                    }} trigger={['click']}>
-                      <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
-                    </Dropdown>
-                  ),
-                },
+              const varietyActions = (v) => [
+                ...(can('update') ? [{ key: 'request', label: 'Request', disabled: selectedLocationId === 'all', onClick: () => handleRequestStock({ ...record, ...v }) }] : []),
+                ...(can('update') ? [{ key: 'adjust', label: 'Adjust', disabled: selectedLocationId === 'all', onClick: () => handleAdjustStock({ ...record, ...v }) }] : []),
+                ...(can('update') ? [{ key: 'transfer', label: 'Transfer', disabled: selectedLocationId === 'all' || v.quantity === 0, onClick: () => handleTransferStock({ ...record, ...v }) }] : []),
+                { key: 'details', label: 'Details', onClick: () => handleViewDetails({ ...record, ...v }) },
               ];
-              const subData = varieties.map((v, idx) => ({ ...v, key: v.variety_id || `v-${idx}` }));
               return (
-                <div style={{ padding: 0 }}>
-                  <Table
-                    columns={subColumns}
-                    dataSource={subData}
-                    pagination={false}
-                    showHeader={false}
-                    size="small"
-                    tableLayout="fixed"
-                  />
+                <div style={{ padding: '4px 0 4px 0' }}>
+                  {varieties.map((v) => (
+                    <div key={v.variety_id} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr 1fr', padding: '4px 0', fontSize: 13, alignItems: 'center', borderBottom: '1px solid #f0f0f0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {v.color && (
+                          <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', border: '1px solid #d9d9d9', flexShrink: 0 }} />
+                        )}
+                        <span style={{ fontWeight: 500 }}>{v.pattern || 'Default'}</span>
+                        {v.color && <span style={{ color: '#888' }}>{v.color}</span>}
+                      </div>
+                      <div style={{ textAlign: 'right', paddingRight: 16, fontVariantNumeric: 'tabular-nums' }}>{fmtQty(v.quantity, isFab)}</div>
+                      <div>
+                        {Number(v.quantity) === 0
+                          ? <Tag color="red" style={{ margin: 0 }}>Out of Stock</Tag>
+                          : Number(v.quantity) <= 10
+                            ? <Tag color="orange" style={{ margin: 0 }}>Low Stock</Tag>
+                            : null}
+                      </div>
+                      <div></div>
+                      <div style={{ textAlign: 'center' }}>
+                        <Dropdown menu={{ items: varietyActions(v) }} trigger={['click']}>
+                          <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
+                        </Dropdown>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               );
             },
