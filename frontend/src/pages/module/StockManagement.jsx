@@ -916,7 +916,7 @@ const StockManagement = () => {
       sorter: true,
     }] : []),
     {
-      title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity', width: 130,
+      title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
       render: (qty, record) => {
         const varieties = record.varietiesList;
         if (varieties && varieties.length > 0) {
@@ -939,7 +939,7 @@ const StockManagement = () => {
     {
       title: 'Stock Status',
       dataIndex: 'quantity',
-      key: 'stockStatus', width: 120,
+      key: 'stockStatus',
       render: (qty, record) => {
         const varieties = record.varietiesList;
         if (varieties && varieties.length > 0) {
@@ -954,7 +954,7 @@ const StockManagement = () => {
       sorter: true,
     },
     {
-      title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level', width: 100,
+      title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level',
       render: (val) => (val ? Number(val).toLocaleString() : '-'),
       sorter: true,
     },
