@@ -529,30 +529,28 @@ def inventory_counts():
     if error:
         return error
 
-    query = Inventory.query.join(Product).filter(Product.is_active == True)
-    if resolved_location_id and resolved_location_id != "all":
-        query = query.filter(Inventory.location_id == resolved_location_id)
+    loc_param = resolved_location_id if resolved_location_id and resolved_location_id != "all" else None
 
-    all_inv = query.all()
+    rows = db.session.execute(
+        db.text("""
+            SELECT i.product_id, i.location_id,
+                   SUM(i.quantity) as total_qty,
+                   CAST(p.reorder_level AS INTEGER) as reorder_level
+            FROM "Inventory" i
+            JOIN "Products" p ON i.product_id = p.product_id
+            WHERE p.is_active = TRUE
+              AND (:loc_id IS NULL OR i.location_id = CAST(:loc_id AS INTEGER))
+            GROUP BY i.product_id, i.location_id, p.reorder_level
+        """),
+        {"loc_id": loc_param},
+    ).fetchall()
 
-    # Group by (product_id, location_id), summing quantities (match frontend grouping)
-    groups = {}
-    for i in all_inv:
-        key = (i.product_id, i.location_id)
-        if key not in groups:
-            groups[key] = {"quantity": 0, "reorder_level": 0}
-            try:
-                groups[key]["reorder_level"] = int(i.product.reorder_level) if i.product and i.product.reorder_level else 0
-            except (ValueError, TypeError):
-                groups[key]["reorder_level"] = 0
-        groups[key]["quantity"] += i.quantity or 0
-
-    total_items = len(groups)
+    total_items = len(rows)
     low_stock_count = 0
     out_of_stock_count = 0
-    for g in groups.values():
-        qty = g["quantity"]
-        rl = g["reorder_level"]
+    for row in rows:
+        qty = row.total_qty or 0
+        rl = row.reorder_level or 0
         if qty == 0:
             out_of_stock_count += 1
         elif rl > 0 and qty < rl:
@@ -1515,7 +1513,12 @@ def list_pending_requests():
     query = StockRequest.query.filter_by(status="pending").order_by(StockRequest.created_at.desc())
     if from_location_id:
         query = query.filter_by(from_location_id=from_location_id)
-    requests = query.limit(50).all()
+    requests = query.options(
+        joinedload(StockRequest.product),
+        joinedload(StockRequest.from_location),
+        joinedload(StockRequest.to_location),
+        joinedload(StockRequest.requester),
+    ).limit(50).all()
     return success_response([{
         "request_id": r.request_id,
         "product_id": r.product_id,
@@ -1540,7 +1543,12 @@ def list_request_logs():
     query = StockRequest.query.order_by(StockRequest.created_at.desc())
     if user_id:
         query = query.filter_by(requested_by=user_id)
-    requests = query.limit(100).all()
+    requests = query.options(
+        joinedload(StockRequest.product),
+        joinedload(StockRequest.from_location),
+        joinedload(StockRequest.to_location),
+        joinedload(StockRequest.requester),
+    ).limit(100).all()
     return success_response([{
         "request_id": r.request_id,
         "product_id": r.product_id,
