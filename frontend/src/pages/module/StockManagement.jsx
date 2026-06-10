@@ -943,11 +943,10 @@ const StockManagement = () => {
       title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
       sorter: (a, b) => 0,
       sortOrder: sortBy === 'quantity' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
+      className: 'qty-cell',
       render: (qty, record) => {
-        const n = Number(qty);
-        const color = n === 0 ? '#ff4d4f' : n <= 10 ? '#fa8c16' : undefined;
-        const val = record._rowType === 'variety' ? fmtQty(qty, record.category === FABRIC_CATEGORY) : fmtQty(qty, record.category === FABRIC_CATEGORY);
-        return color ? <span style={{ color, fontWeight: 600 }}>{val}</span> : val;
+        const val = fmtQty(qty, record.category === FABRIC_CATEGORY);
+        return <span>{val}</span>;
       },
     },
     {
