@@ -67,8 +67,6 @@ const StockManagement = () => {
   const [storehousePendingLoading, setStorehousePendingLoading] = useState(false);
   const [branchFilter, setBranchFilter] = useState('all');
   const [storehouseStockFilter, setStorehouseStockFilter] = useState('all');
-  const [expandedRowKeys, setExpandedRowKeys] = useState([]);
-  const [expandVarieties, setExpandVarieties] = useState(false);
   const [restockCart, setRestockCart] = useState({});
   const [varietyModalVisible, setVarietyModalVisible] = useState(false);
   const [varietyModalProduct, setVarietyModalProduct] = useState(null);
@@ -898,6 +896,21 @@ const StockManagement = () => {
   const { total_items: totalItems, low_stock_count: lowStockCount, out_of_stock_count: outOfStockCount, pending_request_count: pendingRequestCount } = stats;
 
   const showBranch = selectedLocationId === "all";
+  const visibleData = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    const pageParents = inventory.slice(start, end);
+    const flat = [];
+    for (const item of pageParents) {
+      flat.push({ ...item, _rowType: 'parent' });
+      if (item.varietiesList && item.varietiesList.length > 0) {
+        for (const v of item.varietiesList) {
+          flat.push({ ...v, _rowType: 'variety' });
+        }
+      }
+    }
+    return flat;
+  }, [inventory, currentPage, pageSize]);
   const receiptItems = Object.values(restockCart).filter((e) => e.quantity > 0);
   const receiptTotalQty = receiptItems.reduce((sum, e) => sum + (e.quantity || 0), 0);
   const receiptRef = `RS-${Date.now().toString(36).toUpperCase()}`;
@@ -908,39 +921,49 @@ const StockManagement = () => {
   const columns = [
     {
       title: 'Product Name', dataIndex: 'product_name', key: 'product_name',
-      sorter: true,
-      defaultSortOrder: sortBy === 'product_name' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
+      sorter: (a, b) => 0,
+      sortOrder: sortBy === 'product_name' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
+      render: (text, record) => {
+        if (record._rowType === 'variety') {
+          return (
+            <div style={{ paddingLeft: 28, display: 'flex', alignItems: 'center', gap: 8 }}>
+              {record.color && (
+                <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: record.color === 'White' ? '#ddd' : record.color, display: 'inline-block', border: '1px solid #d9d9d9', flexShrink: 0 }} />
+              )}
+              <span style={{ fontWeight: 500 }}>{record.pattern || 'Default'}</span>
+              {record.color && <span style={{ color: '#888' }}>{record.color}</span>}
+            </div>
+          );
+        }
+        return text;
+      },
     },
     ...(showBranch ? [{
       title: 'Branch', dataIndex: 'location_name', key: 'location_name',
-      sorter: true,
+      sorter: (a, b) => 0,
+      sortOrder: sortBy === 'location_name' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
     }] : []),
     {
       title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
+      sorter: (a, b) => 0,
+      sortOrder: sortBy === 'quantity' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
       render: (qty, record) => {
+        if (record._rowType === 'variety') return fmtQty(qty, record.category === FABRIC_CATEGORY);
         const varieties = record.varietiesList;
         if (varieties && varieties.length > 0) {
-          const isExpanded = expandedRowKeys.includes(record.inventory_id);
-          return (
-            <span>
-              <span style={{ fontSize: 10, marginRight: 4, cursor: 'pointer' }} onClick={() => {
-                setExpandedRowKeys((prev) =>
-                  isExpanded ? prev.filter((id) => id !== record.inventory_id) : [...prev, record.inventory_id]
-                );
-              }}>{isExpanded ? '▼' : '▶'}</span>
-              {fmtQty(qty, record.category === FABRIC_CATEGORY)}
-            </span>
-          );
+          return fmtQty(qty, record.category === FABRIC_CATEGORY);
         }
         return fmtQty(qty, record.category === FABRIC_CATEGORY);
       },
-      sorter: true,
     },
     {
       title: 'Stock Status',
       dataIndex: 'quantity',
       key: 'stockStatus',
+      sorter: (a, b) => 0,
+      sortOrder: sortBy === 'stockStatus' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
       render: (qty, record) => {
+        if (record._rowType === 'variety') return getStockStatus(qty).tag;
         const varieties = record.varietiesList;
         if (varieties && varieties.length > 0) {
           const n = Number(qty);
@@ -955,15 +978,19 @@ const StockManagement = () => {
     },
     {
       title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level',
-      render: (val) => (val ? Number(val).toLocaleString() : '-'),
-      sorter: true,
+      sorter: (a, b) => 0,
+      sortOrder: sortBy === 'reorder_level' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
+      render: (val, record) => {
+        if (record._rowType === 'variety') return null;
+        return val ? Number(val).toLocaleString() : '-';
+      },
     },
     {
       title: '',
       key: 'actions',
       width: 60,
       render: (_, record) => {
-        if (record.varietiesList && record.varietiesList.length > 0) return null;
+        if (record.varietiesList && record.varietiesList.length > 0 && record._rowType !== 'variety') return null;
         return (
           <Dropdown
             menu={{
@@ -1196,80 +1223,26 @@ const StockManagement = () => {
               { label: `Low Stock (${stats.low_stock_count})`, value: 'low_stock' },
               { label: `Out of Stock (${stats.out_of_stock_count})`, value: 'out_of_stock' },
             ]}
-            onChange={(val) => setStatusFilter(val === 'all' ? '' : val)}
+            onChange={(val) => { setStatusFilter(val === 'all' ? '' : val); setCurrentPage(1); }}
           />
-          <Switch
-            checked={expandVarieties}
-            onChange={(checked) => {
-              setExpandVarieties(checked);
-              if (checked) {
-                setExpandedRowKeys(inventory.filter((i) => i.varietiesList?.length).map((i) => i.inventory_id));
-              } else {
-                setExpandedRowKeys([]);
-              }
-            }}
-          />
-          <span style={{ fontSize: 13, color: '#888' }}>Expand all</span>
         </Space>
         <Table
-          dataSource={inventory}
+          dataSource={visibleData}
           columns={visibleColumns}
-          rowKey="inventory_id"
+          rowKey={(record) => record._rowType === 'variety' ? `v-${record.inventory_id}` : record.inventory_id}
           loading={loading}
           scroll={{ x: 'max-content' }}
           rowClassName={(record) => {
+            if (record._rowType === 'variety') {
+              const q = Number(record.quantity);
+              if (q === 0) return 'row-variety row-out-of-stock';
+              if (q <= 10) return 'row-variety row-low-stock';
+              return 'row-variety';
+            }
             const q = Number(record.quantity);
             if (q === 0) return 'row-out-of-stock';
             if (q <= 10) return 'row-low-stock';
             return '';
-          }}
-          expandable={{
-            expandedRowRender: (record) => {
-              const varieties = record.varietiesList;
-              if (!varieties || varieties.length === 0) return null;
-              const isFab = record.category === FABRIC_CATEGORY;
-              const varietyActions = (v) => [
-                ...(can('update') ? [{ key: 'request', label: 'Request', disabled: selectedLocationId === 'all', onClick: () => handleRequestStock({ ...record, ...v }) }] : []),
-                ...(can('update') ? [{ key: 'adjust', label: 'Adjust', disabled: selectedLocationId === 'all', onClick: () => handleAdjustStock({ ...record, ...v }) }] : []),
-                ...(can('update') ? [{ key: 'transfer', label: 'Transfer', disabled: selectedLocationId === 'all' || v.quantity === 0, onClick: () => handleTransferStock({ ...record, ...v }) }] : []),
-                { key: 'details', label: 'Details', onClick: () => handleViewDetails({ ...record, ...v }) },
-              ];
-              return (
-                <div style={{ padding: '4px 0 4px 0' }}>
-                  {varieties.map((v) => (
-                    <div key={v.variety_id} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr auto', columnGap: 8, padding: '4px 8px', fontSize: 13, alignItems: 'center', borderBottom: '1px solid #f0f0f0' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 25 }}>
-                        {v.color && (
-                          <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', border: '1px solid #d9d9d9', flexShrink: 0 }} />
-                        )}
-                        <span style={{ fontWeight: 500 }}>{v.pattern || 'Default'}</span>
-                        {v.color && <span style={{ color: '#888' }}>{v.color}</span>}
-                      </div>
-                      <div style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtQty(v.quantity, isFab)}</div>
-                      <div>
-                        {Number(v.quantity) === 0
-                          ? <Tag color="red" style={{ margin: 0 }}>Out of Stock</Tag>
-                          : Number(v.quantity) <= 10
-                            ? <Tag color="orange" style={{ margin: 0 }}>Low Stock</Tag>
-                            : null}
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <Dropdown menu={{ items: varietyActions(v) }} trigger={['click']}>
-                          <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
-                        </Dropdown>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            },
-            expandedRowKeys,
-            onExpand: (expanded, record) => {
-              setExpandedRowKeys((prev) =>
-                expanded ? [...prev, record.inventory_id] : prev.filter((id) => id !== record.inventory_id)
-              );
-            },
-            showExpandColumn: false,
           }}
           onChange={(pagination, filters, sorter) => {
             if (sorter.field) {
@@ -1277,15 +1250,18 @@ const StockManagement = () => {
               const newSortOrder = sorter.order === 'descend' ? 'desc' : 'asc';
               setSortBy(newSortBy);
               setSortOrder(newSortOrder);
+              setCurrentPage(1);
               fetchData(1);
             }
           }}
           pagination={{
+            current: currentPage,
             pageSize,
             total: totalCount,
             showSizeChanger: true,
             pageSizeOptions: [10, 25, 50, 100],
-            onShowSizeChange: (_, size) => setPageSize(size),
+            onChange: (p) => setCurrentPage(p),
+            onShowSizeChange: (_, size) => { setPageSize(size); setCurrentPage(1); },
           }}
         />
       </>
