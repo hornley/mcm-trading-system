@@ -907,16 +907,16 @@ const StockManagement = () => {
 
   const columns = [
     {
-      title: 'Product Name', dataIndex: 'product_name', key: 'product_name',
+      title: 'Product Name', dataIndex: 'product_name', key: 'product_name', width: '35%',
       sorter: true,
       defaultSortOrder: sortBy === 'product_name' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
     },
     ...(showBranch ? [{
-      title: 'Branch', dataIndex: 'location_name', key: 'location_name',
+      title: 'Branch', dataIndex: 'location_name', key: 'location_name', width: '15%',
       sorter: true,
     }] : []),
     {
-      title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
+      title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity', width: '20%',
       render: (qty, record) => {
         const varieties = record.varietiesList;
         if (varieties && varieties.length > 0) {
@@ -939,7 +939,7 @@ const StockManagement = () => {
     {
       title: 'Stock Status',
       dataIndex: 'quantity',
-      key: 'stockStatus',
+      key: 'stockStatus', width: '18%',
       render: (qty, record) => {
         const varieties = record.varietiesList;
         if (varieties && varieties.length > 0) {
@@ -954,14 +954,14 @@ const StockManagement = () => {
       sorter: true,
     },
     {
-      title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level',
+      title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level', width: '15%',
       render: (val) => (val ? Number(val).toLocaleString() : '-'),
       sorter: true,
     },
     {
       title: '',
       key: 'actions',
-      width: 60,
+      width: '12%',
       render: (_, record) => {
         if (record.varietiesList && record.varietiesList.length > 0) return null;
         return (
@@ -1211,12 +1211,18 @@ const StockManagement = () => {
           />
           <span style={{ fontSize: 13, color: '#888' }}>Expand all</span>
         </Space>
+        <style>{`
+          .ant-table-expanded-row > .ant-table-cell {
+            padding: 0 !important;
+          }
+        `}</style>
         <Table
           dataSource={inventory}
           columns={visibleColumns}
           rowKey="inventory_id"
           loading={loading}
           scroll={{ x: 'max-content' }}
+          tableLayout="fixed"
           rowClassName={(record) => {
             const q = Number(record.quantity);
             if (q === 0) return 'row-out-of-stock';
@@ -1230,7 +1236,7 @@ const StockManagement = () => {
               const isFab = record.category === FABRIC_CATEGORY;
               const subColumns = [
                 {
-                  title: 'Variety', dataIndex: 'pattern', key: 'pattern',
+                  title: 'Variety', dataIndex: 'pattern', key: 'pattern', width: '35%',
                   render: (_, v) => (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       {v.color && (
@@ -1242,11 +1248,11 @@ const StockManagement = () => {
                   ),
                 },
                 {
-                  title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
+                  title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity', width: '20%',
                   render: (qty) => fmtQty(qty, isFab),
                 },
                 {
-                  title: 'Stock Status', dataIndex: 'quantity', key: 'stockStatus',
+                  title: 'Stock Status', dataIndex: 'quantity', key: 'stockStatus', width: '18%',
                   render: (qty) => {
                     if (Number(qty) === 0) return <Tag color="red" style={{ margin: 0 }}>Out of Stock</Tag>;
                     if (Number(qty) <= 10) return <Tag color="orange" style={{ margin: 0 }}>Low Stock</Tag>;
@@ -1254,7 +1260,10 @@ const StockManagement = () => {
                   },
                 },
                 {
-                  title: 'Actions', key: 'actions',
+                  title: 'Reorder Level', key: 'reorder_level', width: '15%',
+                },
+                {
+                  title: 'Actions', key: 'actions', width: '12%',
                   render: (_, v) => (
                     <Dropdown menu={{
                       items: [
@@ -1278,6 +1287,7 @@ const StockManagement = () => {
                     pagination={false}
                     showHeader={false}
                     size="small"
+                    tableLayout="fixed"
                   />
                 </div>
               );
