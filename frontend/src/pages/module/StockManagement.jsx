@@ -1238,14 +1238,14 @@ const StockManagement = () => {
                 <div style={{ padding: '4px 0 4px 0' }}>
                   {varieties.map((v) => (
                     <div key={v.variety_id} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr auto', columnGap: 8, padding: '4px 8px', fontSize: 13, alignItems: 'center', borderBottom: '1px solid #f0f0f0' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 25 }}>
                         {v.color && (
                           <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', border: '1px solid #d9d9d9', flexShrink: 0 }} />
                         )}
                         <span style={{ fontWeight: 500 }}>{v.pattern || 'Default'}</span>
                         {v.color && <span style={{ color: '#888' }}>{v.color}</span>}
                       </div>
-                      <div style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', marginRight: -1 }}>{fmtQty(v.quantity, isFab)}</div>
+                      <div style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtQty(v.quantity, isFab)}</div>
                       <div>
                         {Number(v.quantity) === 0
                           ? <Tag color="red" style={{ margin: 0 }}>Out of Stock</Tag>
