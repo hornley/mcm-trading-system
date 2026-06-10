@@ -213,8 +213,10 @@ def top_products():
         days = _parse_days(request.args.get("days"))
         limit = max(1, min(100, request.args.get("limit", 10, type=int)))
         cutoff = datetime.now() - timedelta(days=days)
+        location_id = _resolve_location_id(usertype, request.args.get("user_id", type=int),
+                                            request.args.get("location_id", type=int))
 
-        rows = db.session.query(
+        query = db.session.query(
             Product.product_id,
             Product.name.label("product_name"),
             Product.sku,
@@ -223,7 +225,12 @@ def top_products():
         ).join(OrderItem, OrderItem.product_id == Product.product_id
         ).join(Order, Order.order_id == OrderItem.order_id
         ).filter(Order.status == "completed", Order.order_date >= cutoff
-        ).group_by(Product.product_id
+        )
+
+        if location_id:
+            query = query.filter(Order.location_id == location_id)
+
+        rows = query.group_by(Product.product_id
         ).order_by(func.sum(OrderItem.quantity).desc()
         ).limit(limit).all()
 
@@ -256,13 +263,20 @@ def financial_revenue():
     try:
         days = _parse_days(request.args.get("days"))
         cutoff = datetime.now() - timedelta(days=days)
+        location_id = _resolve_location_id(usertype, request.args.get("user_id", type=int),
+                                            request.args.get("location_id", type=int))
 
-        rows = db.session.query(
+        query = db.session.query(
             func.date(Order.order_date).label("date"),
             func.count(Order.order_id).label("order_count"),
             func.coalesce(func.sum(Order.total_amount), 0).label("revenue"),
         ).filter(Order.status == "completed", Order.order_date >= cutoff
-        ).group_by(func.date(Order.order_date)
+        )
+
+        if location_id:
+            query = query.filter(Order.location_id == location_id)
+
+        rows = query.group_by(func.date(Order.order_date)
         ).order_by(func.date(Order.order_date).desc()).all()
 
         total_revenue = sum(r.revenue for r in rows)
@@ -290,14 +304,21 @@ def payment_methods():
     try:
         days = _parse_days(request.args.get("days"))
         cutoff = datetime.now() - timedelta(days=days)
+        location_id = _resolve_location_id(usertype, request.args.get("user_id", type=int),
+                                            request.args.get("location_id", type=int))
 
-        rows = db.session.query(
+        query = db.session.query(
             Payment.payment_method,
             func.count(Payment.payment_id).label("count"),
             func.coalesce(func.sum(Payment.price), 0).label("total"),
         ).join(Order, Order.order_id == Payment.order_id
         ).filter(Order.status == "completed", Order.order_date >= cutoff
-        ).group_by(Payment.payment_method
+        )
+
+        if location_id:
+            query = query.filter(Order.location_id == location_id)
+
+        rows = query.group_by(Payment.payment_method
         ).order_by(func.count(Payment.payment_id).desc()).all()
 
         return jsonify({
@@ -335,11 +356,17 @@ def activity_summary():
             user_counts[log.user_id] = user_counts.get(log.user_id, 0) + 1
             module_counts[log.module] = module_counts.get(log.module, 0) + 1
 
+        user_ids = list(user_counts.keys())
+        user_map = {}
+        if user_ids:
+            users = User.query.filter(User.user_id.in_(user_ids)).all()
+            user_map = {u.user_id: u.username for u in users}
+
         by_user = sorted(
             [
                 {
                     "user_id": uid,
-                    "username": User.query.get(uid).username if User.query.get(uid) else "Unknown",
+                    "username": user_map.get(uid, "Unknown"),
                     "count": cnt,
                 }
                 for uid, cnt in user_counts.items()

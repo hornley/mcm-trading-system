@@ -40,6 +40,8 @@ const Sales = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
   const [dashboardStats, setDashboardStats] = useState({ sales_today: 0, month_sales: 0, transactions_today: 0 });
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [periodLabel, setPeriodLabel] = useState('All Time');
   const [allSalesFull, setAllSalesFull] = useState([]);
 
   const [searchText, setSearchText] = useState('');
@@ -165,14 +167,19 @@ const Sales = () => {
   };
 
   const fetchDashboardStats = async () => {
+    setStatsLoading(true);
     try {
       let url = `/api/dashboard/summary?${apiParams}`;
       if (dateRange && dateRange[0]) url += `&date_from=${dateRange[0].format('YYYY-MM-DDTHH:mm:ss')}`;
       if (dateRange && dateRange[1]) url += `&date_to=${dateRange[1].format('YYYY-MM-DDTHH:mm:ss')}`;
       const res = await fetch(url);
       const json = await res.json();
-      if (json.success) setDashboardStats(json.data.stats || {});
+      if (json.success) {
+        setDashboardStats(json.data.stats || {});
+        setPeriodLabel(json.data.period_label || 'All Time');
+      }
     } catch (e) { /* ignore */ }
+    finally { setStatsLoading(false); }
   };
 
   useEffect(() => { fetchProducts(); fetchLocations(); }, []);
@@ -614,22 +621,22 @@ const Sales = () => {
       <Row gutter={[16, 16]}>
         <Col xs={12} sm={6}>
           <Card>
-            <Statistic title="Total Sales" value={`₱${(dashboardStats.sales_today || 0).toLocaleString()}`} />
+            <Statistic title={`Sales (${periodLabel})`} value={`₱${(dashboardStats.sales_today || 0).toLocaleString()}`} loading={statsLoading} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card>
-            <Statistic title="Total Transactions" value={dashboardStats.transactions_today || 0} />
+            <Statistic title={`Transactions (${periodLabel})`} value={dashboardStats.transactions_today || 0} loading={statsLoading} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card>
-            <Statistic title="Low Stock Items" value={dashboardStats.low_stock_count || 0} valueStyle={{ color: '#fa8c16' }} />
+            <Statistic title="Low Stock (Current)" value={dashboardStats.low_stock_count || 0} valueStyle={{ color: '#fa8c16' }} loading={statsLoading} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card>
-            <Statistic title="Out of Stock Items" value={dashboardStats.out_of_stock_count || 0} valueStyle={{ color: '#ff4d4f' }} />
+            <Statistic title="Out of Stock (Current)" value={dashboardStats.out_of_stock_count || 0} valueStyle={{ color: '#ff4d4f' }} loading={statsLoading} />
           </Card>
         </Col>
       </Row>

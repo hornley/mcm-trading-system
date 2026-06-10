@@ -1317,7 +1317,7 @@ const Reports = () => {
           </Space>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12}>
-              <Card><Statistic title="Total Actions" value={activityData.stats.total_actions ?? 0} /></Card>
+              <Card><Statistic title="Total Actions" value={activityData.stats.total_logs ?? 0} /></Card>
             </Col>
             <Col xs={24} sm={12}>
               <Card><Statistic title="Unique Users" value={activityData.stats.unique_users ?? 0} /></Card>

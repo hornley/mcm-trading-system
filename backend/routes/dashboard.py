@@ -65,8 +65,6 @@ def dashboard_summary():
         sales_query = sales_query.filter(Order.status == "completed")
         if date_from:
             sales_query = sales_query.filter(Order.order_date >= datetime.fromisoformat(date_from))
-        else:
-            sales_query = sales_query.filter(func.date(Order.order_date) == today)
         if date_to:
             sales_query = sales_query.filter(Order.order_date <= datetime.fromisoformat(date_to))
         if location_id:
@@ -78,8 +76,6 @@ def dashboard_summary():
         )
         if date_from:
             transactions_query = transactions_query.filter(Order.order_date >= datetime.fromisoformat(date_from))
-        else:
-            transactions_query = transactions_query.filter(func.date(Order.order_date) == today)
         if date_to:
             transactions_query = transactions_query.filter(Order.order_date <= datetime.fromisoformat(date_to))
         if location_id:
@@ -211,6 +207,26 @@ def dashboard_summary():
                     "pattern": inv.variety.pattern if inv.variety else None,
                 })
 
+        # ── Period label for UI ──
+        if date_from and date_to:
+            try:
+                df = datetime.fromisoformat(date_from).date()
+                dt = datetime.fromisoformat(date_to).date()
+                if df == dt:
+                    period_label = df.strftime("%b %d, %Y")
+                else:
+                    period_label = f"{df.strftime('%b %d')} – {dt.strftime('%b %d, %Y')}"
+            except ValueError:
+                period_label = "Custom Range"
+        elif date_from:
+            try:
+                df = datetime.fromisoformat(date_from).date()
+                period_label = f"Since {df.strftime('%b %d, %Y')}"
+            except ValueError:
+                period_label = "Custom Range"
+        else:
+            period_label = "All Time"
+
         return success_response({
             "stats": {
                 "total_items": total_items,
@@ -221,6 +237,7 @@ def dashboard_summary():
                 "out_of_stock_count": out_of_stock_count,
                 "active_users": active_users,
             },
+            "period_label": period_label,
             "stock_by_category": pie_data,
             "stock_movement": stock_movement,
             "recent_transactions": recent_transactions,
