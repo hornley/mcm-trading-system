@@ -943,7 +943,12 @@ const StockManagement = () => {
       title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
       sorter: (a, b) => 0,
       sortOrder: sortBy === 'quantity' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
-      className: 'qty-cell',
+      onCell: (record) => {
+        const n = Number(record.quantity);
+        return {
+          className: n === 0 ? 'qty-oos' : n <= 10 ? 'qty-low' : 'qty-normal',
+        };
+      },
       render: (qty, record) => {
         const val = fmtQty(qty, record.category === FABRIC_CATEGORY);
         return <span>{val}</span>;

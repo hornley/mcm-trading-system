@@ -37,10 +37,10 @@
 .row-low-stock:hover td {
   background-color: rgba(250, 140, 22, 0.12) !important;
 }
-.row-out-of-stock .qty-cell {
+td.qty-oos {
   background-color: rgba(255, 77, 79, 0.15) !important;
 }
-.row-low-stock .qty-cell {
+td.qty-low {
   background-color: rgba(250, 140, 22, 0.15) !important;
 }
 .row-variety td {
