@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Table, Card, Typography, Row, Col, Input, Select, Button,
   Tag, Modal, Statistic, Space, Descriptions, Form, InputNumber,
-  DatePicker, Spin, Segmented, Checkbox, Dropdown,
+  DatePicker, Spin, Segmented, Checkbox, Dropdown, Switch,
 } from 'antd';
 import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -68,6 +68,7 @@ const StockManagement = () => {
   const [branchFilter, setBranchFilter] = useState('all');
   const [storehouseStockFilter, setStorehouseStockFilter] = useState('all');
   const [expandedRowKeys, setExpandedRowKeys] = useState([]);
+  const [expandVarieties, setExpandVarieties] = useState(false);
   const [restockCart, setRestockCart] = useState({});
   const [varietyModalVisible, setVarietyModalVisible] = useState(false);
   const [varietyModalProduct, setVarietyModalProduct] = useState(null);
@@ -223,6 +224,12 @@ const StockManagement = () => {
     setMovementsCache({});
     fetchData(1);
   }, [user, selectedLocationId, statusFilter, searchText]);
+
+  useEffect(() => {
+    if (expandVarieties) {
+      setExpandedRowKeys(inventory.filter((i) => i.varietiesList?.length).map((i) => i.inventory_id));
+    }
+  }, [inventory, expandVarieties]);
 
   const handleViewDetails = async (record) => {
     setSelectedRecord(record);
@@ -1188,6 +1195,18 @@ const StockManagement = () => {
             ]}
             onChange={(val) => setStatusFilter(val === 'all' ? '' : val)}
           />
+          <Switch
+            checked={expandVarieties}
+            onChange={(checked) => {
+              setExpandVarieties(checked);
+              if (checked) {
+                setExpandedRowKeys(inventory.filter((i) => i.varietiesList?.length).map((i) => i.inventory_id));
+              } else {
+                setExpandedRowKeys([]);
+              }
+            }}
+          />
+          <span style={{ fontSize: 13, color: '#888' }}>Expand all</span>
         </Space>
         <Table
           dataSource={inventory}
