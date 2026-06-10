@@ -952,18 +952,6 @@ const StockManagement = () => {
       sorter: true,
     },
     {
-      title: 'Auto-Restock',
-      key: 'autoRestock',
-      render: (_, record) => {
-        const level = Number(record.reorder_level) || 0;
-        const sourceId = record.auto_restock_source_id;
-        const source = locations.find((l) => l.location_id === sourceId);
-        return level > 0 && sourceId
-          ? <Tag color="green">{source?.name || 'Source Set'}</Tag>
-          : <Tag>{sourceId ? 'Inactive' : 'No Source Set'}</Tag>;
-      },
-    },
-    {
       title: '',
       key: 'actions',
       width: 60,
@@ -1130,7 +1118,7 @@ const StockManagement = () => {
       {storehouse && (
         <Card size="small" style={{ marginBottom: 16, background: 'rgba(82, 196, 26, 0.08)', borderColor: 'rgba(82, 196, 26, 0.3)' }}>
           <Space>
-            <Tag color="green">Storehouse</Tag>
+            <Tag color="green">Auto Stock</Tag>
             <span><strong>{storehouse.name}</strong></span>
           </Space>
         </Card>
