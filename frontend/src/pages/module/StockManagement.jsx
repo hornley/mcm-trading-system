@@ -1237,7 +1237,7 @@ const StockManagement = () => {
               return (
                 <div style={{ padding: '4px 0 4px 0' }}>
                   {varieties.map((v) => (
-                    <div key={v.variety_id} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr 1fr', columnGap: 8, padding: '4px 8px', fontSize: 13, alignItems: 'center', borderBottom: '1px solid #f0f0f0' }}>
+                    <div key={v.variety_id} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr auto', columnGap: 8, padding: '4px 8px', fontSize: 13, alignItems: 'center', borderBottom: '1px solid #f0f0f0' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         {v.color && (
                           <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', border: '1px solid #d9d9d9', flexShrink: 0 }} />
@@ -1253,7 +1253,6 @@ const StockManagement = () => {
                             ? <Tag color="orange" style={{ margin: 0 }}>Low Stock</Tag>
                             : null}
                       </div>
-                      <div></div>
                       <div style={{ textAlign: 'right' }}>
                         <Dropdown menu={{ items: varietyActions(v) }} trigger={['click']}>
                           <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
