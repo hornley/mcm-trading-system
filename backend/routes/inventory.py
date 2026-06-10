@@ -639,18 +639,10 @@ def list_inventory():
             IA.location_id == Inventory.location_id,
         ))
         query = query.filter(has_out)
-
-        zero_count = db.session.query(
-            Inventory.product_id.label('z_pid'),
-            Inventory.location_id.label('z_lid'),
-            db.func.count(Inventory.inventory_id).label('z_count'),
-        ).filter(Inventory.quantity == 0).group_by(
-            Inventory.product_id, Inventory.location_id
-        ).subquery()
-        query = query.outerjoin(zero_count, db.and_(
-            Inventory.product_id == zero_count.c.z_pid,
-            Inventory.location_id == zero_count.c.z_lid,
-        )).order_by(zero_count.c.z_count.desc(), sort_col.asc())
+        if sort_order == "desc":
+            query = query.order_by(sort_col.desc())
+        else:
+            query = query.order_by(sort_col.asc())
     elif status_filter in ("low_stock", "in_stock"):
         total_subq = db.session.query(
             Inventory.product_id.label('t_pid'),
