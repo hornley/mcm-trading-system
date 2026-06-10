@@ -45,6 +45,7 @@ const StockManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [showVarieties, setShowVarieties] = useState(false);
   const [movementsCache, setMovementsCache] = useState({});
   const [stats, setStats] = useState({ total_items: 0, low_stock_count: 0, out_of_stock_count: 0, pending_request_count: 0 });
   const [sortBy, setSortBy] = useState('quantity');
@@ -894,6 +895,7 @@ const StockManagement = () => {
     const start = (currentPage - 1) * pageSize;
     const end = start + pageSize;
     const pageParents = inventory.slice(start, end);
+    if (!showVarieties) return pageParents;
     const flat = [];
     for (const item of pageParents) {
       flat.push({ ...item, _rowType: 'parent' });
@@ -904,7 +906,7 @@ const StockManagement = () => {
       }
     }
     return flat;
-  }, [inventory, currentPage, pageSize]);
+  }, [inventory, currentPage, pageSize, showVarieties]);
   const receiptItems = Object.values(restockCart).filter((e) => e.quantity > 0);
   const receiptTotalQty = receiptItems.reduce((sum, e) => sum + (e.quantity || 0), 0);
   const receiptRef = `RS-${Date.now().toString(36).toUpperCase()}`;
@@ -1219,6 +1221,8 @@ const StockManagement = () => {
             ]}
             onChange={(val) => { setStatusFilter(val === 'all' ? '' : val); setCurrentPage(1); }}
           />
+          <Switch checked={showVarieties} onChange={setShowVarieties} />
+          <span style={{ fontSize: 13, color: '#888' }}>Show varieties</span>
         </Space>
         <Table
           dataSource={visibleData}
