@@ -329,7 +329,10 @@ const StockManagement = () => {
         const sourceRes = await fetch(stockCheckUrl);
         const sourceData = await sourceRes.json();
         if (sourceData.success) {
-          const sourceInv = sourceData.data.find(i => i.location_id === values.from_location_id && (!selectedRecord.variety_id || i.variety_id === selectedRecord.variety_id));
+          let sourceInv = sourceData.data.find(i => i.location_id === values.from_location_id && (!selectedRecord.variety_id || i.variety_id === selectedRecord.variety_id));
+          if (!sourceInv && selectedRecord.variety_id) {
+            sourceInv = sourceData.data.find(i => i.location_id === values.from_location_id);
+          }
           const sourceQty = sourceInv?.quantity || 0;
           if (Number(sourceQty) < Number(values.quantity)) {
             setAdjustSubmitting(false);

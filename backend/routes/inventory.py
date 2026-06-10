@@ -787,6 +787,12 @@ def get_inventory_by_product(product_id):
 
     inventory = query.all()
 
+    if not inventory and variety_id:
+        query = Inventory.query.filter_by(product_id=product_id)
+        if resolved_location_id and resolved_location_id != "all":
+            query = query.filter_by(location_id=resolved_location_id)
+        inventory = query.all()
+
     return success_response([
         {
             "inventory_id": inv.inventory_id,
@@ -1098,6 +1104,9 @@ def restock_selected():
         if variety_id:
             store_filters["variety_id"] = variety_id
         store_inv = Inventory.query.filter_by(**store_filters).first()
+        if not store_inv and variety_id:
+            store_filters.pop("variety_id", None)
+            store_inv = Inventory.query.filter_by(**store_filters).first()
 
         if not store_inv or store_inv.quantity <= 0:
             label = f"{product.name} ({variety_id})" if variety_id else product.name
@@ -1649,12 +1658,18 @@ def accept_request(request_id):
         dest_filters["variety_id"] = stock_request.variety_id
 
     inventory = Inventory.query.filter_by(**inv_filters).first()
+    if not inventory and stock_request.variety_id:
+        inv_filters.pop("variety_id", None)
+        inventory = Inventory.query.filter_by(**inv_filters).first()
     if not inventory or inventory.quantity < stock_request.quantity:
         return error_response("Insufficient stock at source location", "INSUFFICIENT_STOCK", 400)
 
     inventory.quantity -= stock_request.quantity
 
     dest_inv = Inventory.query.filter_by(**dest_filters).first()
+    if not dest_inv and stock_request.variety_id:
+        dest_filters.pop("variety_id", None)
+        dest_inv = Inventory.query.filter_by(**dest_filters).first()
     if dest_inv:
         dest_inv.quantity = (dest_inv.quantity or 0) + stock_request.quantity
     else:
