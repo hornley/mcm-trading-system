@@ -223,12 +223,6 @@ const StockManagement = () => {
     fetchData(1);
   }, [user, selectedLocationId, statusFilter, searchText]);
 
-  useEffect(() => {
-    if (expandVarieties) {
-      setExpandedRowKeys(inventory.filter((i) => i.varietiesList?.length).map((i) => i.inventory_id));
-    }
-  }, [inventory, expandVarieties]);
-
   const handleViewDetails = async (record) => {
     setSelectedRecord(record);
     if (movementsCache[record.product_id]) {
