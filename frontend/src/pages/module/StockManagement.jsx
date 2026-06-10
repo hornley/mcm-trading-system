@@ -6,8 +6,8 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { FABRIC_CATEGORY, fmtQty } from '../../utils/format.js';
-import { EllipsisOutlined, RightCircleOutlined } from '@ant-design/icons';
+import { FABRIC_CATEGORY, fmtQty, qtyLabel } from '../../utils/format.js';
+import { EllipsisOutlined, RightCircleOutlined, DownloadOutlined } from '@ant-design/icons';
 import QtyInput from '../../components/QtyInput.jsx';
 import logoImage from '../../../images/Logo.png';
 import receiptConfig from '../../config/receipt.json';
@@ -68,11 +68,25 @@ const StockManagement = () => {
   const [branchFilter, setBranchFilter] = useState('all');
   const [storehouseStockFilter, setStorehouseStockFilter] = useState('all');
   const [expandedRowKeys, setExpandedRowKeys] = useState([]);
+  const [restockCart, setRestockCart] = useState({});
+  const [varietyModalVisible, setVarietyModalVisible] = useState(false);
+  const [varietyModalProduct, setVarietyModalProduct] = useState(null);
+  const [varietyModalQtys, setVarietyModalQtys] = useState({});
+  const [varietyCheckedIds, setVarietyCheckedIds] = useState(new Set());
+  const [restockSearchText, setRestockSearchText] = useState('');
+  const [replenishVisible, setReplenishVisible] = useState(false);
+  const [replenishItems, setReplenishItems] = useState([]);
+  const [replenishCart, setReplenishCart] = useState({});
+  const [replenishSearchText, setReplenishSearchText] = useState('');
+  const [replenishSubmitting, setReplenishSubmitting] = useState(false);
+  const [repVarietyModalVisible, setRepVarietyModalVisible] = useState(false);
+  const [repVarietyModalProduct, setRepVarietyModalProduct] = useState(null);
+  const [repVarietyModalQtys, setRepVarietyModalQtys] = useState({});
+  const [repVarietyCheckedIds, setRepVarietyCheckedIds] = useState(new Set());
   const receiptCaptureRef = useRef(null);
 
-  const fetchData = async () => {
+  const fetchData = async (page = 1, size = pageSize) => {
     if (!user) return;
-    const ps = pageSize;
     setLoading(true);
     try {
       const locationParam = selectedLocationId !== "all" ? `&location_id=${selectedLocationId}` : '';
@@ -82,7 +96,7 @@ const StockManagement = () => {
       const statusParam = statusFilter ? `&status=${statusFilter}` : '';
 
       const [invRes, locRes, countRes] = await Promise.all([
-        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=1&limit=500${searchParam}${sortParam}${statusParam}`),
+        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=${page}&limit=${size}${searchParam}${sortParam}${statusParam}`),
         fetch(`/api/locations?usertype=${user.usertype}`),
         fetch(`/api/inventory/counts?usertype=${user.usertype}${locationParam}${userIdParam}`),
       ]);
@@ -117,8 +131,7 @@ const StockManagement = () => {
           }
         }
         setInventory(merged);
-        setTotalCount(merged.length);
-        setCurrentPage(1);
+        setTotalCount(invData.data.total_count || 0);
       }
       if (countData.success) {
         setStats(countData.data);
@@ -199,7 +212,6 @@ const StockManagement = () => {
 
   useEffect(() => {
     if (isStorehouse) {
-      fetchBranchNeeds();
       fetchStorehousePendingRequests();
     }
   }, [isStorehouse, selectedLocationId, storehouse]);
@@ -207,7 +219,7 @@ const StockManagement = () => {
   useEffect(() => {
     setCurrentPage(1);
     setMovementsCache({});
-    fetchData();
+    fetchData(1);
   }, [user, selectedLocationId, statusFilter, searchText]);
 
   const handleViewDetails = async (record) => {
@@ -461,32 +473,68 @@ const StockManagement = () => {
       return;
     }
     try {
-      const res = await fetch(`/api/inventory/low-stock?usertype=${user.usertype}&location_id=${selectedLocationId}&user_id=${user.user_id}`);
-      const data = await res.json();
-      if (data.success) {
-        const raw = data.data || [];
-        const grouped = {};
-        for (const row of raw) {
-          const pid = row.product_id;
-          if (!grouped[pid]) {
-            grouped[pid] = { ...row, quantity: 0 };
-          }
-          grouped[pid].quantity += row.quantity || 0;
-        }
-        const deduped = Object.values(grouped);
-        setLowStockItems(deduped);
-        const defaultQtys = {};
-        deduped.forEach((item) => {
-          const deficit = Math.max(0, (item.reorder_level || 0) - item.quantity);
-          defaultQtys[item.product_id] = deficit > 0 ? deficit + Math.ceil(deficit / 2) : 0;
-        });
-        setRestockQuantities(defaultQtys);
-        setSelectedRestockIds(new Set());
-      } else {
-        Modal.error({ title: 'Error', content: data.message || 'Failed to load low stock items', centered: true });
+      const branchRes = await fetch(`/api/inventory?usertype=${user.usertype}&location_id=${selectedLocationId}&user_id=${user.user_id}&limit=1000`);
+      const branchData = await branchRes.json();
+      if (!branchData.success) {
+        Modal.error({ title: 'Error', content: branchData.message || 'Failed to load items', centered: true });
+        return;
       }
+      const raw = branchData.data.data || [];
+      const pids = [...new Set(raw.map((r) => r.product_id))];
+      let storehouseData = [];
+      if (storehouse && pids.length > 0) {
+        const storeRes = await fetch(`/api/inventory?usertype=${user.usertype}&location_id=${storehouse.location_id}&user_id=${user.user_id}&limit=1000&product_ids=${pids.join(',')}`);
+        const storeJson = await storeRes.json();
+        storehouseData = storeJson.success ? (storeJson.data.data || []) : [];
+      }
+      const groups = {};
+      for (const row of raw) {
+        const key = `${row.product_id}-${row.location_id}`;
+        if (!groups[key]) groups[key] = { parent: null, varieties: [] };
+        if (row.variety_id && (row.color || row.pattern)) {
+          groups[key].varieties.push(row);
+        } else {
+          groups[key].parent = row;
+        }
+      }
+      const storeMap = {};
+      const varietyStoreQty = {};
+      for (const item of storehouseData) {
+        const pid = item.product_id;
+        const vid = item.variety_id;
+        const vkey = `${pid}-${vid || ''}`;
+        if (!storeMap[pid]) storeMap[pid] = { quantity: 0 };
+        storeMap[pid].quantity += item.quantity || 0;
+        varietyStoreQty[vkey] = (varietyStoreQty[vkey] || 0) + (item.quantity || 0);
+      }
+      const merged = [];
+      for (const g of Object.values(groups)) {
+        if (g.parent) {
+          const st = storeMap[g.parent.product_id] || {};
+          g.parent.storehouse_quantity = st.quantity || 0;
+          g.parent.varietiesList = g.varieties;
+          g.parent.varietiesList.forEach((v) => {
+            v.variety_store_qty = varietyStoreQty[`${v.product_id}-${v.variety_id}`] || 0;
+          });
+          if (g.varieties.length > 0) {
+            g.parent.quantity = g.varieties.reduce((sum, v) => sum + (v.quantity || 0), 0);
+          }
+          merged.push(g.parent);
+        } else if (g.varieties.length > 0) {
+          g.varieties[0].varietiesList = g.varieties;
+          g.varieties[0].varietiesList.forEach((v) => {
+            v.variety_store_qty = varietyStoreQty[`${v.product_id}-${v.variety_id}`] || 0;
+          });
+          const st = storeMap[g.varieties[0].product_id] || {};
+          g.varieties[0].storehouse_quantity = st.quantity || 0;
+          g.varieties[0].quantity = g.varieties.reduce((sum, v) => sum + (v.quantity || 0), 0);
+          merged.push(g.varieties[0]);
+        }
+      }
+      setLowStockItems(merged);
+      setRestockCart({});
     } catch {
-      Modal.error({ title: 'Error', content: 'Failed to load low stock items', centered: true });
+      Modal.error({ title: 'Error', content: 'Failed to load items', centered: true });
     }
     setSelectRestockVisible(true);
   };
@@ -504,59 +552,111 @@ const StockManagement = () => {
     setRequestLogVisible(true);
   };
 
-  const handleToggleRestockItem = (productId) => {
-    setSelectedRestockIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(productId)) {
-        next.delete(productId);
-      } else {
-        next.add(productId);
+  const handleAddToCart = (product, variety = null) => {
+    const key = variety ? `${product.product_id}-${variety.variety_id}` : `${product.product_id}`;
+    setRestockCart((prev) => {
+      if (prev[key]) {
+        return prev;
       }
+      const isFab = product.category === FABRIC_CATEGORY;
+      const qty = variety ? 0 : Math.max(0, (product.reorder_level || 0) - product.quantity) || 0;
+      return {
+        ...prev,
+        [key]: {
+          key,
+          product_id: product.product_id,
+          product_name: product.product_name,
+          variety_id: variety?.variety_id || null,
+          variety_label: variety ? `${variety.color || ''} ${variety.pattern || ''}`.trim() : null,
+          quantity: qty,
+          storehouse_qty: product.storehouse_quantity || 0,
+          is_fabric: isFab,
+          category: product.category,
+        },
+      };
+    });
+  };
+
+  const handleRemoveFromCart = (key) => {
+    setRestockCart((prev) => {
+      const next = { ...prev };
+      delete next[key];
       return next;
     });
   };
 
-  const handleSelectAllRestock = (checked) => {
-    if (checked) {
-      setSelectedRestockIds(new Set(lowStockItems.map((i) => i.product_id)));
-    } else {
-      setSelectedRestockIds(new Set());
-    }
+  const handleUpdateCartQty = (key, value) => {
+    setRestockCart((prev) => {
+      if (!prev[key]) return prev;
+      return { ...prev, [key]: { ...prev[key], quantity: value } };
+    });
   };
 
-  const handleRestockQtyChange = (productId, value) => {
-    setRestockQuantities((prev) => ({ ...prev, [productId]: value }));
+  const handleOpenVarietyModal = (product) => {
+    const initial = {};
+    (product.varietiesList || []).forEach((v) => {
+      initial[v.variety_id] = 1;
+    });
+    setVarietyModalQtys(initial);
+    setVarietyModalProduct(product);
+    setVarietyCheckedIds(new Set());
+    setVarietyModalVisible(true);
   };
 
-  const handleOrderRestock = () => {
-    if (selectedRestockIds.size === 0) {
-      Modal.warning({ title: 'Warning', content: 'Select at least one item to restock', centered: true });
-      return;
+  const handleAddVarietyToCart = () => {
+    const product = varietyModalProduct;
+    if (!product) return;
+    for (const v of (product.varietiesList || [])) {
+      if (!varietyCheckedIds.has(v.variety_id)) continue;
+      const qty = varietyModalQtys[v.variety_id] || 0;
+      if (qty <= 0) continue;
+      const key = `${product.product_id}-${v.variety_id}`;
+      setRestockCart((prev) => {
+        if (prev[key]) {
+          return { ...prev, [key]: { ...prev[key], quantity: (prev[key].quantity || 0) + qty } };
+        }
+        return {
+          ...prev,
+          [key]: {
+            key,
+            product_id: product.product_id,
+            product_name: product.product_name,
+            variety_id: v.variety_id,
+            variety_label: `${v.color || ''} ${v.pattern || ''}`.trim(),
+            quantity: qty,
+            storehouse_qty: product.storehouse_quantity || 0,
+            is_fabric: product.category === FABRIC_CATEGORY,
+            category: product.category,
+          },
+        };
+      });
     }
-    setOrderSummaryVisible(true);
+    setVarietyModalVisible(false);
+    setVarietyModalProduct(null);
+    setVarietyModalQtys({});
+    setVarietyCheckedIds(new Set());
   };
 
   const handleConfirmRestock = async () => {
     const items = [];
-    for (const productId of selectedRestockIds) {
-      const qty = restockQuantities[productId] || 0;
-      if (qty > 0) {
-        items.push({ product_id: productId, quantity: qty });
+    for (const entry of Object.values(restockCart)) {
+      if (entry.quantity > 0) {
+        items.push({ product_id: entry.product_id, quantity: entry.quantity, variety_id: entry.variety_id || undefined });
       }
     }
     if (items.length === 0) {
-      Modal.warning({ title: 'Warning', content: 'All selected items have zero quantity', centered: true });
+      Modal.warning({ title: 'Warning', content: 'No items in cart with quantity > 0', centered: true });
       return;
     }
 
     const unavailable = items.filter((item) => {
-      const ls = lowStockItems.find((i) => i.product_id === item.product_id);
-      return !ls || (ls.storehouse_quantity || 0) < item.quantity;
+      const cartEntry = Object.values(restockCart).find((e) => e.product_id === item.product_id);
+      return !cartEntry || (cartEntry.storehouse_qty || 0) < item.quantity;
     });
     if (unavailable.length > 0) {
       const names = unavailable.map((i) => {
-        const ls = lowStockItems.find((ls) => ls.product_id === i.product_id);
-        return ls?.product_name || `Product #${i.product_id}`;
+        const e = Object.values(restockCart).find((e) => e.product_id === i.product_id);
+        return e?.product_name || `Product #${i.product_id}`;
       }).join(', ');
       Modal.error({ title: 'Error', content: `Insufficient storehouse stock for: ${names}`, centered: true });
       return;
@@ -577,9 +677,8 @@ const StockManagement = () => {
       const json = await res.json();
       if (json.success) {
         Modal.success({ title: 'Success', content: `Restock request submitted for ${json.data.count} product(s) — waiting for storehouse approval`, centered: true });
-        setOrderSummaryVisible(false);
         setSelectRestockVisible(false);
-        setSelectedRestockIds(new Set());
+        setRestockCart({});
         fetchData();
       } else {
         Modal.error({ title: 'Error', content: json.message, centered: true });
@@ -590,6 +689,176 @@ const StockManagement = () => {
       setRestockSubmitting(false);
     }
   };
+
+  /* ── Replenish handlers ── */
+
+  const handleOpenReplenish = async () => {
+    if (selectedLocationId === "all") {
+      Modal.warning({ title: 'Warning', content: 'Select a specific branch from the top bar to replenish', centered: true });
+      return;
+    }
+    try {
+      const res = await fetch(`/api/inventory?usertype=${user.usertype}&location_id=${selectedLocationId}&user_id=${user.user_id}&limit=1000`);
+      const json = await res.json();
+      if (!json.success) {
+        Modal.error({ title: 'Error', content: json.message || 'Failed to load items', centered: true });
+        return;
+      }
+      const raw = json.data.data || [];
+      const groups = {};
+      for (const row of raw) {
+        const key = `${row.product_id}-${row.location_id}`;
+        if (!groups[key]) groups[key] = { parent: null, varieties: [] };
+        if (row.variety_id && (row.color || row.pattern)) {
+          groups[key].varieties.push(row);
+        } else {
+          groups[key].parent = row;
+        }
+      }
+      const merged = [];
+      for (const g of Object.values(groups)) {
+        if (g.parent) {
+          g.parent.varietiesList = g.varieties;
+          if (g.varieties.length > 0) {
+            g.parent.quantity = g.varieties.reduce((sum, v) => sum + (v.quantity || 0), 0);
+          }
+          merged.push(g.parent);
+        } else if (g.varieties.length > 0) {
+          g.varieties[0].varietiesList = g.varieties;
+          g.varieties[0].quantity = g.varieties.reduce((sum, v) => sum + (v.quantity || 0), 0);
+          merged.push(g.varieties[0]);
+        }
+      }
+      setReplenishItems(merged);
+      setReplenishCart({});
+    } catch {
+      Modal.error({ title: 'Error', content: 'Failed to load items', centered: true });
+    }
+    setReplenishVisible(true);
+  };
+
+  const handleAddToReplenishCart = (product, variety = null) => {
+    const key = variety ? `${product.product_id}-${variety.variety_id}` : `${product.product_id}`;
+    setReplenishCart((prev) => {
+      if (prev[key]) return prev;
+      const isFab = product.category === FABRIC_CATEGORY;
+      const qty = 0;
+      return {
+        ...prev,
+        [key]: {
+          key,
+          product_id: product.product_id,
+          product_name: product.product_name,
+          variety_id: variety?.variety_id || null,
+          variety_label: variety ? `${variety.color || ''} ${variety.pattern || ''}`.trim() : null,
+          quantity: qty,
+          is_fabric: isFab,
+          category: product.category,
+        },
+      };
+    });
+  };
+
+  const handleRemoveFromReplenishCart = (key) => {
+    setReplenishCart((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const handleUpdateReplenishCartQty = (key, value) => {
+    setReplenishCart((prev) => {
+      if (!prev[key]) return prev;
+      return { ...prev, [key]: { ...prev[key], quantity: value } };
+    });
+  };
+
+  const handleOpenRepVarietyModal = (product) => {
+    const initial = {};
+    (product.varietiesList || []).forEach((v) => {
+      initial[v.variety_id] = 1;
+    });
+    setRepVarietyModalQtys(initial);
+    setRepVarietyModalProduct(product);
+    setRepVarietyCheckedIds(new Set());
+    setRepVarietyModalVisible(true);
+  };
+
+  const handleAddRepVarietyToCart = () => {
+    const product = repVarietyModalProduct;
+    if (!product) return;
+    for (const v of (product.varietiesList || [])) {
+      if (!repVarietyCheckedIds.has(v.variety_id)) continue;
+      const qty = repVarietyModalQtys[v.variety_id] || 0;
+      if (qty <= 0) continue;
+      const key = `${product.product_id}-${v.variety_id}`;
+      setReplenishCart((prev) => {
+        if (prev[key]) {
+          return { ...prev, [key]: { ...prev[key], quantity: (prev[key].quantity || 0) + qty } };
+        }
+        const isFab = product.category === FABRIC_CATEGORY;
+        return {
+          ...prev,
+          [key]: {
+            key,
+            product_id: product.product_id,
+            product_name: product.product_name,
+            variety_id: v.variety_id,
+            variety_label: `${v.color || ''} ${v.pattern || ''}`.trim(),
+            quantity: qty,
+            is_fabric: isFab,
+            category: product.category,
+          },
+        };
+      });
+    }
+    setRepVarietyModalVisible(false);
+    setRepVarietyModalProduct(null);
+    setRepVarietyModalQtys({});
+    setRepVarietyCheckedIds(new Set());
+  };
+
+  const handleConfirmReplenish = async () => {
+    const items = [];
+    for (const entry of Object.values(replenishCart)) {
+      if (entry.quantity > 0) {
+        items.push({ product_id: entry.product_id, quantity: entry.quantity, variety_id: entry.variety_id || undefined });
+      }
+    }
+    if (items.length === 0) {
+      Modal.warning({ title: 'Warning', content: 'No items with quantity > 0', centered: true });
+      return;
+    }
+    setReplenishSubmitting(true);
+    try {
+      const res = await fetch('/api/inventory/replenish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          usertype: user.usertype,
+          user_id: user.user_id,
+          location_id: selectedLocationId,
+          items,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        Modal.success({ title: 'Success', content: `Replenished ${json.data.count} product(s)`, centered: true });
+        setReplenishVisible(false);
+        setReplenishCart({});
+        fetchData();
+      } else {
+        Modal.error({ title: 'Error', content: json.message, centered: true });
+      }
+    } catch {
+      Modal.error({ title: 'Error', content: 'Failed to replenish inventory', centered: true });
+    } finally {
+      setReplenishSubmitting(false);
+    }
+  };
+
+  /* ── end Replenish ── */
 
   const handlePrintSummary = async () => {
     if (!receiptCaptureRef.current) return;
@@ -608,8 +877,8 @@ const StockManagement = () => {
   const { total_items: totalItems, low_stock_count: lowStockCount, out_of_stock_count: outOfStockCount, pending_request_count: pendingRequestCount } = stats;
 
   const showBranch = selectedLocationId === "all";
-  const receiptItems = lowStockItems.filter((i) => selectedRestockIds.has(i.product_id) && (restockQuantities[i.product_id] || 0) > 0);
-  const receiptTotalQty = receiptItems.reduce((sum, i) => sum + (restockQuantities[i.product_id] || 0), 0);
+  const receiptItems = Object.values(restockCart).filter((e) => e.quantity > 0);
+  const receiptTotalQty = receiptItems.reduce((sum, e) => sum + (e.quantity || 0), 0);
   const receiptRef = `RS-${Date.now().toString(36).toUpperCase()}`;
 
   const columns = [
@@ -760,22 +1029,21 @@ const StockManagement = () => {
     },
   ];
 
-  if (loading && inventory.length === 0) return <Card style={{ textAlign: 'center' }}><Spin size="large" /></Card>;
+  if (!isStorehouse && loading && inventory.length === 0) return <Card style={{ textAlign: 'center' }}><Spin size="large" /></Card>;
 
   const visibleColumns = selectedLocationId === 'all'
     ? columns
     : columns.filter(col => col.key !== 'location_name');
 
-  const restockFooterItems = orderSummaryVisible
-    ? [
-      <Button key="print" style={{ background: '#1677ff', borderColor: '#1677ff', color: '#fff' }} onClick={handlePrintSummary}>Download Receipt</Button>,
-      <Button key="cancel" danger onClick={() => { setOrderSummaryVisible(false); }}>Cancel</Button>,
-      <Button key="confirm" type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} loading={restockSubmitting} onClick={handleConfirmRestock}>Confirm</Button>,
-    ]
-    : [
-      <Button key="cancel" onClick={() => { setSelectRestockVisible(false); setOrderSummaryVisible(false); }}>Cancel</Button>,
-      <Button key="order" type="primary" onClick={handleOrderRestock}>Order</Button>,
-    ];
+  const restockFooterItems = [
+    <Button key="cancel" onClick={() => { setSelectRestockVisible(false); setRestockCart({}); }}>Cancel</Button>,
+    <Button key="confirm" type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} loading={restockSubmitting} onClick={handleConfirmRestock}>Confirm Restock</Button>,
+  ];
+
+  const replenishFooterItems = [
+    <Button key="cancel" onClick={() => { setReplenishVisible(false); setReplenishCart({}); }}>Cancel</Button>,
+    <Button key="confirm" type="primary" style={{ background: '#1677ff', borderColor: '#1677ff' }} loading={replenishSubmitting} onClick={handleConfirmReplenish}>Confirm Replenish</Button>,
+  ];
 
   return (
     <div>
@@ -854,190 +1122,132 @@ const StockManagement = () => {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} md={14}>
           <Space wrap>
-            {isStorehouse ? (
-              <Space>
-                <Search
-                  placeholder="Search products..."
-                  value={searchText}
-                  onChange={(e) => { setSearchText(e.target.value); fetchBranchNeeds(); }}
-                  allowClear
-                  style={{ width: 200 }}
-                />
-                <Select
-                  placeholder="Filter by branch"
-                  value={branchFilter}
-                  onChange={setBranchFilter}
-                  style={{ width: 160 }}
-                  allowClear={false}
+            <>
+              <Search
+                placeholder="Search by product name"
+                value={searchText}
+                onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1); }}
+                allowClear
+                style={{ width: 220 }}
+              />
+              {user && (user.usertype === 1 || user.usertype === 3) && (
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'all', label: 'All Locations' },
+                      ...locations.filter((l) => l.is_active).map(loc => ({ key: String(loc.location_id), label: loc.name })),
+                    ],
+                    onClick: ({ key }) => {
+                      if (key === 'all') {
+                        setSelectedLocationId('all');
+                        setIsStorehouse(false);
+                      } else {
+                        setSelectedLocationId(Number(key));
+                        const loc = locations.find(l => l.location_id === Number(key));
+                        setIsStorehouse(loc ? loc.is_storehouse : false);
+                      }
+                    },
+                  }}
                 >
-                  <Select.Option value="all">All Branches</Select.Option>
-                  {locations.filter((l) => l.location_id !== storehouse?.location_id).map((l) => (
-                    <Select.Option key={l.location_id} value={String(l.location_id)}>{l.name}</Select.Option>
-                  ))}
-                </Select>
-                <Segmented
-                  value={storehouseStockFilter}
-                  options={[
-                    { label: 'All', value: 'all' },
-                    { label: 'Has Stock', value: 'has_stock' },
-                    { label: 'No Stock', value: 'no_stock' },
-                  ]}
-                  onChange={setStorehouseStockFilter}
-                />
-              </Space>
-            ) : (
-              <>
-                <Search
-                  placeholder="Search by product name"
-                  value={searchText}
-                  onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1); }}
-                  allowClear
-                  style={{ width: 220 }}
-                />
-                {user && (user.usertype === 1 || user.usertype === 3) && (
-                  <Dropdown
-                    menu={{
-                      items: [
-                        { key: 'all', label: 'All Locations' },
-                        ...locations.filter((l) => l.is_active).map(loc => ({ key: String(loc.location_id), label: loc.name })),
-                      ],
-                      onClick: ({ key }) => {
-                        if (key === 'all') {
-                          setSelectedLocationId('all');
-                          setIsStorehouse(false);
-                        } else {
-                          setSelectedLocationId(Number(key));
-                          const loc = locations.find(l => l.location_id === Number(key));
-                          setIsStorehouse(loc ? loc.is_storehouse : false);
-                        }
-                      },
-                    }}
-                  >
-                    <Button type={selectedLocationId !== 'all' ? 'primary' : 'default'}>
-                      {selectedLocationId !== 'all'
-                        ? (locations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
-                        : 'All Locations'}
-                    </Button>
-                  </Dropdown>
-                )}
-                {can('update') && (
-                  <Button type="primary" onClick={handleOpenSelectRestock} disabled={selectedLocationId === "all"}>
-                    Select Restock
+                  <Button type={selectedLocationId !== 'all' ? 'primary' : 'default'}>
+                    {selectedLocationId !== 'all'
+                      ? (locations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
+                      : 'All Locations'}
                   </Button>
-                )}
-              </>
-            )}
+                </Dropdown>
+              )}
+              {can('update') && (
+                <Button type="primary" ghost onClick={handleOpenReplenish} disabled={selectedLocationId === "all"}>
+                  Replenish
+                </Button>
+              )}
+              {!isStorehouse && can('update') && (
+                <Button type="primary" onClick={handleOpenSelectRestock} disabled={selectedLocationId === "all"}>
+                  Select Restock
+                </Button>
+              )}
+            </>
           </Space>
         </Col>
       </Row>
 
-      {isStorehouse ? (
-        <Table
-          scroll={{ x: 'max-content' }}
-          dataSource={branchNeeds.filter((r) => {
-            if (searchText && !r.product_name.toLowerCase().includes(searchText.toLowerCase())) return false;
-            if (branchFilter !== 'all' && String(r.branch_id) !== branchFilter) return false;
-            if (storehouseStockFilter === 'has_stock' && !(r.storehouse_qty > 0)) return false;
-            if (storehouseStockFilter === 'no_stock' && (r.storehouse_qty > 0)) return false;
-            return true;
-          })}
-          rowKey={(r) => `${r.product_id}-${r.branch_id}`}
-          loading={branchNeedsLoading}
-          size="middle"
-          bordered
-          columns={[
-            { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
-            { title: 'Branch', dataIndex: 'branch_name', key: 'branch_name' },
-            {
-              title: 'Current Qty', dataIndex: 'current_qty', key: 'current_qty',
-              render: (v, r) => fmtQty(v, r.category === FABRIC_CATEGORY),
-            },
-            {
-              title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level',
-              render: (v) => Number(v).toLocaleString(),
-            },
-            {
-              title: 'Deficit', dataIndex: 'deficit', key: 'deficit',
-              render: (v, r) => <span style={{ color: '#ff4d4f' }}>{fmtQty(v, r.category === FABRIC_CATEGORY)}</span>,
-            },
-            {
-              title: 'Storehouse Stock', key: 'storehouseQty',
-              render: (_, r) => {
-                const sq = r.storehouse_qty || 0;
-                return sq > 0
-                  ? <span style={{ color: '#52c41a' }}>{fmtQty(sq, r.category === FABRIC_CATEGORY)}</span>
-                  : <Tag color="red">No Stock</Tag>;
-              },
-            },
-          ]}
-          locale={{ emptyText: 'All branches are adequately stocked' }}
-          pagination={{ pageSize: 10 }}
-        />
-      ) : (
-        <>
-          <Space style={{ marginBottom: 12 }}>
-            <Segmented
-              value={statusFilter || 'all'}
-              options={[
-                { label: 'All', value: 'all' },
-                { label: `In Stock (${stats.total_items - stats.low_stock_count - stats.out_of_stock_count})`, value: 'in_stock' },
-                { label: `Low Stock (${stats.low_stock_count})`, value: 'low_stock' },
-                { label: `Out of Stock (${stats.out_of_stock_count})`, value: 'out_of_stock' },
-              ]}
-              onChange={(val) => setStatusFilter(val === 'all' ? '' : val)}
-            />
-          </Space>
-          <Table
-            dataSource={inventory}
-            columns={visibleColumns}
-            rowKey="inventory_id"
-            loading={loading}
-            scroll={{ x: 'max-content' }}
-            rowClassName={(record) => {
-              const q = Number(record.quantity);
-              if (q === 0) return 'row-out-of-stock';
-              if (q <= 10) return 'row-low-stock';
-              return '';
-            }}
-            expandable={{
-              expandedRowRender: (record) => {
-                const varieties = record.varietiesList;
-                if (!varieties || varieties.length === 0) return null;
-                return (
-                  <div style={{ padding: '8px 0 8px 40px' }}>
-                    {varieties.map((v) => (
-                      <div key={v.variety_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0', fontSize: 13 }}>
-                        {v.color && (
-                          <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', border: '1px solid #d9d9d9' }} />
-                        )}
-                        <span style={{ width: 100 }}>{v.pattern || 'Default'}</span>
-                        <span style={{ color: '#888' }}>{v.color || ''}</span>
-                        <Tag>{fmtQty(v.quantity, record.category === FABRIC_CATEGORY)}</Tag>
-                      </div>
-                    ))}
-                  </div>
-                );
-              },
-              expandedRowKeys,
-              onExpand: (expanded, record) => {
-                setExpandedRowKeys((prev) =>
-                  expanded ? [...prev, record.inventory_id] : prev.filter((id) => id !== record.inventory_id)
-                );
-              },
-              showExpandColumn: false,
-            }}
-            onChange={(pagination, filters, sorter) => {
-              if (sorter.field) {
-                const newSortBy = sorter.field;
-                const newSortOrder = sorter.order === 'descend' ? 'desc' : 'asc';
-                setSortBy(newSortBy);
-                setSortOrder(newSortOrder);
-              }
-            }}
-            pagination={{ current: currentPage, pageSize, total: totalCount, showSizeChanger: true, pageSizeOptions: [10, 50, 100, 200], onShowSizeChange: (_, size) => setPageSize(size), onChange: (p) => setCurrentPage(p) }}
+      <>
+        <Space style={{ marginBottom: 12 }}>
+          <Segmented
+            value={statusFilter || 'all'}
+            options={[
+              { label: 'All', value: 'all' },
+              { label: `In Stock (${stats.total_items - stats.low_stock_count - stats.out_of_stock_count})`, value: 'in_stock' },
+              { label: `Low Stock (${stats.low_stock_count})`, value: 'low_stock' },
+              { label: `Out of Stock (${stats.out_of_stock_count})`, value: 'out_of_stock' },
+            ]}
+            onChange={(val) => setStatusFilter(val === 'all' ? '' : val)}
           />
-        </>
-      )}
+        </Space>
+        <Table
+          dataSource={inventory}
+          columns={visibleColumns}
+          rowKey="inventory_id"
+          loading={loading}
+          scroll={{ x: 'max-content' }}
+          rowClassName={(record) => {
+            const q = Number(record.quantity);
+            if (q === 0) return 'row-out-of-stock';
+            if (q <= 10) return 'row-low-stock';
+            return '';
+          }}
+          expandable={{
+            expandedRowRender: (record) => {
+              const varieties = record.varietiesList;
+              if (!varieties || varieties.length === 0) return null;
+              return (
+                <div style={{ padding: '8px 0 8px 40px' }}>
+                  {varieties.map((v) => (
+                    <div key={v.variety_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0', fontSize: 13 }}>
+                      {v.color && (
+                        <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', border: '1px solid #d9d9d9' }} />
+                      )}
+                      <span style={{ width: 100 }}>{v.pattern || 'Default'}</span>
+                      <span style={{ color: '#888' }}>{v.color || ''}</span>
+                      <Tag>{fmtQty(v.quantity, record.category === FABRIC_CATEGORY)}</Tag>
+                    </div>
+                  ))}
+                </div>
+              );
+            },
+            expandedRowKeys,
+            onExpand: (expanded, record) => {
+              setExpandedRowKeys((prev) =>
+                expanded ? [...prev, record.inventory_id] : prev.filter((id) => id !== record.inventory_id)
+              );
+            },
+            showExpandColumn: false,
+          }}
+          onChange={(pagination, filters, sorter) => {
+            if (sorter.field) {
+              const newSortBy = sorter.field;
+              const newSortOrder = sorter.order === 'descend' ? 'desc' : 'asc';
+              setSortBy(newSortBy);
+              setSortOrder(newSortOrder);
+              fetchData(1);
+            }
+          }}
+          pagination={{
+            current: currentPage, pageSize, total: totalCount,
+            showSizeChanger: true,
+            pageSizeOptions: [10, 25, 50, 100],
+            onShowSizeChange: (_, size) => {
+              setPageSize(size);
+              setCurrentPage(1);
+              fetchData(1, size);
+            },
+            onChange: (p) => {
+              setCurrentPage(p);
+              fetchData(p);
+            },
+          }}
+        />
+      </>
 
       <Modal
         title={`${selectedRecord?.product_name} - Stock Details`}
@@ -1199,109 +1409,435 @@ const StockManagement = () => {
       <Modal
         title="Select Items to Restock"
         open={selectRestockVisible}
-        onCancel={() => { setSelectRestockVisible(false); setOrderSummaryVisible(false); }}
-        width={950}
+        onCancel={() => { setSelectRestockVisible(false); setRestockCart({}); }}
+        width={1100}
         centered
-        styles={{ body: { padding: '16px 24px' } }}
+        styles={{ body: { padding: '16px 24px', maxHeight: '80vh', overflowY: 'auto' } }}
         footer={restockFooterItems}
       >
-        <div>
-          <div style={{ marginBottom: 12 }}>
-            <Checkbox
-              checked={selectedRestockIds.size > 0 && selectedRestockIds.size === lowStockItems.length}
-              indeterminate={selectedRestockIds.size > 0 && selectedRestockIds.size < lowStockItems.length}
-              onChange={(e) => handleSelectAllRestock(e.target.checked)}
-            >
-              Select All
-            </Checkbox>
-          </div>
-          <div style={{ overflowY: 'auto', maxHeight: orderSummaryVisible ? '30vh' : '45vh' }}>
-            <Table
-              dataSource={lowStockItems}
-              rowKey="product_id"
-              pagination={false}
-              size="small"
-              bordered
-              scroll={{ x: 'max-content' }}
-              columns={[
-                {
-                  title: 'Select', key: 'select', width: 60,
-                  render: (_, record) => (
-                    <Checkbox
-                      checked={selectedRestockIds.has(record.product_id)}
-                      onChange={() => handleToggleRestockItem(record.product_id)}
-                    />
-                  ),
-                },
-                { title: 'Product Name', dataIndex: 'product_name', key: 'product_name', sorter: (a, b) => a.product_name.localeCompare(b.product_name) },
-                { title: 'Category', dataIndex: 'category', key: 'category', sorter: (a, b) => (a.category || '').localeCompare(b.category || '') },
-                {
-                  title: 'Status', key: 'status', width: 130,
-                  sorter: (a, b) => a.quantity - b.quantity,
-                  render: (_, record) => getStockStatus(record.quantity).tag,
-                },
-                {
-                  title: 'Current Quantity', dataIndex: 'quantity', key: 'quantity', width: 110,
-                  sorter: (a, b) => a.quantity - b.quantity,
-                  render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
-                },
-                {
-                  title: 'Storehouse Stock', key: 'storehouseStock', width: 110,
-                  render: (_, record) => {
-                    const sq = record.storehouse_quantity || 0;
-                    return sq > 0
-                      ? <span style={{ color: '#52c41a' }}>{fmtQty(sq, record.category === FABRIC_CATEGORY)}</span>
-                      : <Tag color="red">No Stock</Tag>;
-                  },
-                },
-                {
-                  title: 'Restock Quantity', key: 'restockQty', width: 175,
-                  render: (_, record) => (
-                    <QtyInput
-                      isFabric={record.category === FABRIC_CATEGORY}
-                      value={restockQuantities[record.product_id] || 0}
-                      disabled={!selectedRestockIds.has(record.product_id)}
-                      min={0}
-                      onChange={(val) => handleRestockQtyChange(record.product_id, val || 0)}
-                    />
-                  ),
-                },
-              ]}
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={17}>
+            <Input.Search
+              placeholder="Search products..."
+              value={restockSearchText}
+              onChange={(e) => setRestockSearchText(e.target.value)}
+              allowClear
+              style={{ marginBottom: 16, width: 280 }}
             />
-          </div>
-          {orderSummaryVisible && (
-            <div
-              id="restock-summary-content"
-              style={{
-                marginTop: 16,
-                borderTop: '1px solid #f0f0f0',
-                paddingTop: 16,
-              }}
-            >
-              <Typography.Title level={5} style={{ marginTop: 0 }}>Order Summary</Typography.Title>
-              <Table
-                dataSource={lowStockItems.filter((i) => selectedRestockIds.has(i.product_id) && (restockQuantities[i.product_id] || 0) > 0)}
-                rowKey="product_id"
-                pagination={false}
-                size="small"
-                bordered
-                scroll={{ x: 'max-content' }}
-                columns={[
-                  { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
-                  { title: 'Category', dataIndex: 'category', key: 'category' },
-                  {
-                    title: 'Current Qty', dataIndex: 'quantity', key: 'quantity', width: 100,
-                    render: (qty, record) => fmtQty(qty, record.category === FABRIC_CATEGORY),
-                  },
-                  {
-                    title: 'Restock Qty', key: 'restockQty', width: 100,
-                    render: (_, record) => fmtQty(restockQuantities[record.product_id] || 0, record.category === FABRIC_CATEGORY),
-                  },
-                ]}
-              />
+            {[
+              { label: 'Out of Stock', key: 'out', filter: (p) => Number(p.quantity) === 0 },
+              { label: 'Low Stock', key: 'low', filter: (p) => Number(p.quantity) > 0 && Number(p.quantity) < Number(p.reorder_level) },
+              { label: 'In Stock', key: 'in', filter: (p) => Number(p.quantity) >= Number(p.reorder_level) || !p.reorder_level },
+            ].map((section) => {
+              const items = lowStockItems.filter((p) => {
+                if (restockSearchText && !p.product_name.toLowerCase().includes(restockSearchText.toLowerCase())) return false;
+                return section.filter(p);
+              });
+              if (items.length === 0) return null;
+              return (
+                <div key={section.key} style={{ marginBottom: 20 }}>
+                  <Typography.Text strong style={{ fontSize: 14, display: 'block', marginBottom: 8, color: section.key === 'out' ? '#cf1322' : section.key === 'low' ? '#fa8c16' : '#52c41a' }}>
+                    {section.label} ({items.length})
+                  </Typography.Text>
+                  <Row gutter={[12, 12]}>
+                    {items.map((product) => {
+                      const inCart = Object.values(restockCart).some((e) => e.product_id === product.product_id && !e.variety_id);
+                      const inCartVarieties = Object.values(restockCart).filter((e) => e.product_id === product.product_id && e.variety_id);
+                      return (
+                        <Col xs={12} md={8} key={product.product_id}>
+                          <Card
+                            hoverable
+                            size="small"
+                            onClick={() => {
+                              const hasVarieties = product.varietiesList && product.varietiesList.length > 0;
+                              if (hasVarieties) {
+                                handleOpenVarietyModal(product);
+                              } else {
+                                handleAddToCart(product);
+                              }
+                            }}
+                            style={{
+                              borderColor: inCart || inCartVarieties.length > 0 ? '#52c41a' : undefined,
+                              borderWidth: inCart || inCartVarieties.length > 0 ? 2 : 1,
+                              background: inCart || inCartVarieties.length > 0 ? '#f6ffed' : undefined,
+                            }}
+                          >
+                            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4, lineHeight: 1.3 }}>{product.product_name}</div>
+                            <div style={{ fontSize: 11, color: '#888', marginBottom: 2 }}>
+                              Current: {fmtQty(product.quantity, product.category === FABRIC_CATEGORY)}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#888', marginBottom: 2 }}>
+                              Storehouse: {fmtQty(product.storehouse_quantity || 0, product.category === FABRIC_CATEGORY)}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#888' }}>
+                              Reorder: {product.reorder_level ? Number(product.reorder_level).toLocaleString() : '-'}
+                            </div>
+                            <div style={{ marginTop: 4 }}>{getStockStatus(product.quantity).tag}</div>
+                            {(inCartVarieties.length > 0) && (
+                              <div style={{ fontSize: 11, color: '#52c41a', marginTop: 4, fontWeight: 600 }}>
+                                {inCartVarieties.length} variety(ies) selected
+                              </div>
+                            )}
+                            {inCart && (
+                              <div style={{ fontSize: 11, color: '#52c41a', marginTop: 4, fontWeight: 600 }}>
+                                In cart
+                              </div>
+                            )}
+                          </Card>
+                        </Col>
+                      );
+                    })}
+                  </Row>
+                </div>
+              );
+            })}
+            {lowStockItems.length === 0 && (
+              <Typography.Text type="secondary">No products loaded</Typography.Text>
+            )}
+          </Col>
+          <Col xs={24} lg={7}>
+            <div style={{ background: '#fafafa', borderRadius: 8, padding: 12, minHeight: 200, border: '1px solid #f0f0f0' }}>
+              <Typography.Text strong style={{ fontSize: 14, display: 'block', marginBottom: 12 }}>Selected Items</Typography.Text>
+              {Object.values(restockCart).length === 0 ? (
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>Click a product card to add items</Typography.Text>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {Object.values(restockCart).map((entry) => (
+                    <div key={entry.key} style={{ background: '#fff', borderRadius: 6, padding: '8px 10px', border: '1px solid #e8e8e8' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, flex: 1, lineHeight: 1.3 }}>{entry.product_name}</div>
+                        <Button type="text" size="small" danger onClick={() => handleRemoveFromCart(entry.key)} style={{ padding: 0, height: 20, width: 20, minWidth: 20, marginLeft: 4 }}>✕</Button>
+                      </div>
+                      {entry.variety_label && (
+                        <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{entry.variety_label}</div>
+                      )}
+                      <QtyInput
+                        isFabric={entry.is_fabric}
+                        value={entry.quantity}
+                        min={0}
+                        max={entry.storehouse_qty || 9999}
+                        onChange={(val) => handleUpdateCartQty(entry.key, val || 0)}
+                      />
+                      <div style={{ fontSize: 10, color: '#aaa', marginTop: 2 }}>
+                        Avail: {fmtQty(entry.storehouse_qty, entry.is_fabric)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {Object.values(restockCart).length > 0 && (
+                <>
+                  <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid #e8e8e8' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                      Total: {Object.values(restockCart).filter((e) => e.quantity > 0).length} item(s)
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <Button
+                      type="default"
+                      size="small"
+                      icon={<DownloadOutlined />}
+                      onClick={handlePrintSummary}
+                      block
+                    >
+                      Download Receipt
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
-          )}
-        </div>
+          </Col>
+        </Row>
+      </Modal>
+
+      <Modal
+        title={`Select Variety — ${varietyModalProduct?.product_name || ''}`}
+        open={varietyModalVisible}
+        onCancel={() => { setVarietyModalVisible(false); setVarietyModalProduct(null); setVarietyModalQtys({}); setVarietyCheckedIds(new Set()); }}
+        footer={[
+          <Button key="cancel" onClick={() => { setVarietyModalVisible(false); setVarietyModalProduct(null); setVarietyModalQtys({}); setVarietyCheckedIds(new Set()); }}>Cancel</Button>,
+          <Button key="add" type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} onClick={handleAddVarietyToCart}>Add to Cart</Button>,
+        ]}
+        width={480}
+        centered
+        destroyOnClose
+      >
+        {varietyModalProduct && (
+          <div style={{ padding: '8px 0' }}>
+            <div style={{ marginBottom: 12, padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <Checkbox
+                checked={varietyCheckedIds.size > 0 && varietyCheckedIds.size === (varietyModalProduct.varietiesList || []).length}
+                indeterminate={varietyCheckedIds.size > 0 && varietyCheckedIds.size < (varietyModalProduct.varietiesList || []).length}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setVarietyCheckedIds(new Set((varietyModalProduct.varietiesList || []).map((v) => v.variety_id)));
+                  } else {
+                    setVarietyCheckedIds(new Set());
+                  }
+                }}
+              >
+                Select All
+              </Checkbox>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {(varietyModalProduct.varietiesList || []).map((v) => {
+                const checked = varietyCheckedIds.has(v.variety_id);
+                return (
+                  <div
+                    key={v.variety_id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '8px 12px', borderRadius: 8,
+                      border: checked ? '2px solid #52c41a' : '1px solid #d9d9d9',
+                      background: checked ? '#f6ffed' : '#fff',
+                    }}
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onChange={() => {
+                        setVarietyCheckedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(v.variety_id)) next.delete(v.variety_id);
+                          else next.add(v.variety_id);
+                          return next;
+                        });
+                      }}
+                    />
+                    {v.color && (
+                      <span style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: v.color, border: '1px solid #d9d9d9', flexShrink: 0, display: 'inline-block' }} />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 500, fontSize: 13 }}>
+                        {v.pattern || 'Default'}
+                        <Tag style={{ marginLeft: 6, fontSize: 10 }}>{fmtQty(v.quantity || 0, varietyModalProduct.category === FABRIC_CATEGORY)}</Tag>
+                      </div>
+                      {v.color && <div style={{ fontSize: 11, color: '#888' }}>{v.color}{v.variety_sku ? ` — ${v.variety_sku}` : ''}</div>}
+                    </div>
+                    {checked && (
+                      <QtyInput
+                        isFabric={varietyModalProduct.category === FABRIC_CATEGORY}
+                        value={varietyModalQtys[v.variety_id] || 0}
+                        min={0}
+                        max={v.variety_store_qty ?? (varietyModalProduct.storehouse_quantity || 9999)}
+                        onChange={(val) => setVarietyModalQtys((prev) => ({ ...prev, [v.variety_id]: val || 0 }))}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+              {(varietyModalProduct.varietiesList || []).length === 0 && (
+                <Typography.Text type="secondary">No varieties available</Typography.Text>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Replenish Modal ── */}
+      <Modal
+        title="Replenish Inventory"
+        open={replenishVisible}
+        onCancel={() => { setReplenishVisible(false); setReplenishCart({}); }}
+        width={1100}
+        centered
+        styles={{ body: { padding: '16px 24px', maxHeight: '80vh', overflowY: 'auto' } }}
+        footer={replenishFooterItems}
+      >
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={17}>
+            <Input.Search
+              placeholder="Search products..."
+              value={replenishSearchText}
+              onChange={(e) => setReplenishSearchText(e.target.value)}
+              allowClear
+              style={{ marginBottom: 16, width: 280 }}
+            />
+            {[
+              { label: 'Out of Stock', key: 'out', filter: (p) => Number(p.quantity) === 0 },
+              { label: 'Low Stock', key: 'low', filter: (p) => Number(p.quantity) > 0 && Number(p.quantity) < Number(p.reorder_level) },
+              { label: 'In Stock', key: 'in', filter: (p) => Number(p.quantity) >= Number(p.reorder_level) || !p.reorder_level },
+            ].map((section) => {
+              const items = replenishItems.filter((p) => {
+                if (replenishSearchText && !p.product_name.toLowerCase().includes(replenishSearchText.toLowerCase())) return false;
+                return section.filter(p);
+              });
+              if (items.length === 0) return null;
+              return (
+                <div key={section.key} style={{ marginBottom: 20 }}>
+                  <Typography.Text strong style={{ fontSize: 14, display: 'block', marginBottom: 8, color: section.key === 'out' ? '#cf1322' : section.key === 'low' ? '#fa8c16' : '#52c41a' }}>
+                    {section.label} ({items.length})
+                  </Typography.Text>
+                  <Row gutter={[12, 12]}>
+                    {items.map((product) => {
+                      const inCart = Object.values(replenishCart).some((e) => e.product_id === product.product_id && !e.variety_id);
+                      const inCartVarieties = Object.values(replenishCart).filter((e) => e.product_id === product.product_id && e.variety_id);
+                      return (
+                        <Col xs={12} md={8} key={product.product_id}>
+                          <Card
+                            hoverable
+                            size="small"
+                            onClick={() => {
+                              const hasVarieties = product.varietiesList && product.varietiesList.length > 0;
+                              if (hasVarieties) {
+                                handleOpenRepVarietyModal(product);
+                              } else {
+                                handleAddToReplenishCart(product);
+                              }
+                            }}
+                            style={{
+                              borderColor: inCart || inCartVarieties.length > 0 ? '#1677ff' : undefined,
+                              borderWidth: inCart || inCartVarieties.length > 0 ? 2 : 1,
+                              background: inCart || inCartVarieties.length > 0 ? '#f0f5ff' : undefined,
+                            }}
+                          >
+                            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4, lineHeight: 1.3 }}>{product.product_name}</div>
+                            <div style={{ fontSize: 11, color: '#888' }}>
+                              Reorder: {product.reorder_level ? Number(product.reorder_level).toLocaleString() : '-'}
+                            </div>
+                            <div style={{ marginTop: 4 }}>{getStockStatus(product.quantity).tag}</div>
+                            {(inCartVarieties.length > 0) && (
+                              <div style={{ fontSize: 11, color: '#1677ff', marginTop: 4, fontWeight: 600 }}>
+                                {inCartVarieties.length} variety(ies) selected
+                              </div>
+                            )}
+                            {inCart && (
+                              <div style={{ fontSize: 11, color: '#1677ff', marginTop: 4, fontWeight: 600 }}>
+                                In cart
+                              </div>
+                            )}
+                          </Card>
+                        </Col>
+                      );
+                    })}
+                  </Row>
+                </div>
+              );
+            })}
+            {replenishItems.length === 0 && (
+              <Typography.Text type="secondary">No products loaded</Typography.Text>
+            )}
+          </Col>
+          <Col xs={24} lg={7}>
+            <div style={{ background: '#fafafa', borderRadius: 8, padding: 12, minHeight: 200, border: '1px solid #f0f0f0' }}>
+              <Typography.Text strong style={{ fontSize: 14, display: 'block', marginBottom: 12 }}>Selected Items</Typography.Text>
+              {Object.values(replenishCart).length === 0 ? (
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>Click a product card to add items</Typography.Text>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {Object.values(replenishCart).map((entry) => (
+                    <div key={entry.key} style={{ background: '#fff', borderRadius: 6, padding: '8px 10px', border: '1px solid #e8e8e8' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, flex: 1, lineHeight: 1.3 }}>{entry.product_name}</div>
+                        <Button type="text" size="small" danger onClick={() => handleRemoveFromReplenishCart(entry.key)} style={{ padding: 0, height: 20, width: 20, minWidth: 20, marginLeft: 4 }}>✕</Button>
+                      </div>
+                      {entry.variety_label && (
+                        <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{entry.variety_label}</div>
+                      )}
+                      <QtyInput
+                        isFabric={entry.is_fabric}
+                        value={entry.quantity}
+                        min={0}
+                        max={99999}
+                        onChange={(val) => handleUpdateReplenishCartQty(entry.key, val || 0)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {Object.values(replenishCart).length > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid #e8e8e8' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    Total: {Object.values(replenishCart).filter((e) => e.quantity > 0).length} item(s)
+                  </div>
+                </div>
+              )}
+            </div>
+          </Col>
+        </Row>
+      </Modal>
+
+      {/* ── Replenish Variety Modal ── */}
+      <Modal
+        title={`Select Variety — ${repVarietyModalProduct?.product_name || ''}`}
+        open={repVarietyModalVisible}
+        onCancel={() => { setRepVarietyModalVisible(false); setRepVarietyModalProduct(null); setRepVarietyModalQtys({}); setRepVarietyCheckedIds(new Set()); }}
+        footer={[
+          <Button key="cancel" onClick={() => { setRepVarietyModalVisible(false); setRepVarietyModalProduct(null); setRepVarietyModalQtys({}); setRepVarietyCheckedIds(new Set()); }}>Cancel</Button>,
+          <Button key="add" type="primary" style={{ background: '#1677ff', borderColor: '#1677ff' }} onClick={handleAddRepVarietyToCart}>Add to Cart</Button>,
+        ]}
+        width={480}
+        centered
+        destroyOnClose
+      >
+        {repVarietyModalProduct && (
+          <div style={{ padding: '8px 0' }}>
+            <div style={{ marginBottom: 12, padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <Checkbox
+                checked={repVarietyCheckedIds.size > 0 && repVarietyCheckedIds.size === (repVarietyModalProduct.varietiesList || []).length}
+                indeterminate={repVarietyCheckedIds.size > 0 && repVarietyCheckedIds.size < (repVarietyModalProduct.varietiesList || []).length}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setRepVarietyCheckedIds(new Set((repVarietyModalProduct.varietiesList || []).map((v) => v.variety_id)));
+                  } else {
+                    setRepVarietyCheckedIds(new Set());
+                  }
+                }}
+              >
+                Select All
+              </Checkbox>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {(repVarietyModalProduct.varietiesList || []).map((v) => {
+                const checked = repVarietyCheckedIds.has(v.variety_id);
+                return (
+                  <div
+                    key={v.variety_id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '8px 12px', borderRadius: 8,
+                      border: checked ? '2px solid #1677ff' : '1px solid #d9d9d9',
+                      background: checked ? '#f0f5ff' : '#fff',
+                    }}
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onChange={() => {
+                        setRepVarietyCheckedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(v.variety_id)) next.delete(v.variety_id);
+                          else next.add(v.variety_id);
+                          return next;
+                        });
+                      }}
+                    />
+                    {v.color && (
+                      <span style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: v.color, border: '1px solid #d9d9d9', flexShrink: 0, display: 'inline-block' }} />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 500, fontSize: 13 }}>
+                        {v.pattern || 'Default'}
+                        <Tag style={{ marginLeft: 6, fontSize: 10 }}>{fmtQty(v.quantity || 0, repVarietyModalProduct.category === FABRIC_CATEGORY)}</Tag>
+                      </div>
+                      {v.color && <div style={{ fontSize: 11, color: '#888' }}>{v.color}{v.variety_sku ? ` — ${v.variety_sku}` : ''}</div>}
+                    </div>
+                    {checked && (
+                      <QtyInput
+                        isFabric={repVarietyModalProduct.category === FABRIC_CATEGORY}
+                        value={repVarietyModalQtys[v.variety_id] || 0}
+                        min={0}
+                        max={99999}
+                        onChange={(val) => setRepVarietyModalQtys((prev) => ({ ...prev, [v.variety_id]: val || 0 }))}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+              {(repVarietyModalProduct.varietiesList || []).length === 0 && (
+                <Typography.Text type="secondary">No varieties available</Typography.Text>
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
 
       <Modal
@@ -1390,9 +1926,11 @@ const StockManagement = () => {
             <div style={{ textAlign: 'center', padding: '16px 0', color: '#999' }}>No items selected</div>
           ) : (
             receiptItems.map((item) => (
-              <div key={item.product_id} className="receipt-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, borderBottom: '1px dotted #ddd' }}>
-                <span style={{ flex: 1, paddingRight: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.product_name}</span>
-                <span style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtQty(restockQuantities[item.product_id] || 0, item.category === FABRIC_CATEGORY)}</span>
+              <div key={item.key} className="receipt-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, borderBottom: '1px dotted #ddd' }}>
+                <span style={{ flex: 1, paddingRight: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.product_name}{item.variety_label ? ` (${item.variety_label})` : ''}
+                </span>
+                <span style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtQty(item.quantity, item.is_fabric)}</span>
               </div>
             ))
           )}
@@ -1403,7 +1941,7 @@ const StockManagement = () => {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 600 }}>
               <span>Total Quantity:</span>
-              <span>{receiptTotalQty}</span>
+              <span>{qtyLabel(receiptTotalQty)}</span>
             </div>
           </div>
           <div className="receipt-footer" style={{ textAlign: 'center', marginTop: 20, paddingTop: 12, borderTop: '2px dashed #888', fontSize: 13, color: '#555' }}>

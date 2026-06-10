@@ -16,6 +16,10 @@ def _resolve_location_id(usertype, user_id, requested_location_id):
         user = User.query.get(user_id)
         if not user:
             return None, error_response("User not found", "NOT_FOUND", 404)
+        if requested_location_id:
+            loc = Location.query.get(requested_location_id)
+            if loc and loc.is_storehouse:
+                return requested_location_id, None
         return user.location_id, None
     return requested_location_id, None
 
@@ -44,6 +48,12 @@ def check_and_auto_restock(location_id):
         if not product or not product.auto_restock_source_id:
             continue
         source_id = product.auto_restock_source_id
+        if location_id == source_id:
+            db.session.add(Notification(
+                location_id=location_id, type="restock_failed",
+                message=f"Auto-restock failed for {product.name}: source location is the same as the current location",
+            ))
+            continue
         source = Location.query.get(source_id)
         if not source:
             continue
@@ -529,30 +539,28 @@ def inventory_counts():
     if error:
         return error
 
-    query = Inventory.query.join(Product).filter(Product.is_active == True)
-    if resolved_location_id and resolved_location_id != "all":
-        query = query.filter(Inventory.location_id == resolved_location_id)
+    loc_param = resolved_location_id if resolved_location_id and resolved_location_id != "all" else None
 
-    all_inv = query.all()
+    rows = db.session.execute(
+        db.text("""
+            SELECT i.product_id, i.location_id,
+                   SUM(i.quantity) as total_qty,
+                   CAST(p.reorder_level AS INTEGER) as reorder_level
+            FROM "Inventory" i
+            JOIN "Products" p ON i.product_id = p.product_id
+            WHERE p.is_active = TRUE
+              AND (:loc_id IS NULL OR i.location_id = CAST(:loc_id AS INTEGER))
+            GROUP BY i.product_id, i.location_id, p.reorder_level
+        """),
+        {"loc_id": loc_param},
+    ).fetchall()
 
-    # Group by (product_id, location_id), summing quantities (match frontend grouping)
-    groups = {}
-    for i in all_inv:
-        key = (i.product_id, i.location_id)
-        if key not in groups:
-            groups[key] = {"quantity": 0, "reorder_level": 0}
-            try:
-                groups[key]["reorder_level"] = int(i.product.reorder_level) if i.product and i.product.reorder_level else 0
-            except (ValueError, TypeError):
-                groups[key]["reorder_level"] = 0
-        groups[key]["quantity"] += i.quantity or 0
-
-    total_items = len(groups)
+    total_items = len(rows)
     low_stock_count = 0
     out_of_stock_count = 0
-    for g in groups.values():
-        qty = g["quantity"]
-        rl = g["reorder_level"]
+    for row in rows:
+        qty = row.total_qty or 0
+        rl = row.reorder_level or 0
         if qty == 0:
             out_of_stock_count += 1
         elif rl > 0 and qty < rl:
@@ -586,6 +594,15 @@ def list_inventory():
     if resolved_location_id and resolved_location_id != "all":
         query = query.filter(Inventory.location_id == resolved_location_id)
 
+    product_ids = request.args.get("product_ids", "").strip()
+    if product_ids:
+        try:
+            pids = [int(x) for x in product_ids.split(",") if x.strip()]
+            if pids:
+                query = query.filter(Inventory.product_id.in_(pids))
+        except ValueError:
+            pass
+
     search = request.args.get("q", "").strip()
     if search:
         query = query.filter(Product.name.ilike(f"%{search}%"))
@@ -609,7 +626,7 @@ def list_inventory():
     page = request.args.get("page", 1, type=int)
     limit = request.args.get("limit", 20, type=int)
     page = max(1, page)
-    limit = max(1, min(100, limit))
+    limit = max(1, min(1000, limit))
 
     if status_filter == "out_of_stock":
         query = query.filter(Inventory.quantity == 0)
@@ -1014,6 +1031,7 @@ def restock_selected():
 
     for item in items:
         product_id = item.get("product_id")
+        variety_id = item.get("variety_id")
         requested_qty = item.get("quantity", 0)
 
         if not product_id or requested_qty <= 0:
@@ -1040,6 +1058,7 @@ def restock_selected():
         valid_items.append({
             "product": product,
             "product_id": product_id,
+            "variety_id": variety_id,
             "quantity": requested_qty,
         })
 
@@ -1054,6 +1073,7 @@ def restock_selected():
     for vi in valid_items:
         stock_request = StockRequest(
             product_id=vi["product_id"],
+            variety_id=vi.get("variety_id"),
             from_location_id=storehouse.location_id,
             to_location_id=location_id,
             requested_by=user_id,
@@ -1065,6 +1085,7 @@ def restock_selected():
         created.append({
             "product_id": vi["product_id"],
             "product_name": vi["product"].name,
+            "variety_id": vi.get("variety_id"),
             "quantity": vi["quantity"],
         })
 
@@ -1073,6 +1094,82 @@ def restock_selected():
     return success_response(
         {"requests": created, "count": len(created)},
         f"Restock request submitted for {len(created)} product(s) — waiting for storehouse approval",
+    )
+
+
+@inventory_bp.route("/api/inventory/replenish", methods=["POST"])
+def replenish_inventory():
+    data = request.get_json()
+    if not data:
+        return error_response("Request body is required", "MISSING_BODY", 400)
+
+    usertype = data.get("usertype")
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+
+    if not _can_update(usertype):
+        return error_response("You don't have permission to replenish inventory", "FORBIDDEN", 403)
+
+    location_id = data.get("location_id")
+    user_id = data.get("user_id")
+    items = data.get("items", [])
+
+    if not items:
+        return error_response("No items provided", "MISSING_ITEMS", 400)
+
+    if usertype == 2:
+        manager = User.query.get(user_id)
+        if not manager:
+            return error_response("User not found", "NOT_FOUND", 404)
+        if manager.location_id != location_id:
+            return error_response("You can only replenish your assigned location", "FORBIDDEN", 403)
+
+    location = Location.query.get(location_id)
+    if not location:
+        return error_response("Location not found", "NOT_FOUND", 404)
+
+    updated = []
+    for item in items:
+        product_id = item.get("product_id")
+        variety_id = item.get("variety_id")
+        qty = item.get("quantity", 0)
+
+        if not product_id or qty <= 0:
+            continue
+
+        product = Product.query.get(product_id)
+        if not product:
+            continue
+
+        inv = Inventory.query.filter_by(
+            product_id=product_id,
+            location_id=location_id,
+            variety_id=variety_id,
+        ).first()
+
+        if inv:
+            inv.quantity = (inv.quantity or 0) + qty
+        else:
+            inv = Inventory(
+                product_id=product_id,
+                location_id=location_id,
+                variety_id=variety_id,
+                quantity=qty,
+            )
+            db.session.add(inv)
+
+        updated.append({
+            "product_id": product_id,
+            "product_name": product.name,
+            "variety_id": variety_id,
+            "quantity": qty,
+        })
+
+    db.session.commit()
+
+    return success_response(
+        {"updated": updated, "count": len(updated)},
+        f"Inventory replenished for {len(updated)} product(s)",
     )
 
 
@@ -1484,6 +1581,20 @@ def accept_request(request_id):
         db.session.add(dest_inv)
 
     stock_request.status = "accepted"
+
+    product_name = stock_request.product.name if stock_request.product else "Unknown"
+    variety_label = ""
+    if stock_request.variety:
+        parts = [stock_request.variety.color, stock_request.variety.pattern]
+        variety_label = " (" + " ".join(filter(None, parts)) + ")"
+    notif = Notification(
+        location_id=stock_request.to_location_id,
+        type="restock_accepted",
+        message=f"Your restock request for {stock_request.quantity:.0f} {product_name}{variety_label} has been accepted",
+        request_id=stock_request.request_id,
+    )
+    db.session.add(notif)
+
     db.session.commit()
     check_and_auto_restock(stock_request.from_location_id)
     return success_response({"message": "Request accepted"})
@@ -1512,15 +1623,27 @@ def decline_request(request_id):
 @inventory_bp.route("/api/inventory/pending-requests", methods=["GET"])
 def list_pending_requests():
     from_location_id = request.args.get("location_id", type=int)
-    query = StockRequest.query.filter_by(status="pending").order_by(StockRequest.created_at.desc())
+    query = StockRequest.query.filter(
+        StockRequest.status == "pending",
+        StockRequest.from_location_id != StockRequest.to_location_id,
+    ).order_by(StockRequest.created_at.desc())
     if from_location_id:
         query = query.filter_by(from_location_id=from_location_id)
-    requests = query.limit(50).all()
+    requests = query.options(
+        joinedload(StockRequest.product),
+        joinedload(StockRequest.variety),
+        joinedload(StockRequest.from_location),
+        joinedload(StockRequest.to_location),
+        joinedload(StockRequest.requester),
+    ).limit(50).all()
     return success_response([{
         "request_id": r.request_id,
         "product_id": r.product_id,
         "product_name": r.product.name if r.product else "Unknown",
         "quantity": r.quantity,
+        "variety_id": r.variety_id,
+        "variety_color": r.variety.color if r.variety else None,
+        "variety_pattern": r.variety.pattern if r.variety else None,
         "is_fabric": is_fabric_category(r.product.category_id) if r.product else False,
         "description": r.description,
         "from_location_id": r.from_location_id,
@@ -1540,7 +1663,12 @@ def list_request_logs():
     query = StockRequest.query.order_by(StockRequest.created_at.desc())
     if user_id:
         query = query.filter_by(requested_by=user_id)
-    requests = query.limit(100).all()
+    requests = query.options(
+        joinedload(StockRequest.product),
+        joinedload(StockRequest.from_location),
+        joinedload(StockRequest.to_location),
+        joinedload(StockRequest.requester),
+    ).limit(100).all()
     return success_response([{
         "request_id": r.request_id,
         "product_id": r.product_id,
