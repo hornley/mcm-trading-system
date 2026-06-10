@@ -25,10 +25,6 @@ def _resolve_location_id(usertype, user_id, requested_location_id):
         if not user:
             return None, error_response("User not found", "NOT_FOUND", 404)
         return user.location_id, None
-    if usertype in [1, 3]:
-        user = User.query.get(user_id)
-        if user:
-            return user.location_id if user.location_id is not None else requested_location_id, None
     return requested_location_id, None
 
 
