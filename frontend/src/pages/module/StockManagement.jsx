@@ -230,7 +230,8 @@ const StockManagement = () => {
       setMovements(movementsCache[record.product_id]);
     } else {
       try {
-        const res = await fetch(`/api/inventory/movements?usertype=${user.usertype}&product_id=${record.product_id}`);
+        const varietyParam = record.variety_id ? `&variety_id=${record.variety_id}` : '';
+        const res = await fetch(`/api/inventory/movements?usertype=${user.usertype}&product_id=${record.product_id}${varietyParam}`);
         const data = await res.json();
         const result = data.success ? data.data : [];
         setMovements(result);
@@ -324,10 +325,11 @@ const StockManagement = () => {
       const values = await adjustForm.validateFields();
 
       if (requestPreset) {
-        const sourceRes = await fetch(`/api/inventory/product/${selectedRecord.product_id}?usertype=${user.usertype}&location_id=${values.from_location_id}&stock_check=1`);
+        const stockCheckUrl = `/api/inventory/product/${selectedRecord.product_id}?usertype=${user.usertype}&location_id=${values.from_location_id}&stock_check=1${selectedRecord.variety_id ? `&variety_id=${selectedRecord.variety_id}` : ''}`;
+        const sourceRes = await fetch(stockCheckUrl);
         const sourceData = await sourceRes.json();
         if (sourceData.success) {
-          const sourceInv = sourceData.data.find(i => i.location_id === values.from_location_id);
+          const sourceInv = sourceData.data.find(i => i.location_id === values.from_location_id && (!selectedRecord.variety_id || i.variety_id === selectedRecord.variety_id));
           const sourceQty = sourceInv?.quantity || 0;
           if (Number(sourceQty) < Number(values.quantity)) {
             setAdjustSubmitting(false);
@@ -349,6 +351,7 @@ const StockManagement = () => {
             to_location_id: selectedLocationId,
             quantity: values.quantity,
             description: values.remarks || null,
+            variety_id: selectedRecord.variety_id || null,
           }),
         });
         const data = await res.json();
@@ -376,6 +379,7 @@ const StockManagement = () => {
             location_id: selectedLocationId,
             quantity_change: quantityChange,
             reason,
+            variety_id: selectedRecord.variety_id || null,
           }),
         });
         const data = await res.json();
@@ -413,6 +417,7 @@ const StockManagement = () => {
           quantity: values.quantity,
           transfer_date: transferDate,
           remarks: values.remarks || null,
+          variety_id: selectedRecord.variety_id || null,
         }),
       });
       const data = await res.json();
