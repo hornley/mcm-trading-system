@@ -172,7 +172,7 @@ const POSModal = ({
     setCart((prev) => {
       const existing = prev.find((c) => c.variety_id === variety.variety_id);
       if (existing) {
-        const maxQty = product.quantity ?? 999;
+        const maxQty = variety.stock ?? 999;
         const newQty = Math.min(maxQty, existing.quantity + getDefaultQty(product));
         return prev.map((c) =>
           c.variety_id === variety.variety_id ? { ...c, quantity: newQty } : c,
@@ -416,7 +416,8 @@ const POSModal = ({
                   ) : (
                     cart.map((item) => {
                       const product = products.find((p) => p.product_id === item.product_id);
-                      const maxQty = product?.quantity ?? 999;
+                      const variety = item.variety_id ? product?.varieties?.find(v => v.variety_id === item.variety_id) : null;
+                      const maxQty = variety ? (variety.stock ?? 999) : (product?.quantity ?? 999);
                       const minQty = item.is_fabric ? MIN_FABRIC_QTY : 1;
                       return (
                         <div key={item.product_id + (item.variety_id || '')} style={{

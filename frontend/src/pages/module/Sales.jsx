@@ -49,8 +49,6 @@ const Sales = () => {
   const [periodPreset, setPeriodPreset] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [locations, setLocations] = useState([]);
-  const [branchLocations, setBranchLocations] = useState([]);
-  const [branchFilter, setBranchFilter] = useState('all');
 
   const receiptRef = useRef(null);
   const [saleModalVisible, setSaleModalVisible] = useState(false);
@@ -100,7 +98,7 @@ const Sales = () => {
     }
   };
 
-  const effectiveBranchId = isOwner && branchFilter !== 'all' ? branchFilter : (selectedLocationId && selectedLocationId !== 'all' ? selectedLocationId : undefined);
+  const effectiveBranchId = selectedLocationId && selectedLocationId !== 'all' ? selectedLocationId : undefined;
   const apiParams = `usertype=${usertype}&user_id=${userId}` + (effectiveBranchId ? `&location_id=${effectiveBranchId}` : '');
 
   const fetchSales = async (page) => {
@@ -143,7 +141,6 @@ const Sales = () => {
       if (json.success) {
         const active = (json.data || []).filter((l) => l.is_active);
         setLocations(active);
-        setBranchLocations(active);
       }
     } catch (e) { /* ignore */ }
   };
@@ -170,8 +167,12 @@ const Sales = () => {
     setStatsLoading(true);
     try {
       let url = `/api/dashboard/summary?${apiParams}`;
-      if (dateRange && dateRange[0]) url += `&date_from=${dateRange[0].format('YYYY-MM-DDTHH:mm:ss')}`;
-      if (dateRange && dateRange[1]) url += `&date_to=${dateRange[1].format('YYYY-MM-DDTHH:mm:ss')}`;
+      if (dateRange && dateRange[0]) {
+        url += `&date_from=${dateRange[0].format('YYYY-MM-DDTHH:mm:ss')}`;
+        if (dateRange && dateRange[1]) url += `&date_to=${dateRange[1].format('YYYY-MM-DDTHH:mm:ss')}`;
+      } else {
+        url += '&period=all';
+      }
       const res = await fetch(url);
       const json = await res.json();
       if (json.success) {
@@ -196,7 +197,7 @@ const Sales = () => {
     if (periodLoadedRef.current && dateRange) periodLoadedRef.current = false;
     fetchSales(1);
     fetchDashboardStats();
-  }, [searchText, dateRange, statusFilter, selectedLocationId, branchFilter]);
+  }, [searchText, dateRange, statusFilter, selectedLocationId]);
 
   const fetchTotalSalesData = useCallback(async (branch, dateFrom, dateTo) => {
     setTotalSalesLoading(true);
@@ -656,7 +657,7 @@ const Sales = () => {
                 menu={{
                   items: [
                     { key: 'all', label: 'All Locations' },
-                    ...branchLocations.map(loc => ({ key: String(loc.location_id), label: loc.name })),
+                    ...locations.filter(l => !l.is_storehouse).map(loc => ({ key: String(loc.location_id), label: loc.name })),
                   ],
                   onClick: ({ key }) => {
                     if (key === 'all') {
@@ -664,7 +665,7 @@ const Sales = () => {
                       setIsStorehouse(false);
                     } else {
                       setSelectedLocationId(Number(key));
-                      const loc = branchLocations.find(l => l.location_id === Number(key));
+                      const loc = locations.find(l => l.location_id === Number(key));
                       setIsStorehouse(loc ? loc.is_storehouse : false);
                     }
                   },
@@ -672,7 +673,7 @@ const Sales = () => {
               >
                 <Button type={selectedLocationId !== 'all' ? 'primary' : 'default'}>
                   {selectedLocationId !== 'all'
-                    ? (branchLocations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
+                    ? (locations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
                     : 'All Locations'}
                 </Button>
               </Dropdown>
@@ -695,19 +696,6 @@ const Sales = () => {
             </Select>
             {periodPreset === 'custom' && (
               <RangePicker onChange={(dates) => setDateRange(dates)} />
-            )}
-            {isOwner && (
-              <Select
-                placeholder="Filter by branch"
-                style={{ width: 160 }}
-                value={branchFilter}
-                onChange={setBranchFilter}
-              >
-                <Select.Option value="all">All Branches</Select.Option>
-                {locations.map((l) => (
-                  <Select.Option key={l.location_id} value={l.location_id}>{l.name}</Select.Option>
-                ))}
-              </Select>
             )}
             <Select
               placeholder="Filter by status"

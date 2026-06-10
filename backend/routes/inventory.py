@@ -193,6 +193,7 @@ def list_products():
     # Bulk-load all variety stock for this location
     variety_stock_map = {}
     product_qty_map = {}
+    product_variety_qty = {}
     if resolved_location_id is not None and resolved_location_id != "all":
         all_inv = Inventory.query.filter(
             Inventory.location_id == resolved_location_id
@@ -202,7 +203,12 @@ def list_products():
     for inv in all_inv:
         if inv.variety_id is not None:
             variety_stock_map[inv.variety_id] = variety_stock_map.get(inv.variety_id, 0) + inv.quantity
+            product_variety_qty[inv.product_id] = product_variety_qty.get(inv.product_id, 0) + inv.quantity
         product_qty_map[inv.product_id] = product_qty_map.get(inv.product_id, 0) + inv.quantity
+
+    # For products with varieties, use sum of variety stocks as the product quantity
+    for pid in product_variety_qty:
+        product_qty_map[pid] = product_variety_qty[pid]
 
     result = []
     for p in products:

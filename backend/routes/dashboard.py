@@ -37,6 +37,7 @@ def dashboard_summary():
 
         date_from = request.args.get("date_from")
         date_to = request.args.get("date_to")
+        period_all = request.args.get("period") == "all"
 
         # ── Stats ──
         inv_query = Inventory.query.join(Product).filter(Product.is_active == True)
@@ -65,6 +66,8 @@ def dashboard_summary():
         sales_query = sales_query.filter(Order.status == "completed")
         if date_from:
             sales_query = sales_query.filter(Order.order_date >= datetime.fromisoformat(date_from))
+        elif not period_all:
+            sales_query = sales_query.filter(func.date(Order.order_date) == today)
         if date_to:
             sales_query = sales_query.filter(Order.order_date <= datetime.fromisoformat(date_to))
         if location_id:
@@ -76,6 +79,8 @@ def dashboard_summary():
         )
         if date_from:
             transactions_query = transactions_query.filter(Order.order_date >= datetime.fromisoformat(date_from))
+        elif not period_all:
+            transactions_query = transactions_query.filter(func.date(Order.order_date) == today)
         if date_to:
             transactions_query = transactions_query.filter(Order.order_date <= datetime.fromisoformat(date_to))
         if location_id:

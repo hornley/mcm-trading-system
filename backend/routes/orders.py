@@ -131,6 +131,8 @@ def create_order():
     location = Location.query.get(resolved_location_id)
     if not location:
         return error_response("Location not found", "NOT_FOUND", 404)
+    if location.is_storehouse:
+        return error_response("Cannot create orders at a storehouse location", "STOREHOUSE_FORBIDDEN", 400)
 
     order_date_str = data.get("order_date")
     order_date = None

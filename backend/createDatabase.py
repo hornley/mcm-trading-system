@@ -260,7 +260,7 @@ def seed(skip_drop=False):
         now = datetime.now()
 
         for _ in range(SEED_ORDERS):
-            loc = random.choice(locs)
+            loc = random.choice(locs[1:])  # branches only, exclude storehouse
 
             # Skew dates toward recent so dashboards show meaningful data
             weight = random.random()
