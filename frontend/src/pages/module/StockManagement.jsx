@@ -112,7 +112,7 @@ const StockManagement = () => {
         for (const row of raw) {
           const key = `${row.product_id}-${row.location_id}`;
           if (!groups[key]) groups[key] = { parent: null, varieties: [] };
-          if (row.variety_id && (row.color || row.pattern)) {
+          if (row.variety_id) {
             groups[key].varieties.push(row);
           } else {
             groups[key].parent = row;
@@ -493,7 +493,7 @@ const StockManagement = () => {
       for (const row of raw) {
         const key = `${row.product_id}-${row.location_id}`;
         if (!groups[key]) groups[key] = { parent: null, varieties: [] };
-        if (row.variety_id && (row.color || row.pattern)) {
+        if (row.variety_id) {
           groups[key].varieties.push(row);
         } else {
           groups[key].parent = row;
@@ -711,7 +711,7 @@ const StockManagement = () => {
       for (const row of raw) {
         const key = `${row.product_id}-${row.location_id}`;
         if (!groups[key]) groups[key] = { parent: null, varieties: [] };
-        if (row.variety_id && (row.color || row.pattern)) {
+        if (row.variety_id) {
           groups[key].varieties.push(row);
         } else {
           groups[key].parent = row;
