@@ -1255,7 +1255,7 @@ const StockManagement = () => {
               return (
                 <div style={{ padding: '4px 0 4px 40px' }}>
                   {varieties.map((v) => (
-                    <div key={v.variety_id} style={{ display: 'grid', gridTemplateColumns: '1fr 130px 120px 100px 60px', padding: '4px 0', fontSize: 13, alignItems: 'center', borderBottom: '1px solid #f0f0f0' }}>
+                    <div key={v.variety_id} style={{ display: 'grid', gridTemplateColumns: 'auto 130px 120px 100px 60px', padding: '4px 0', fontSize: 13, alignItems: 'center', borderBottom: '1px solid #f0f0f0' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         {v.color && (
                           <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', border: '1px solid #d9d9d9', flexShrink: 0 }} />
