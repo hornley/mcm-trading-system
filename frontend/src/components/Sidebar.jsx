@@ -75,9 +75,7 @@ const Sidebar = () => {
     user?.role === 'manager' ? managerModules :
     []
 
-  const modules = isStorehouse
-    ? baseModules.filter((m) => m.label !== 'Sales')
-    : baseModules
+  const modules = baseModules
 
   const selectedKey = modules.find((m) => m.path === location.pathname)?.key || '1'
 

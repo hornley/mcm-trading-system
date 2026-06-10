@@ -657,7 +657,7 @@ const Sales = () => {
                 menu={{
                   items: [
                     { key: 'all', label: 'All Locations' },
-                    ...locations.filter(l => !l.is_storehouse).map(loc => ({ key: String(loc.location_id), label: loc.name })),
+                    ...locations.map(loc => ({ key: String(loc.location_id), label: loc.name })),
                   ],
                   onClick: ({ key }) => {
                     if (key === 'all') {

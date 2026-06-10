@@ -24,7 +24,7 @@ const computeTrend = (current) => {
 }
 
 const Manager = () => {
-  const { user, selectedLocationId, isStorehouse } = useAuth()
+  const { user, selectedLocationId } = useAuth()
   const navigate = useNavigate()
   const { data: rawData, isLoading } = useDashboardQuery(selectedLocationId)
   const [lastUpdated, setLastUpdated] = useState(null)
@@ -67,18 +67,13 @@ const Manager = () => {
       trend: computeTrend(stats.total_items),
       route: '/dashboard/inventory',
     },
-    ...(isStorehouse ? [{
-      title: 'Sales Today',
-      value: 'N/A — Storehouse',
-      icon: <ShoppingCartOutlined />,
-      valueStyle: { color: '#999' },
-    }] : [{
+    {
       title: 'Sales Today',
       value: stats.sales_today,
       icon: <ShoppingCartOutlined />,
       trend: computeTrend(stats.sales_today),
       route: '/dashboard/sales?period=today',
-    }]),
+    },
     {
       title: 'Low Stock Alerts',
       value: stats.low_stock_count,
