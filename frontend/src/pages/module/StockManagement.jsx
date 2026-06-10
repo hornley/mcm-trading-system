@@ -1227,58 +1227,58 @@ const StockManagement = () => {
             expandedRowRender: (record) => {
               const varieties = record.varietiesList;
               if (!varieties || varieties.length === 0) return null;
-              const varietyActions = (v) => [
-                ...(can('update') ? [{
-                  key: 'request',
-                  label: 'Request',
-                  disabled: selectedLocationId === 'all',
-                  onClick: () => handleRequestStock({ ...record, ...v }),
-                }] : []),
-                ...(can('update') ? [{
-                  key: 'adjust',
-                  label: 'Adjust',
-                  disabled: selectedLocationId === 'all',
-                  onClick: () => handleAdjustStock({ ...record, ...v }),
-                }] : []),
-                ...(can('update') ? [{
-                  key: 'transfer',
-                  label: 'Transfer',
-                  disabled: selectedLocationId === 'all' || v.quantity === 0,
-                  onClick: () => handleTransferStock({ ...record, ...v }),
-                }] : []),
+              const isFab = record.category === FABRIC_CATEGORY;
+              const subColumns = [
                 {
-                  key: 'details',
-                  label: 'Details',
-                  onClick: () => handleViewDetails({ ...record, ...v }),
+                  title: 'Variety', dataIndex: 'pattern', key: 'pattern',
+                  render: (_, v) => (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {v.color && (
+                        <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', border: '1px solid #d9d9d9', flexShrink: 0 }} />
+                      )}
+                      <span style={{ fontWeight: 500 }}>{v.pattern || 'Default'}</span>
+                      {v.color && <span style={{ color: '#888' }}>{v.color}</span>}
+                    </div>
+                  ),
+                },
+                {
+                  title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
+                  render: (qty) => fmtQty(qty, isFab),
+                },
+                {
+                  title: 'Stock Status', dataIndex: 'quantity', key: 'stockStatus',
+                  render: (qty) => {
+                    if (Number(qty) === 0) return <Tag color="red" style={{ margin: 0 }}>Out of Stock</Tag>;
+                    if (Number(qty) <= 10) return <Tag color="orange" style={{ margin: 0 }}>Low Stock</Tag>;
+                    return null;
+                  },
+                },
+                {
+                  title: 'Actions', key: 'actions',
+                  render: (_, v) => (
+                    <Dropdown menu={{
+                      items: [
+                        ...(can('update') ? [{ key: 'request', label: 'Request', disabled: selectedLocationId === 'all', onClick: () => handleRequestStock({ ...record, ...v }) }] : []),
+                        ...(can('update') ? [{ key: 'adjust', label: 'Adjust', disabled: selectedLocationId === 'all', onClick: () => handleAdjustStock({ ...record, ...v }) }] : []),
+                        ...(can('update') ? [{ key: 'transfer', label: 'Transfer', disabled: selectedLocationId === 'all' || v.quantity === 0, onClick: () => handleTransferStock({ ...record, ...v }) }] : []),
+                        { key: 'details', label: 'Details', onClick: () => handleViewDetails({ ...record, ...v }) },
+                      ],
+                    }} trigger={['click']}>
+                      <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
+                    </Dropdown>
+                  ),
                 },
               ];
+              const subData = varieties.map((v, idx) => ({ ...v, key: v.variety_id || `v-${idx}` }));
               return (
-                <div style={{ padding: '4px 0 4px 40px' }}>
-                  {varieties.map((v) => (
-                    <div key={v.variety_id} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr 1fr', padding: '4px 0', fontSize: 13, alignItems: 'center', borderBottom: '1px solid #f0f0f0' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {v.color && (
-                          <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', border: '1px solid #d9d9d9', flexShrink: 0 }} />
-                        )}
-                        <span style={{ fontWeight: 500 }}>{v.pattern || 'Default'}</span>
-                        {v.color && <span style={{ color: '#888' }}>{v.color}</span>}
-                      </div>
-                      <div style={{ textAlign: 'right', paddingRight: 16, fontVariantNumeric: 'tabular-nums' }}>{fmtQty(v.quantity, record.category === FABRIC_CATEGORY)}</div>
-                      <div>
-                        {Number(v.quantity) === 0
-                          ? <Tag color="red" style={{ margin: 0 }}>Out of Stock</Tag>
-                          : Number(v.quantity) <= 10
-                            ? <Tag color="orange" style={{ margin: 0 }}>Low Stock</Tag>
-                            : null}
-                      </div>
-                      <div></div>
-                      <div style={{ textAlign: 'center' }}>
-                        <Dropdown menu={{ items: varietyActions(v) }} trigger={['click']}>
-                          <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
-                        </Dropdown>
-                      </div>
-                    </div>
-                  ))}
+                <div style={{ padding: '0 0 0 40px' }}>
+                  <Table
+                    columns={subColumns}
+                    dataSource={subData}
+                    pagination={false}
+                    showHeader={false}
+                    size="small"
+                  />
                 </div>
               );
             },
