@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Card, Typography, Row, Col, Table, Tabs, Statistic,
   Select, Spin, Space, message, Divider, Button, Modal, Form,
-  Input, Tag, List, Badge, Tooltip, Dropdown,
+  Input,   Tag, List, Badge, Tooltip, Dropdown, Checkbox,
 } from 'antd';
 import {
   PieChart, Pie, Cell, BarChart, Bar,
@@ -68,6 +68,9 @@ const Reports = () => {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [distributionData, setDistributionData] = useState([]);
   const [stockLevelsView, setStockLevelsView] = useState('table');
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState('csv');
+  const [exportOptions, setExportOptions] = useState({ totalProducts: true, lowStockItems: true, outOfStock: true });
 
   const exportCSV = (data, title, columnDefs) => {
     if (!data || data.length === 0) {
@@ -119,6 +122,180 @@ const Reports = () => {
       alternateRowStyles: { fillColor: [245, 245, 245] },
     });
     doc.save(`${(filename || title).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`);
+  };
+
+  const exportCSVSections = (sections, filename) => {
+    const parts = [];
+    for (const section of sections) {
+      if (!section.data || section.data.length === 0) continue;
+      parts.push(`"${section.title}"`);
+      parts.push(section.columns.map(c => c.label).join(','));
+      section.data.forEach(row => {
+        parts.push(section.columns.map(c => {
+          const val = c.accessor(row);
+          const str = val !== null && val !== undefined ? String(val) : '';
+          return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str.replace(/"/g, '""')}"` : str;
+        }).join(','));
+      });
+      parts.push('');
+    }
+    if (parts.length === 0) { message.warning('No data to export'); return; }
+    const csv = '\uFEFF' + parts.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(filename || 'Inventory_Report').replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  };
+
+  const exportPDFSections = (sections, filename) => {
+    const dataSections = sections.filter(s => s.data && s.data.length > 0);
+    if (dataSections.length === 0) { message.warning('No data to export'); return; }
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const branchName = selectedLocationId !== 'all'
+      ? (branchLocations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
+      : 'All Locations';
+    doc.setFontSize(14);
+    doc.text('Inventory Report', 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Branch: ${branchName}`, 14, 27);
+    doc.setFontSize(9);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 33);
+    let currentY = 40;
+    for (const section of dataSections) {
+      if (currentY > 250) { doc.addPage(); currentY = 14; }
+      doc.setFontSize(12);
+      doc.text(section.title, 14, currentY);
+      currentY += 6;
+      autoTable(doc, {
+        startY: currentY,
+        head: [section.columns.map(c => c.label)],
+        body: section.data.map(row => section.columns.map(c => c.accessor(row))),
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [22, 119, 255], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+      });
+      currentY = doc.lastAutoTable.finalY + 10;
+    }
+    doc.save(`${(filename || 'Inventory_Report').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`);
+  };
+
+  const buildHierarchicalRows = (flatData) => {
+    if (!flatData || flatData.length === 0) return { rows: [], singleBranch: false };
+    const uniqueBranches = [...new Set(flatData.map(d => d.location_name).filter(Boolean))];
+    const singleBranch = uniqueBranches.length <= 1;
+    const groups = {};
+    flatData.forEach(item => {
+      const pid = item.product_id;
+      if (!groups[pid]) {
+        groups[pid] = { items: [], product_name: item.product_name, sku: item.sku, reorder_level: item.reorder_level };
+      }
+      groups[pid].items.push(item);
+    });
+    const rows = [];
+    Object.values(groups).forEach(group => {
+      const totalQty = group.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+      rows.push({
+        product: `${group.product_name} (${totalQty})`,
+        sku: group.sku,
+        branch: singleBranch ? undefined : '',
+        stock: totalQty,
+        reorder_level: group.reorder_level,
+      });
+      const hasVariety = (item) => item.variety_id != null;
+      const sorted = [...group.items].sort((a, b) => {
+        if (!hasVariety(a) && hasVariety(b)) return -1;
+        if (hasVariety(a) && !hasVariety(b)) return 1;
+        return ((a.color || a.pattern || '')).localeCompare((b.color || b.pattern || ''));
+      });
+      sorted.forEach(item => {
+        if (!hasVariety(item)) {
+          rows.push({
+            product: `  - Base (${item.quantity})`,
+            sku: '',
+            branch: singleBranch ? undefined : item.location_name,
+            stock: item.quantity,
+            reorder_level: '-',
+          });
+        } else {
+          const varietyLabel = [item.color, item.pattern].filter(Boolean).join(' - ');
+          rows.push({
+            product: `  - ${varietyLabel} (${item.quantity})`,
+            sku: item.variety_sku || '',
+            branch: singleBranch ? undefined : item.location_name,
+            stock: item.quantity,
+            reorder_level: '-',
+          });
+        }
+      });
+    });
+    return { rows, singleBranch };
+  };
+
+  const mkSectionCols = (singleBranch) => [
+    { label: 'Product', accessor: (r) => r.product },
+    { label: 'SKU', accessor: (r) => r.sku },
+    ...(singleBranch ? [] : [{ label: 'Branch', accessor: (r) => r.branch || '' }]),
+    { label: 'Stock', accessor: (r) => r.stock },
+    { label: 'Reorder Level', accessor: (r) => r.reorder_level },
+  ];
+
+  const handleExportClick = (format) => {
+    setExportFormat(format);
+    setExportModalOpen(true);
+  };
+
+  const handleExportConfirm = () => {
+    const { totalProducts, lowStockItems, outOfStock } = exportOptions;
+    if (!totalProducts && !lowStockItems && !outOfStock) {
+      message.warning('Please select at least one option');
+      return;
+    }
+
+    const sections = [];
+    const dateStr = new Date().toISOString().split('T')[0];
+
+    if (totalProducts) {
+      const uniqueBranches = [...new Set((inventorySummary.by_branch || []).map(r => r.location_name).filter(Boolean))];
+      const singleBranch = uniqueBranches.length <= 1;
+      sections.push({
+        title: 'Stock Levels by Branch',
+        data: inventorySummary.by_branch,
+        columns: [
+          ...(singleBranch ? [] : [{ label: 'Branch', accessor: (r) => r.location_name }]),
+          { label: 'Total Items', accessor: (r) => r.product_count },
+          { label: 'Total Quantity', accessor: (r) => Math.floor(r.total_quantity) },
+        ],
+      });
+    }
+
+    if (lowStockItems) {
+      const { rows: lowStockRows, singleBranch } = buildHierarchicalRows(inventorySummary.low_stock);
+      sections.push({
+        title: 'Low Stock Items',
+        data: lowStockRows,
+        columns: mkSectionCols(singleBranch),
+      });
+    }
+
+    if (outOfStock) {
+      const outOfStockData = (inventorySummary.low_stock || []).filter(r => r.quantity === 0);
+      const { rows: outRows, singleBranch } = buildHierarchicalRows(outOfStockData);
+      sections.push({
+        title: 'Out of Stock Items',
+        data: outRows,
+        columns: mkSectionCols(singleBranch),
+      });
+    }
+
+    setExportModalOpen(false);
+
+    if (exportFormat === 'csv') {
+      exportCSVSections(sections, `Inventory_Report_${dateStr}`);
+    } else {
+      exportPDFSections(sections, `Inventory_Report_${dateStr}`);
+    }
   };
 
   const mkParams = (extra) => {
@@ -622,6 +799,46 @@ const Reports = () => {
       label: <span><DatabaseOutlined /> Inventory</span>,
       children: (
         <Spin spinning={loading.inventory}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+            <Space>
+              {user && (user.usertype === 1 || user.usertype === 3) && (
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'all', label: 'All Locations' },
+                      ...branchLocations.map(loc => ({ key: String(loc.location_id), label: loc.name })),
+                    ],
+                    onClick: ({ key }) => {
+                      if (key === 'all') {
+                        setSelectedLocationId('all');
+                        setIsStorehouse(false);
+                      } else {
+                        setSelectedLocationId(Number(key));
+                        const loc = branchLocations.find(l => l.location_id === Number(key));
+                        setIsStorehouse(loc ? loc.is_storehouse : false);
+                      }
+                    },
+                  }}
+                >
+                  <Button type={selectedLocationId !== 'all' ? 'primary' : 'default'}>
+                    {selectedLocationId !== 'all'
+                      ? (branchLocations.find(l => l.location_id === Number(selectedLocationId))?.name || 'Branch')
+                      : 'All Locations'}
+                  </Button>
+                </Dropdown>
+              )}
+            </Space>
+            <Dropdown
+              menu={{
+                items: [
+                  { key: 'csv', label: 'CSV', onClick: () => handleExportClick('csv') },
+                  { key: 'pdf', label: 'PDF', onClick: () => handleExportClick('pdf') },
+                ],
+              }}
+            >
+              <Button icon={<DownloadOutlined />}>Export</Button>
+            </Dropdown>
+          </div>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={8}>
               <Card><Statistic title="Total Products" value={inventorySummary.stats.total_products ?? 0} /></Card>
@@ -1323,6 +1540,37 @@ const Reports = () => {
             </div>
           )}
         </Modal>
+          <Modal
+            title="Export Inventory Report"
+            open={exportModalOpen}
+            onCancel={() => setExportModalOpen(false)}
+            onOk={handleExportConfirm}
+            okText={`Export as ${exportFormat.toUpperCase()}`}
+          >
+            <div style={{ marginBottom: 16, color: '#888' }}>
+              Select the sections to include in the export:
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <Checkbox
+                checked={exportOptions.totalProducts}
+                onChange={(e) => setExportOptions(prev => ({ ...prev, totalProducts: e.target.checked }))}
+              >
+                Total Products
+              </Checkbox>
+              <Checkbox
+                checked={exportOptions.lowStockItems}
+                onChange={(e) => setExportOptions(prev => ({ ...prev, lowStockItems: e.target.checked }))}
+              >
+                Low Stock Items
+              </Checkbox>
+              <Checkbox
+                checked={exportOptions.outOfStock}
+                onChange={(e) => setExportOptions(prev => ({ ...prev, outOfStock: e.target.checked }))}
+              >
+                Out of Stock
+              </Checkbox>
+            </div>
+          </Modal>
         </>
       )}
     </div>
