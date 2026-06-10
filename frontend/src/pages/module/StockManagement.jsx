@@ -83,7 +83,9 @@ const StockManagement = () => {
   const [repVarietyModalProduct, setRepVarietyModalProduct] = useState(null);
   const [repVarietyModalQtys, setRepVarietyModalQtys] = useState({});
   const [repVarietyCheckedIds, setRepVarietyCheckedIds] = useState(new Set());
+  const [replenishRemark, setReplenishRemark] = useState('');
   const receiptCaptureRef = useRef(null);
+  const replenishReceiptCaptureRef = useRef(null);
 
   const fetchData = async (page = 1, size = pageSize) => {
     if (!user) return;
@@ -742,7 +744,7 @@ const StockManagement = () => {
     setReplenishCart((prev) => {
       if (prev[key]) return prev;
       const isFab = product.category === FABRIC_CATEGORY;
-      const qty = 0;
+      const qty = 1;
       return {
         ...prev,
         [key]: {
@@ -874,12 +876,27 @@ const StockManagement = () => {
     link.click();
   };
 
+  const handlePrintReplenishSummary = async () => {
+    if (!replenishReceiptCaptureRef.current) return;
+    const { default: html2canvas } = await import('html2canvas');
+    const canvas = await html2canvas(replenishReceiptCaptureRef.current, {
+      scale: 2, useCORS: true, backgroundColor: '#ffffff',
+    });
+    const link = document.createElement('a');
+    link.download = 'replenish-receipt.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+
   const { total_items: totalItems, low_stock_count: lowStockCount, out_of_stock_count: outOfStockCount, pending_request_count: pendingRequestCount } = stats;
 
   const showBranch = selectedLocationId === "all";
   const receiptItems = Object.values(restockCart).filter((e) => e.quantity > 0);
   const receiptTotalQty = receiptItems.reduce((sum, e) => sum + (e.quantity || 0), 0);
   const receiptRef = `RS-${Date.now().toString(36).toUpperCase()}`;
+  const replenishReceiptItems = Object.values(replenishCart).filter((e) => e.quantity > 0);
+  const replenishReceiptTotalQty = replenishReceiptItems.reduce((sum, e) => sum + (e.quantity || 0), 0);
+  const replenishReceiptRef = `RP-${Date.now().toString(36).toUpperCase()}`;
 
   const columns = [
     {
@@ -1156,8 +1173,8 @@ const StockManagement = () => {
                   </Button>
                 </Dropdown>
               )}
-              {can('update') && (
-                <Button type="primary" ghost onClick={handleOpenReplenish} disabled={selectedLocationId === "all"}>
+              {isStorehouse && can('update') && (
+                <Button type="primary" onClick={handleOpenReplenish} disabled={selectedLocationId === "all"}>
                   Replenish
                 </Button>
               )}
@@ -1637,7 +1654,7 @@ const StockManagement = () => {
       <Modal
         title="Replenish Inventory"
         open={replenishVisible}
-        onCancel={() => { setReplenishVisible(false); setReplenishCart({}); }}
+        onCancel={() => { setReplenishVisible(false); setReplenishCart({}); setReplenishRemark(''); }}
         width={1100}
         centered
         styles={{ body: { padding: '16px 24px', maxHeight: '80vh', overflowY: 'auto' } }}
@@ -1748,6 +1765,24 @@ const StockManagement = () => {
                 <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid #e8e8e8' }}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>
                     Total: {Object.values(replenishCart).filter((e) => e.quantity > 0).length} item(s)
+                  </div>
+                  <Input.TextArea
+                    placeholder="Add a remark..."
+                    value={replenishRemark}
+                    onChange={(e) => setReplenishRemark(e.target.value)}
+                    rows={2}
+                    style={{ marginTop: 8, fontSize: 12 }}
+                  />
+                  <div style={{ marginTop: 8 }}>
+                    <Button
+                      type="default"
+                      size="small"
+                      icon={<DownloadOutlined />}
+                      onClick={handlePrintReplenishSummary}
+                      block
+                    >
+                      Download Receipt
+                    </Button>
                   </div>
                 </div>
               )}
@@ -1942,6 +1977,66 @@ const StockManagement = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 600 }}>
               <span>Total Quantity:</span>
               <span>{qtyLabel(receiptTotalQty)}</span>
+            </div>
+          </div>
+          <div className="receipt-footer" style={{ textAlign: 'center', marginTop: 20, paddingTop: 12, borderTop: '2px dashed #888', fontSize: 13, color: '#555' }}>
+            Thank you!
+          </div>
+        </div>
+      </div>
+
+      <div id="replenish-receipt-print" ref={replenishReceiptCaptureRef} style={{ position: 'absolute', left: '-9999px', top: 0, width: 550, background: '#fff', zIndex: -1, padding: 32 }}>
+        <div className="receipt-inner" style={{ width: '100%', padding: '24px 24px', fontFamily: "'Courier New', monospace", fontSize: 14, color: '#222', background: '#fff', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            <img src={logoImage} alt="Logo" style={{ height: 60, width: 'auto', display: 'block', margin: '0 auto 6px' }} />
+            <div className="receipt-header" style={{ fontSize: 18, fontWeight: 700, letterSpacing: 1 }}>{receiptConfig.companyName}</div>
+          </div>
+          <div className="receipt-section" style={{ textAlign: 'center', fontSize: 15, fontWeight: 600, padding: '6px 0', borderTop: '2px dashed #888', borderBottom: '2px dashed #888', marginBottom: 12 }}>
+            REPLENISH RECEIPT
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 13 }}>
+            <tbody>
+              {[['Date:', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })],
+                ['Ref No:', replenishReceiptRef],
+                ['Branch:', user?.location_name || `Branch #${user?.location_id}`],
+                ['Prepared by:', user?.username || '-']].map(([label, value], i) => (
+                <tr key={i}>
+                  <td className="receipt-label" style={{ padding: '2px 4px', color: '#666' }}>{label}</td>
+                  <td className="receipt-label" style={{ padding: '2px 4px', textAlign: 'right' }}>{value}</td>
+                </tr>
+              ))}
+              {replenishRemark && (
+                <tr>
+                  <td className="receipt-label" style={{ padding: '2px 4px', color: '#666', verticalAlign: 'top' }}>Remark:</td>
+                  <td className="receipt-label" style={{ padding: '2px 4px', textAlign: 'right', color: '#333' }}>{replenishRemark}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          <div style={{ borderTop: '1px dashed #aaa', borderBottom: '1px dashed #aaa', padding: '6px 0', marginBottom: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: 13 }}>
+            <span>Item</span>
+            <span>Qty</span>
+          </div>
+          {replenishReceiptItems.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '16px 0', color: '#999' }}>No items selected</div>
+          ) : (
+            replenishReceiptItems.map((item) => (
+              <div key={item.key} className="receipt-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, borderBottom: '1px dotted #ddd' }}>
+                <span style={{ flex: 1, paddingRight: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.product_name}{item.variety_label ? ` (${item.variety_label})` : ''}
+                </span>
+                <span style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtQty(item.quantity, item.is_fabric)}</span>
+              </div>
+            ))
+          )}
+          <div className="receipt-totals" style={{ borderTop: '2px dashed #888', marginTop: 8, paddingTop: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+              <span>Total Items:</span>
+              <span>{replenishReceiptItems.length}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 600 }}>
+              <span>Total Quantity:</span>
+              <span>{qtyLabel(replenishReceiptTotalQty)}</span>
             </div>
           </div>
           <div className="receipt-footer" style={{ textAlign: 'center', marginTop: 20, paddingTop: 12, borderTop: '2px dashed #888', fontSize: 13, color: '#555' }}>
