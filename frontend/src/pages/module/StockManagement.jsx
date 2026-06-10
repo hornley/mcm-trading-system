@@ -1271,7 +1271,7 @@ const StockManagement = () => {
               ];
               const subData = varieties.map((v, idx) => ({ ...v, key: v.variety_id || `v-${idx}` }));
               return (
-                <div style={{ padding: '0 0 0 40px' }}>
+                <div style={{ padding: 0 }}>
                   <Table
                     columns={subColumns}
                     dataSource={subData}
