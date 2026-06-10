@@ -1,6 +1,7 @@
 import math
 from flask import Blueprint, request
 from datetime import datetime
+from sqlalchemy.orm import selectinload, joinedload
 from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer, StockRequest, OrderItem, Notification, ProductVariety
 from utils.response import success_response, error_response
 from utils.validation import validate_required, validate_quantity, is_fabric_category
@@ -35,7 +36,9 @@ def check_and_auto_restock(location_id):
     location = Location.query.get(location_id)
     if not location:
         return
-    inventory_list = Inventory.query.filter_by(location_id=location_id).all()
+    inventory_list = Inventory.query.options(
+        joinedload(Inventory.product),
+    ).filter_by(location_id=location_id).all()
     for inv in inventory_list:
         product = inv.product
         if not product or not product.auto_restock_source_id:
@@ -92,7 +95,9 @@ def _generate_sku():
     return f"PROD-{count + 1:03d}"
 
 
-def _get_variety_stock(variety_id, location_id=None):
+def _get_variety_stock(variety_id, location_id=None, stock_map=None):
+    if stock_map is not None:
+        return stock_map.get(variety_id, 0)
     inv = Inventory.query.filter_by(variety_id=variety_id)
     if location_id:
         inv = inv.filter_by(location_id=location_id)
@@ -100,8 +105,8 @@ def _get_variety_stock(variety_id, location_id=None):
     return total
 
 
-def _serialize_product(product, include_inventory=False, location_id=None):
-    varieties = ProductVariety.query.filter_by(product_id=product.product_id).all()
+def _serialize_product(product, include_inventory=False, location_id=None, variety_stock_map=None, product_qty_cache=None):
+    varieties = product.varieties or []
     data = {
         "product_id": product.product_id,
         "name": product.name,
@@ -122,7 +127,7 @@ def _serialize_product(product, include_inventory=False, location_id=None):
                 "variety_sku": v.variety_sku,
                 "color": v.color,
                 "pattern": v.pattern,
-                "stock": _get_variety_stock(v.variety_id, location_id),
+                "stock": _get_variety_stock(v.variety_id, location_id, variety_stock_map),
             }
             for v in varieties
         ],
@@ -175,20 +180,30 @@ def list_products():
         is_active_val = is_active.lower() == "true"
         query = query.filter_by(is_active=is_active_val)
 
-    products = quick_sort(query.all(), key=sort_by, order=sort_order)
+    products = query.options(
+        selectinload(Product.varieties),
+        selectinload(Product.category),
+    ).all()
+    products = quick_sort(products, key=sort_by, order=sort_order)
+
+    # Bulk-load all variety stock for this location
+    variety_stock_map = {}
+    product_qty_map = {}
+    if resolved_location_id is not None and resolved_location_id != "all":
+        all_inv = Inventory.query.filter(
+            Inventory.location_id == resolved_location_id
+        ).all()
+    else:
+        all_inv = Inventory.query.all()
+    for inv in all_inv:
+        if inv.variety_id is not None:
+            variety_stock_map[inv.variety_id] = variety_stock_map.get(inv.variety_id, 0) + inv.quantity
+        product_qty_map[inv.product_id] = product_qty_map.get(inv.product_id, 0) + inv.quantity
 
     result = []
     for p in products:
-        data = _serialize_product(p, location_id=resolved_location_id)
-        if resolved_location_id is not None and resolved_location_id != "all":
-            inventory = Inventory.query.filter_by(
-                product_id=p.product_id,
-                location_id=resolved_location_id
-            ).first()
-            data["quantity"] = inventory.quantity if inventory else 0
-        else:
-            total = db.session.query(db.func.sum(Inventory.quantity)).filter_by(product_id=p.product_id).scalar()
-            data["quantity"] = total or 0
+        data = _serialize_product(p, location_id=resolved_location_id, variety_stock_map=variety_stock_map)
+        data["quantity"] = product_qty_map.get(p.product_id, 0)
         result.append(data)
 
     return success_response(result)
@@ -207,19 +222,26 @@ def get_product(product_id):
     if error:
         return error
 
-    product = Product.query.get(product_id)
+    product = Product.query.options(
+        selectinload(Product.varieties),
+        selectinload(Product.category),
+    ).get(product_id)
     if not product:
         return error_response("Product not found", "NOT_FOUND", 404)
 
     data = _serialize_product(product)
 
     if resolved_location_id and resolved_location_id != "all":
-        inventory = Inventory.query.filter_by(
+        inventory = Inventory.query.options(
+            joinedload(Inventory.location),
+        ).filter_by(
             product_id=product_id,
             location_id=resolved_location_id
         ).all()
     else:
-        inventory = Inventory.query.filter_by(product_id=product_id).all()
+        inventory = Inventory.query.options(
+            joinedload(Inventory.location),
+        ).filter_by(product_id=product_id).all()
 
     data["inventory"] = [
         {
@@ -513,30 +535,28 @@ def inventory_counts():
     if error:
         return error
 
-    query = Inventory.query.join(Product).filter(Product.is_active == True)
-    if resolved_location_id and resolved_location_id != "all":
-        query = query.filter(Inventory.location_id == resolved_location_id)
+    loc_param = resolved_location_id if resolved_location_id and resolved_location_id != "all" else None
 
-    all_inv = query.all()
+    rows = db.session.execute(
+        db.text("""
+            SELECT i.product_id, i.location_id,
+                   SUM(i.quantity) as total_qty,
+                   CAST(p.reorder_level AS INTEGER) as reorder_level
+            FROM "Inventory" i
+            JOIN "Products" p ON i.product_id = p.product_id
+            WHERE p.is_active = TRUE
+              AND (:loc_id IS NULL OR i.location_id = CAST(:loc_id AS INTEGER))
+            GROUP BY i.product_id, i.location_id, p.reorder_level
+        """),
+        {"loc_id": loc_param},
+    ).fetchall()
 
-    # Group by (product_id, location_id), summing quantities (match frontend grouping)
-    groups = {}
-    for i in all_inv:
-        key = (i.product_id, i.location_id)
-        if key not in groups:
-            groups[key] = {"quantity": 0, "reorder_level": 0}
-            try:
-                groups[key]["reorder_level"] = int(i.product.reorder_level) if i.product and i.product.reorder_level else 0
-            except (ValueError, TypeError):
-                groups[key]["reorder_level"] = 0
-        groups[key]["quantity"] += i.quantity or 0
-
-    total_items = len(groups)
+    total_items = len(rows)
     low_stock_count = 0
     out_of_stock_count = 0
-    for g in groups.values():
-        qty = g["quantity"]
-        rl = g["reorder_level"]
+    for row in rows:
+        qty = row.total_qty or 0
+        rl = row.reorder_level or 0
         if qty == 0:
             out_of_stock_count += 1
         elif rl > 0 and qty < rl:
@@ -604,7 +624,11 @@ def list_inventory():
 
     total_count = query.count()
 
-    inventory = query.offset((page - 1) * limit).limit(limit).all()
+    inventory = query.options(
+        joinedload(Inventory.product).joinedload(Product.category),
+        joinedload(Inventory.location),
+        joinedload(Inventory.variety),
+    ).offset((page - 1) * limit).limit(limit).all()
 
     return success_response({
         "data": [
@@ -1070,49 +1094,46 @@ def get_low_stock():
         return error
 
     storehouse = Location.query.filter_by(is_storehouse=True, is_active=True).first()
+    storehouse_id = storehouse.location_id if storehouse else None
 
-    products = Product.query.filter_by(is_active=True).all()
-    low_stock = []
+    low_stock = db.session.execute(
+        db.text("""
+            SELECT i.inventory_id, p.product_id, p.name as product_name, p.sku,
+                   p.category_id, c.name as category_name,
+                   i.location_id, l.name as location_name,
+                   i.quantity, p.reorder_level,
+                   COALESCE(si.quantity, 0) as storehouse_quantity
+            FROM "Inventory" i
+            JOIN "Products" p ON i.product_id = p.product_id
+            LEFT JOIN "Categories" c ON p.category_id = c.category_id
+            JOIN "Locations" l ON i.location_id = l.location_id
+            LEFT JOIN "Inventory" si ON si.product_id = p.product_id AND si.location_id = :storehouse_id
+            WHERE p.is_active = TRUE
+              AND p.reorder_level IS NOT NULL
+              AND CAST(p.reorder_level AS INTEGER) > 0
+              AND i.quantity < CAST(p.reorder_level AS INTEGER)
+              AND (:loc_id IS NULL OR i.location_id = CAST(:loc_id AS INTEGER))
+        """),
+        {"storehouse_id": storehouse_id, "loc_id": resolved_location_id if resolved_location_id != "all" else None},
+    ).fetchall()
 
-    for product in products:
-        reorder_level = product.reorder_level
-        if reorder_level is None:
-            continue
-        try:
-            level = int(reorder_level)
-        except (ValueError, TypeError):
-            continue
+    result = []
+    for row in low_stock:
+        result.append({
+            "inventory_id": row.inventory_id,
+            "product_id": row.product_id,
+            "product_name": row.product_name,
+            "sku": row.sku,
+            "category_id": row.category_id,
+            "category": row.category_name,
+            "location_id": row.location_id,
+            "location_name": row.location_name,
+            "quantity": row.quantity,
+            "reorder_level": int(row.reorder_level) if row.reorder_level else 0,
+            "storehouse_quantity": row.storehouse_quantity,
+        })
 
-        query = Inventory.query.filter_by(product_id=product.product_id)
-        if resolved_location_id is not None and resolved_location_id != "all":
-            query = query.filter_by(location_id=resolved_location_id)
-
-        store_qty = 0
-        if storehouse:
-            store_inv = Inventory.query.filter_by(
-                product_id=product.product_id,
-                location_id=storehouse.location_id,
-            ).first()
-            store_qty = store_inv.quantity if store_inv else 0
-
-        inventory = query.all()
-        for inv in inventory:
-            if inv.quantity < level:
-                low_stock.append({
-                    "inventory_id": inv.inventory_id,
-                    "product_id": product.product_id,
-                    "product_name": product.name,
-                    "sku": product.sku,
-                    "category_id": product.category_id,
-                    "category": product.category.name if product.category else None,
-                    "location_id": inv.location_id,
-                    "location_name": inv.location.name if inv.location else None,
-                    "quantity": inv.quantity,
-                    "reorder_level": level,
-                    "storehouse_quantity": store_qty,
-                })
-
-    return success_response(low_stock)
+    return success_response(result)
 
 
 @inventory_bp.route("/api/inventory/branch-needs", methods=["GET"])
@@ -1125,38 +1146,42 @@ def get_branch_needs():
     if not storehouse:
         return error_response("No storehouse configured", "NO_STOREHOUSE", 400)
 
-    branches = Location.query.filter(
-        Location.is_storehouse == False,
-        Location.is_active == True
-    ).all()
+    rows = db.session.execute(
+        db.text("""
+            SELECT p.product_id, p.name as product_name,
+                   c.name as category_name,
+                   b.location_id as branch_id, b.name as branch_name,
+                   i.quantity as current_qty,
+                   CAST(p.reorder_level AS INTEGER) as reorder_level,
+                   CAST(p.reorder_level AS INTEGER) - i.quantity as deficit,
+                   COALESCE(si.quantity, 0) as storehouse_qty
+            FROM "Inventory" i
+            JOIN "Products" p ON i.product_id = p.product_id
+            LEFT JOIN "Categories" c ON p.category_id = c.category_id
+            JOIN "Locations" b ON i.location_id = b.location_id
+            LEFT JOIN "Inventory" si ON si.product_id = p.product_id AND si.location_id = :storehouse_id
+            WHERE b.is_storehouse = FALSE
+              AND b.is_active = TRUE
+              AND p.reorder_level IS NOT NULL
+              AND CAST(p.reorder_level AS INTEGER) > 0
+              AND i.quantity < CAST(p.reorder_level AS INTEGER)
+        """),
+        {"storehouse_id": storehouse.location_id},
+    ).fetchall()
 
     branch_needs = []
-    for branch in branches:
-        items = Inventory.query.filter_by(location_id=branch.location_id).all()
-        for inv in items:
-            product = Product.query.get(inv.product_id)
-            if not product or not product.reorder_level:
-                continue
-            try:
-                level = int(product.reorder_level)
-            except (ValueError, TypeError):
-                continue
-            if inv.quantity < level:
-                store_inv = Inventory.query.filter_by(
-                    product_id=product.product_id,
-                    location_id=storehouse.location_id,
-                ).first()
-                branch_needs.append({
-                    "product_id": product.product_id,
-                    "product_name": product.name,
-                    "category": product.category.name if product.category else None,
-                    "branch_id": branch.location_id,
-                    "branch_name": branch.name,
-                    "current_qty": inv.quantity,
-                    "reorder_level": level,
-                    "deficit": level - inv.quantity,
-                    "storehouse_qty": store_inv.quantity if store_inv else 0,
-                })
+    for row in rows:
+        branch_needs.append({
+            "product_id": row.product_id,
+            "product_name": row.product_name,
+            "category": row.category_name,
+            "branch_id": row.branch_id,
+            "branch_name": row.branch_name,
+            "current_qty": row.current_qty,
+            "reorder_level": row.reorder_level,
+            "deficit": row.deficit,
+            "storehouse_qty": row.storehouse_qty,
+        })
 
     return success_response(branch_needs)
 
@@ -1367,9 +1392,17 @@ def get_inventory_movements():
     if not product_id:
         return error_response("product_id query parameter is required", "MISSING_PARAM", 400)
 
-    adjustments = StockAdjustment.query.filter_by(product_id=product_id)
-    transfers_from = StockTransfer.query.filter_by(product_id=product_id)
-    transfers_to = StockTransfer.query.filter_by(product_id=product_id)
+    adjustments = StockAdjustment.query.filter_by(product_id=product_id).options(
+        joinedload(StockAdjustment.location),
+    )
+    transfers_from = StockTransfer.query.filter_by(product_id=product_id).options(
+        joinedload(StockTransfer.from_location),
+        joinedload(StockTransfer.to_location),
+    )
+    transfers_to = StockTransfer.query.filter_by(product_id=product_id).options(
+        joinedload(StockTransfer.from_location),
+        joinedload(StockTransfer.to_location),
+    )
 
     if location_id:
         adjustments = adjustments.filter_by(location_id=location_id)
@@ -1489,7 +1522,12 @@ def list_pending_requests():
     ).order_by(StockRequest.created_at.desc())
     if from_location_id:
         query = query.filter_by(from_location_id=from_location_id)
-    requests = query.limit(50).all()
+    requests = query.options(
+        joinedload(StockRequest.product),
+        joinedload(StockRequest.from_location),
+        joinedload(StockRequest.to_location),
+        joinedload(StockRequest.requester),
+    ).limit(50).all()
     return success_response([{
         "request_id": r.request_id,
         "product_id": r.product_id,
@@ -1514,7 +1552,12 @@ def list_request_logs():
     query = StockRequest.query.order_by(StockRequest.created_at.desc())
     if user_id:
         query = query.filter_by(requested_by=user_id)
-    requests = query.limit(100).all()
+    requests = query.options(
+        joinedload(StockRequest.product),
+        joinedload(StockRequest.from_location),
+        joinedload(StockRequest.to_location),
+        joinedload(StockRequest.requester),
+    ).limit(100).all()
     return success_response([{
         "request_id": r.request_id,
         "product_id": r.product_id,

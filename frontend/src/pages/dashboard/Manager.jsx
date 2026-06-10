@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Row, Col, Card, Statistic, Table, Tag, Typography, Button, Space } from 'antd'
 import {
   DatabaseOutlined, ShoppingCartOutlined, WarningOutlined,
@@ -10,6 +10,7 @@ import {
 } from 'recharts'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useNavigate } from 'react-router-dom'
+import { useDashboardQuery } from '../../hooks/useQueries'
 import { FABRIC_CATEGORY, fmtQty, qtyLabel } from '../../utils/format.js'
 
 const { Title, Text } = Typography
@@ -25,37 +26,24 @@ const computeTrend = (current) => {
 const Manager = () => {
   const { user, selectedLocationId } = useAuth()
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
+  const { data: rawData, isLoading } = useDashboardQuery(selectedLocationId)
   const [lastUpdated, setLastUpdated] = useState(null)
-  const [data, setData] = useState({
-    stats: { total_items: 0, sales_today: 0, low_stock_count: 0, active_users: 0 },
-    stock_by_category: [],
-    stock_movement: [],
-    recent_transactions: [],
-    low_stock_items: [],
-  })
 
-  const fetchData = () => {
-    setLoading(true)
-    const params = new URLSearchParams({ usertype: user?.usertype, user_id: user?.user_id, location_id: selectedLocationId })
-    fetch(`/api/dashboard/summary?${params}`)
-      .then((res) => res.json())
-      .then((res) => {
-        if (res.success) {
-          const d = res.data;
-          if (d.stock_by_category) {
-            d.stock_by_category = d.stock_by_category.map((c) => ({ ...c, value: Math.floor(c.value) }));
-          }
-          if (d.stats) d.stats.total_items = Math.floor(d.stats.total_items);
-          setData(d);
-          setLastUpdated(new Date().toLocaleTimeString());
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }
+  useEffect(() => {
+    if (rawData) setLastUpdated(new Date().toLocaleTimeString())
+  }, [rawData])
 
-  useEffect(() => { if (user) fetchData() }, [user, selectedLocationId])
+  const data = useMemo(() => {
+    if (!rawData) return { stats: { total_items: 0, sales_today: 0, low_stock_count: 0, active_users: 0 }, stock_by_category: [], stock_movement: [], recent_transactions: [], low_stock_items: [] }
+    const d = { ...rawData }
+    if (d.stock_by_category) {
+      d.stock_by_category = d.stock_by_category.map((c) => ({ ...c, value: Math.floor(c.value) }))
+    }
+    if (d.stats) {
+      d.stats = { ...d.stats, total_items: Math.floor(d.stats.total_items) }
+    }
+    return d
+  }, [rawData])
 
   const { stats, stock_by_category, stock_movement, recent_transactions, low_stock_items } = data
   const branchName = user?.location_name || `Branch #${user?.location_id}`
@@ -84,7 +72,7 @@ const Manager = () => {
       value: stats.sales_today,
       icon: <ShoppingCartOutlined />,
       trend: computeTrend(stats.sales_today),
-      route: '/dashboard/sales',
+      route: '/dashboard/sales?period=today',
     },
     {
       title: 'Low Stock Alerts',
@@ -124,7 +112,7 @@ const Manager = () => {
               style={{ height: '100%', ...(stat.title === 'Low Stock Alerts' && stats.low_stock_count > 0 ? { borderLeft: '3px solid #fa8c16' } : {}) }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <Statistic title={stat.title} value={stat.value} prefix={stat.icon} valueStyle={stat.valueStyle} loading={loading} />
+                <Statistic title={stat.title} value={stat.value} prefix={stat.icon} valueStyle={stat.valueStyle} loading={isLoading} />
                 <div style={{ flex: 1 }} />
                 {stat.trend && (
                   <Space>
@@ -248,7 +236,7 @@ const Manager = () => {
                 { title: 'Amount', dataIndex: 'amount', key: 'amount' },
                 { title: 'Date', dataIndex: 'date', key: 'date' },
               ]}
-              pagination={false} size="small" loading={loading}
+              pagination={false} size="small" loading={isLoading}
               scroll={{ y: 280 }}
               onRow={() => ({ style: { cursor: 'pointer' }, onClick: () => navigate('/dashboard/sales') })}
             />
@@ -263,7 +251,7 @@ const Manager = () => {
             <Table
               dataSource={low_stock_items}
               columns={lowStockColumns}
-              pagination={false} size="small" loading={loading}
+              pagination={false} size="small" loading={isLoading}
               scroll={{ x: 'max-content', y: 280 }}
               rowClassName={(record) => {
                 const q = Number(record.quantity);

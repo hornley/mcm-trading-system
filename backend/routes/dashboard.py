@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from flask import Blueprint, request
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload, selectinload
 from models import db, Product, Category, Location, Inventory, Order, OrderItem, User
 from models import StockAdjustment, StockTransfer, ActivityLog
 from utils.response import success_response, error_response
@@ -41,7 +42,11 @@ def dashboard_summary():
         inv_query = Inventory.query.join(Product).filter(Product.is_active == True)
         if location_id:
             inv_query = inv_query.filter(Inventory.location_id == location_id)
-        all_inv = inv_query.all()
+        all_inv = inv_query.options(
+            joinedload(Inventory.product).joinedload(Product.category),
+            joinedload(Inventory.variety),
+            joinedload(Inventory.location),
+        ).all()
         total_items = sum(inv.quantity for inv in all_inv)
 
         low_stock_count = 0
@@ -106,8 +111,13 @@ def dashboard_summary():
 
         # ── Stock Movement (last 7 days, bar chart) ──
         cutoff = now - timedelta(days=6)
-        adj_query = StockAdjustment.query.filter(StockAdjustment.date >= cutoff)
-        transfer_query = StockTransfer.query.filter(StockTransfer.transfer_date >= cutoff)
+        adj_query = StockAdjustment.query.filter(StockAdjustment.date >= cutoff).options(
+            joinedload(StockAdjustment.location),
+        )
+        transfer_query = StockTransfer.query.filter(StockTransfer.transfer_date >= cutoff).options(
+            joinedload(StockTransfer.from_location),
+            joinedload(StockTransfer.to_location),
+        )
         if location_id:
             adj_query = adj_query.filter(StockAdjustment.location_id == location_id)
             transfer_query = transfer_query.filter(
@@ -149,12 +159,18 @@ def dashboard_summary():
         orders_query = Order.query.filter(Order.status == "completed")
         if location_id:
             orders_query = orders_query.filter(Order.location_id == location_id)
-        recent_orders = orders_query.order_by(Order.order_date.desc()).limit(5).all()
+        recent_orders = orders_query.options(
+            selectinload(Order.items)
+                .selectinload(OrderItem.product)
+                .selectinload(Product.category),
+            selectinload(Order.items)
+                .selectinload(OrderItem.variety),
+            selectinload(Order.location),
+        ).order_by(Order.order_date.desc()).limit(5).all()
 
         recent_transactions = []
         for order in recent_orders:
-            items = OrderItem.query.filter_by(order_id=order.order_id).all()
-            for item in items:
+            for item in order.items:
                 recent_transactions.append({
                     "key": order.order_id,
                     "product": item.product.name if item.product else "Unknown",

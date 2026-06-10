@@ -1,9 +1,20 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ConfigProvider, theme, App as AntApp } from 'antd'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import './index.css'
 import App from './App.jsx'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+})
 
 const fontSizeMap = { small: 12, medium: 14, large: 16, xlarge: 28 }
 
@@ -52,8 +63,10 @@ const ThemedApp = () => {
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <AuthProvider>
-      <ThemedApp />
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ThemedApp />
+      </AuthProvider>
+    </QueryClientProvider>
   </StrictMode>,
 )

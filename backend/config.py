@@ -43,9 +43,9 @@ class Config:
     SQLALCHEMY_DATABASE_URI = _uri
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     _engine_options = {
-        "pool_size": 1,
-        "max_overflow": 0,
-        "pool_recycle": 60,
+        "pool_size": 5,
+        "max_overflow": 10,
+        "pool_recycle": 300,
         "pool_pre_ping": True,
     }
     if _uri and _uri.startswith("sqlite"):

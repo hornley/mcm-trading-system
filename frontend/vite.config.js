@@ -5,6 +5,17 @@ export default defineConfig({
   build: {
     target: 'es2020',
     cssTarget: 'firefox100',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/antd')) return 'antd'
+          if (id.includes('node_modules/recharts')) return 'recharts'
+          if (id.includes('node_modules/@tanstack/react-query')) return 'query'
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router')) return 'vendor'
+        },
+      },
+    },
   },
   plugins: [
     react(),

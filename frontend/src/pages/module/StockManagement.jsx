@@ -70,9 +70,8 @@ const StockManagement = () => {
   const [expandedRowKeys, setExpandedRowKeys] = useState([]);
   const receiptCaptureRef = useRef(null);
 
-  const fetchData = async () => {
+  const fetchData = async (page = 1, size = pageSize) => {
     if (!user) return;
-    const ps = pageSize;
     setLoading(true);
     try {
       const locationParam = selectedLocationId !== "all" ? `&location_id=${selectedLocationId}` : '';
@@ -82,7 +81,7 @@ const StockManagement = () => {
       const statusParam = statusFilter ? `&status=${statusFilter}` : '';
 
       const [invRes, locRes, countRes] = await Promise.all([
-        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=1&limit=500${searchParam}${sortParam}${statusParam}`),
+        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=${page}&limit=${size}${searchParam}${sortParam}${statusParam}`),
         fetch(`/api/locations?usertype=${user.usertype}`),
         fetch(`/api/inventory/counts?usertype=${user.usertype}${locationParam}${userIdParam}`),
       ]);
@@ -117,8 +116,7 @@ const StockManagement = () => {
           }
         }
         setInventory(merged);
-        setTotalCount(merged.length);
-        setCurrentPage(1);
+        setTotalCount(invData.data.total_count || 0);
       }
       if (countData.success) {
         setStats(countData.data);
@@ -205,10 +203,11 @@ const StockManagement = () => {
   }, [isStorehouse, selectedLocationId, storehouse]);
 
   useEffect(() => {
+    if (isStorehouse) return;
     setCurrentPage(1);
     setMovementsCache({});
-    fetchData();
-  }, [user, selectedLocationId, statusFilter, searchText]);
+    fetchData(1);
+  }, [user, selectedLocationId, statusFilter, searchText, isStorehouse]);
 
   const handleViewDetails = async (record) => {
     setSelectedRecord(record);
@@ -1032,9 +1031,23 @@ const StockManagement = () => {
                 const newSortOrder = sorter.order === 'descend' ? 'desc' : 'asc';
                 setSortBy(newSortBy);
                 setSortOrder(newSortOrder);
+                fetchData(1);
               }
             }}
-            pagination={{ current: currentPage, pageSize, total: totalCount, showSizeChanger: true, pageSizeOptions: [10, 50, 100, 200], onShowSizeChange: (_, size) => setPageSize(size), onChange: (p) => setCurrentPage(p) }}
+            pagination={{
+              current: currentPage, pageSize, total: totalCount,
+              showSizeChanger: true,
+              pageSizeOptions: [10, 25, 50, 100],
+              onShowSizeChange: (_, size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+                fetchData(1, size);
+              },
+              onChange: (p) => {
+                setCurrentPage(p);
+                fetchData(p);
+              },
+            }}
           />
         </>
       )}

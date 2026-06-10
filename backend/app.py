@@ -58,46 +58,8 @@ def create_app():
             import sqlalchemy as sa
             if db.engine.url.drivername == 'sqlite':
                 sa.event.listen(db.engine, 'connect', lambda c, _: c.execute('PRAGMA journal_mode=WAL'))
-            inspector = sa.inspect(db.engine)
-            cols = [c['name'] for c in inspector.get_columns('Locations')]
-            if 'auto_restock_source_id' not in cols:
-                db.session.execute(sa.text('ALTER TABLE "Locations" ADD COLUMN auto_restock_source_id INTEGER REFERENCES "Locations"(location_id)'))
-                db.session.commit()
-            prod_cols = [c['name'] for c in inspector.get_columns('Products')]
-            if 'auto_restock_source_id' not in prod_cols:
-                db.session.execute(sa.text('ALTER TABLE "Products" ADD COLUMN auto_restock_source_id INTEGER REFERENCES "Locations"(location_id)'))
-                db.session.commit()
-            user_cols = [c['name'] for c in inspector.get_columns('Users')]
-            if 'theme' not in user_cols:
-                db.session.execute(sa.text('ALTER TABLE "Users" ADD COLUMN theme VARCHAR DEFAULT \'light\''))
-                db.session.commit()
-            if 'fontsize' not in user_cols:
-                db.session.execute(sa.text('ALTER TABLE "Users" ADD COLUMN fontsize VARCHAR DEFAULT \'medium\''))
-                db.session.commit()
-            if 'is_active' not in user_cols:
-                db.session.execute(sa.text('ALTER TABLE "Users" ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
-                db.session.commit()
-            tables = inspector.get_table_names()
-            if 'Product_Varieties' not in tables:
-                db.create_all()
-                db.session.commit()
-            # Add nullable variety_id FK columns to existing tables
-            mig_tables = [
-                ('Inventory', 'variety_id'),
-                ('Order_Items', 'variety_id'),
-                ('Stock_Transfers', 'variety_id'),
-                ('Stock_Adjustments', 'variety_id'),
-                ('Stock_Requests', 'variety_id'),
-            ]
-            for tname, col in mig_tables:
-                if tname in tables:
-                    existing = [c['name'] for c in inspector.get_columns(tname)]
-                    if col not in existing:
-                        db.session.execute(sa.text(
-                            f'ALTER TABLE "{tname}" ADD COLUMN {col} INTEGER REFERENCES "Product_Varieties"(variety_id)'
-                        ))
-                        db.session.commit()
-            if 'Notifications' not in tables:
+            tables = sa.inspect(db.engine).get_table_names()
+            if 'Users' not in tables:
                 db.create_all()
                 db.session.commit()
             # Clean up self-referencing pending auto-restock requests
