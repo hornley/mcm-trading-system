@@ -123,8 +123,7 @@ const StockManagement = () => {
           if (g.parent) {
             g.parent.varietiesList = g.varieties;
             if (g.varieties.length > 0) {
-              const vsum = g.varieties.reduce((s, v) => s + (v.quantity || 0), 0);
-              if (vsum > 0) g.parent.quantity = vsum;
+              g.parent.quantity = g.varieties.reduce((s, v) => s + (v.quantity || 0), 0);
             }
             merged.push(g.parent);
           } else if (g.varieties.length > 0) {
@@ -520,8 +519,7 @@ const StockManagement = () => {
             v.variety_store_qty = varietyStoreQty[`${v.product_id}-${v.variety_id}`] || 0;
           });
           if (g.varieties.length > 0) {
-            const vsum = g.varieties.reduce((s, v) => s + (v.quantity || 0), 0);
-            if (vsum > 0) g.parent.quantity = vsum;
+            g.parent.quantity = g.varieties.reduce((s, v) => s + (v.quantity || 0), 0);
           }
           merged.push(g.parent);
         } else if (g.varieties.length > 0) {
@@ -724,8 +722,7 @@ const StockManagement = () => {
         if (g.parent) {
           g.parent.varietiesList = g.varieties;
           if (g.varieties.length > 0) {
-            const vsum = g.varieties.reduce((s, v) => s + (v.quantity || 0), 0);
-            if (vsum > 0) g.parent.quantity = vsum;
+            g.parent.quantity = g.varieties.reduce((s, v) => s + (v.quantity || 0), 0);
           }
           merged.push(g.parent);
         } else if (g.varieties.length > 0) {
