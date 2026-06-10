@@ -99,7 +99,7 @@ const StockManagement = () => {
       const statusParam = statusFilter ? `&status=${statusFilter}` : '';
 
       const [invRes, locRes, countRes] = await Promise.all([
-        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=${page}&limit=${size}${searchParam}${sortParam}${statusParam}`),
+        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=1&limit=500${searchParam}${sortParam}${statusParam}`),
         fetch(`/api/locations?usertype=${user.usertype}`),
         fetch(`/api/inventory/counts?usertype=${user.usertype}${locationParam}${userIdParam}`),
       ]);
@@ -1262,18 +1262,11 @@ const StockManagement = () => {
             }
           }}
           pagination={{
-            current: currentPage, pageSize, total: totalCount,
+            pageSize,
+            total: totalCount,
             showSizeChanger: true,
             pageSizeOptions: [10, 25, 50, 100],
-            onShowSizeChange: (_, size) => {
-              setPageSize(size);
-              setCurrentPage(1);
-              fetchData(1, size);
-            },
-            onChange: (p) => {
-              setCurrentPage(p);
-              fetchData(p);
-            },
+            onShowSizeChange: (_, size) => setPageSize(size),
           }}
         />
       </>
