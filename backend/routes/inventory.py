@@ -41,6 +41,12 @@ def check_and_auto_restock(location_id):
         if not product or not product.auto_restock_source_id:
             continue
         source_id = product.auto_restock_source_id
+        if location_id == source_id:
+            db.session.add(Notification(
+                location_id=location_id, type="restock_failed",
+                message=f"Auto-restock failed for {product.name}: source location is the same as the current location",
+            ))
+            continue
         source = Location.query.get(source_id)
         if not source:
             continue
