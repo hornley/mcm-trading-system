@@ -52,6 +52,7 @@ const Sales = () => {
   const [lastOrder, setLastOrder] = useState(null);
   const [totalSalesModalVisible, setTotalSalesModalVisible] = useState(false);
   const [totalSalesDateRange, setTotalSalesDateRange] = useState(null);
+  const [totalSalesPeriodPreset, setTotalSalesPeriodPreset] = useState(null);
   const [totalSalesBranch, setTotalSalesBranch] = useState(defaultTotalBranch);
   const [totalSalesLoading, setTotalSalesLoading] = useState(false);
 
@@ -467,14 +468,14 @@ const Sales = () => {
 
         <div style={{ borderTop: '1px dashed #333', borderBottom: '1px dashed #333', padding: '4px 0', marginBottom: 8 }}>
           <div style={{ display: 'flex', fontWeight: 600, fontSize: 11, padding: '2px 0', borderBottom: '1px solid #333' }}>
-            <span style={{ width: '45px', textAlign: 'center' }}>QTY</span>
+            <span style={{ width: '65px', textAlign: 'center' }}>QTY</span>
             <span style={{ flex: 1, paddingLeft: 4 }}>ITEM</span>
             <span style={{ width: '5.5em', textAlign: 'right' }}>AMOUNT</span>
           </div>
           {(order.items || []).map((item) => (
             <div key={item.order_item_id} style={{ display: 'flex', fontSize: 11, padding: '2px 0' }}>
-              <span style={{ width: '45px', textAlign: 'center', fontFamily: "'Courier New', monospace" }}>
-                {fmtQty(item.quantity, item.category === FABRIC_CATEGORY, item.category === FABRIC_CATEGORY ? 'yds' : 'pcs')}
+              <span style={{ width: '65px', textAlign: 'center', fontFamily: "'Courier New', monospace" }}>
+                {fmtQty(item.quantity, item.category === FABRIC_CATEGORY)}
               </span>
               <span style={{ flex: 1, paddingLeft: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Courier New', monospace" }}>
                 {item.product_name}{item.color ? ` (${[item.color, item.pattern].filter(Boolean).join(', ')})` : ''}
@@ -745,10 +746,35 @@ const Sales = () => {
             </Select>
           )}
           <Text type="secondary" style={{ display: 'block' }}>Branch: {totalSalesBranch}</Text>
-          <RangePicker
-            style={{ marginBottom: 16 }}
-            onChange={(dates) => setTotalSalesDateRange(dates)}
-          />
+          <Space style={{ marginBottom: 16 }}>
+            <Select
+              value={totalSalesPeriodPreset}
+              onChange={(val) => {
+                setTotalSalesPeriodPreset(val);
+                if (val === 'custom') {
+                  setTotalSalesDateRange(null);
+                } else {
+                  setTotalSalesDateRange(presetToRange(val));
+                }
+              }}
+              style={{ width: 150 }}
+              placeholder="Period"
+              allowClear
+              onClear={() => { setTotalSalesPeriodPreset(null); setTotalSalesDateRange(null); }}
+            >
+              <Select.Option value="today">Today</Select.Option>
+              <Select.Option value="yesterday">Yesterday</Select.Option>
+              <Select.Option value="this-week">This Week</Select.Option>
+              <Select.Option value="last-week">Last Week</Select.Option>
+              <Select.Option value="this-month">This Month</Select.Option>
+              <Select.Option value="last-month">Last Month</Select.Option>
+              <Select.Option value="custom">Custom Range</Select.Option>
+            </Select>
+            <RangePicker
+              value={totalSalesDateRange}
+              onChange={(dates) => { setTotalSalesDateRange(dates); setTotalSalesPeriodPreset('custom'); }}
+            />
+          </Space>
           <Table
             dataSource={totalSalesFiltered}
             columns={totalSalesColumns}

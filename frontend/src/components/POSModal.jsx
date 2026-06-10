@@ -191,16 +191,20 @@ const POSModal = ({
         variety_label: parts.length ? parts.join(', ') : null,
       }];
     });
-    setVarietyModalVisible(false);
-    setVarietyModalProduct(null);
-    setSelectedVariety(null);
   }, [varietyModalProduct, getDefaultQty, products]);
 
   const handlePointerDown = useCallback((product) => {
     isLongPress.current = false;
     longPressRef.current = setTimeout(() => {
       isLongPress.current = true;
-      handleOpenQtyModal(product);
+      const hasVarieties = product.varieties && product.varieties.length > 0;
+      if (hasVarieties) {
+        setVarietyModalProduct(product);
+        setSelectedVariety(null);
+        setVarietyModalVisible(true);
+      } else {
+        handleOpenQtyModal(product);
+      }
     }, 500);
   }, [handleOpenQtyModal]);
 
@@ -215,14 +219,14 @@ const POSModal = ({
     clearTimeout(longPressRef.current);
   }, []);
 
-  const handleUpdateQty = useCallback((productId, newQty) => {
+  const handleUpdateQty = useCallback((productId, varietyId, newQty) => {
     setCart((prev) => prev.map((item) =>
-      item.product_id === productId ? { ...item, quantity: newQty } : item,
+      item.product_id === productId && item.variety_id === varietyId ? { ...item, quantity: newQty } : item,
     ));
   }, []);
 
-  const handleRemoveFromCart = useCallback((productId) => {
-    setCart((prev) => prev.filter((c) => c.product_id !== productId));
+  const handleRemoveFromCart = useCallback((productId, varietyId) => {
+    setCart((prev) => prev.filter((c) => c.product_id !== productId || c.variety_id !== varietyId));
   }, []);
 
   const handleConfirm = useCallback(async () => {
@@ -432,7 +436,7 @@ const POSModal = ({
                                 min={minQty}
                                 max={maxQty}
                                 value={item.quantity}
-                                onChange={(v) => handleUpdateQty(item.product_id, v ?? minQty)}
+                                onChange={(v) => handleUpdateQty(item.product_id, item.variety_id, v ?? minQty)}
                               />
                             </Col>
                             <Col flex="auto" style={{ textAlign: 'right' }}>
@@ -444,7 +448,7 @@ const POSModal = ({
                                 danger
                                 size="small"
                                 icon={<DeleteOutlined />}
-                                onClick={() => handleRemoveFromCart(item.product_id)}
+                                onClick={() => handleRemoveFromCart(item.product_id, item.variety_id)}
                               />
                             </Col>
                           </Row>
@@ -614,27 +618,24 @@ const POSModal = ({
         title={`Select Variety — ${varietyModalProduct?.name || ''}`}
         open={varietyModalVisible}
         onCancel={() => { setVarietyModalVisible(false); setVarietyModalProduct(null); setSelectedVariety(null); }}
-        footer={[
-          <Button key="cancel" onClick={() => { setVarietyModalVisible(false); setVarietyModalProduct(null); setSelectedVariety(null); }}>Cancel</Button>,
-          <Button key="add" type="primary" onClick={() => { if (selectedVariety) handleAddVarietyToCart(selectedVariety); }} disabled={!selectedVariety}>
-            Add to Cart
-          </Button>,
-        ]}
+        footer={null}
         width={400}
         destroyOnClose
       >
         {varietyModalProduct && (
           <div style={{ padding: '12px 0' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {(varietyModalProduct.varieties || []).map((v) => (
+              {(varietyModalProduct.varieties || []).map((v) => {
+                const inCart = cart.find((c) => c.variety_id === v.variety_id);
+                return (
                 <div
                   key={v.variety_id}
-                  onClick={() => setSelectedVariety(v)}
+                  onClick={() => handleAddVarietyToCart(v)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
-                    border: selectedVariety?.variety_id === v.variety_id ? '2px solid #5b7ff0' : '1px solid #d9d9d9',
-                    background: selectedVariety?.variety_id === v.variety_id ? '#e6f4ff' : '#fff',
+                    border: inCart ? '2px solid #ff4d4f' : '1px solid #d9d9d9',
+                    background: inCart ? '#fff2f0' : '#fff',
                   }}
                 >
                   {v.color && (
@@ -653,10 +654,12 @@ const POSModal = ({
                       {v.color && <span style={{ color: v.color, fontWeight: 600 }}>{v.color}</span>}
                       {v.color && v.variety_sku && <span> — </span>}
                       {v.variety_sku && <span>SKU: {v.variety_sku}</span>}
+                      {inCart && <span style={{ marginLeft: 8, color: '#ff4d4f', fontWeight: 600 }}>In cart</span>}
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {(varietyModalProduct.varieties || []).length === 0 && (
                 <Text type="secondary">No varieties available</Text>
               )}

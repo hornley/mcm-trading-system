@@ -178,9 +178,10 @@ def create_order():
             return error_response(f"Item {idx}: {qty_error.get('message', 'Invalid quantity')}", "INVALID_VALUE", 400)
         qty = float(qty)
 
-        if pid in seen_product_ids:
+        item_key = (pid, vid)
+        if item_key in seen_product_ids:
             return error_response(f"Duplicate product_id {pid} in items", "DUPLICATE_PRODUCT", 400)
-        seen_product_ids.add(pid)
+        seen_product_ids.add(item_key)
 
         inventory = Inventory.query.filter_by(
             product_id=pid,
