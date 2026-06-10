@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Table, Card, Typography, Row, Col, Input, Select, Button,
   Tag, Modal, Statistic, Space, Descriptions, Form, InputNumber,
-  DatePicker, Spin, Segmented, Checkbox, Dropdown,
+  DatePicker, Spin, Segmented, Checkbox, Dropdown, Switch,
 } from 'antd';
 import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -45,6 +45,7 @@ const StockManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [showVarieties, setShowVarieties] = useState(false);
   const [movementsCache, setMovementsCache] = useState({});
   const [stats, setStats] = useState({ total_items: 0, low_stock_count: 0, out_of_stock_count: 0, pending_request_count: 0 });
   const [sortBy, setSortBy] = useState('quantity');
@@ -67,7 +68,6 @@ const StockManagement = () => {
   const [storehousePendingLoading, setStorehousePendingLoading] = useState(false);
   const [branchFilter, setBranchFilter] = useState('all');
   const [storehouseStockFilter, setStorehouseStockFilter] = useState('all');
-  const [expandedRowKeys, setExpandedRowKeys] = useState([]);
   const [restockCart, setRestockCart] = useState({});
   const [varietyModalVisible, setVarietyModalVisible] = useState(false);
   const [varietyModalProduct, setVarietyModalProduct] = useState(null);
@@ -83,7 +83,9 @@ const StockManagement = () => {
   const [repVarietyModalProduct, setRepVarietyModalProduct] = useState(null);
   const [repVarietyModalQtys, setRepVarietyModalQtys] = useState({});
   const [repVarietyCheckedIds, setRepVarietyCheckedIds] = useState(new Set());
+  const [replenishRemark, setReplenishRemark] = useState('');
   const receiptCaptureRef = useRef(null);
+  const replenishReceiptCaptureRef = useRef(null);
 
   const fetchData = async (page = 1, size = pageSize) => {
     if (!user) return;
@@ -96,7 +98,7 @@ const StockManagement = () => {
       const statusParam = statusFilter ? `&status=${statusFilter}` : '';
 
       const [invRes, locRes, countRes] = await Promise.all([
-        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=${page}&limit=${size}${searchParam}${sortParam}${statusParam}`),
+        fetch(`/api/inventory?usertype=${user.usertype}${locationParam}${userIdParam}&page=1&limit=500${searchParam}${sortParam}${statusParam}`),
         fetch(`/api/locations?usertype=${user.usertype}`),
         fetch(`/api/inventory/counts?usertype=${user.usertype}${locationParam}${userIdParam}`),
       ]);
@@ -110,7 +112,7 @@ const StockManagement = () => {
         for (const row of raw) {
           const key = `${row.product_id}-${row.location_id}`;
           if (!groups[key]) groups[key] = { parent: null, varieties: [] };
-          if (row.variety_id && (row.color || row.pattern)) {
+          if (row.variety_id) {
             groups[key].varieties.push(row);
           } else {
             groups[key].parent = row;
@@ -121,7 +123,7 @@ const StockManagement = () => {
           if (g.parent) {
             g.parent.varietiesList = g.varieties;
             if (g.varieties.length > 0) {
-              g.parent.quantity = g.varieties.reduce((sum, v) => sum + (v.quantity || 0), 0);
+              g.parent.quantity = g.varieties.reduce((s, v) => s + (v.quantity || 0), 0);
             }
             merged.push(g.parent);
           } else if (g.varieties.length > 0) {
@@ -131,7 +133,7 @@ const StockManagement = () => {
           }
         }
         setInventory(merged);
-        setTotalCount(invData.data.total_count || 0);
+        setTotalCount(merged.length);
       }
       if (countData.success) {
         setStats(countData.data);
@@ -491,7 +493,7 @@ const StockManagement = () => {
       for (const row of raw) {
         const key = `${row.product_id}-${row.location_id}`;
         if (!groups[key]) groups[key] = { parent: null, varieties: [] };
-        if (row.variety_id && (row.color || row.pattern)) {
+        if (row.variety_id) {
           groups[key].varieties.push(row);
         } else {
           groups[key].parent = row;
@@ -517,7 +519,7 @@ const StockManagement = () => {
             v.variety_store_qty = varietyStoreQty[`${v.product_id}-${v.variety_id}`] || 0;
           });
           if (g.varieties.length > 0) {
-            g.parent.quantity = g.varieties.reduce((sum, v) => sum + (v.quantity || 0), 0);
+            g.parent.quantity = g.varieties.reduce((s, v) => s + (v.quantity || 0), 0);
           }
           merged.push(g.parent);
         } else if (g.varieties.length > 0) {
@@ -709,7 +711,7 @@ const StockManagement = () => {
       for (const row of raw) {
         const key = `${row.product_id}-${row.location_id}`;
         if (!groups[key]) groups[key] = { parent: null, varieties: [] };
-        if (row.variety_id && (row.color || row.pattern)) {
+        if (row.variety_id) {
           groups[key].varieties.push(row);
         } else {
           groups[key].parent = row;
@@ -720,7 +722,7 @@ const StockManagement = () => {
         if (g.parent) {
           g.parent.varietiesList = g.varieties;
           if (g.varieties.length > 0) {
-            g.parent.quantity = g.varieties.reduce((sum, v) => sum + (v.quantity || 0), 0);
+            g.parent.quantity = g.varieties.reduce((s, v) => s + (v.quantity || 0), 0);
           }
           merged.push(g.parent);
         } else if (g.varieties.length > 0) {
@@ -742,7 +744,7 @@ const StockManagement = () => {
     setReplenishCart((prev) => {
       if (prev[key]) return prev;
       const isFab = product.category === FABRIC_CATEGORY;
-      const qty = 0;
+      const qty = 1;
       return {
         ...prev,
         [key]: {
@@ -874,49 +876,92 @@ const StockManagement = () => {
     link.click();
   };
 
+  const handlePrintReplenishSummary = async () => {
+    if (!replenishReceiptCaptureRef.current) return;
+    const { default: html2canvas } = await import('html2canvas');
+    const canvas = await html2canvas(replenishReceiptCaptureRef.current, {
+      scale: 2, useCORS: true, backgroundColor: '#ffffff',
+    });
+    const link = document.createElement('a');
+    link.download = 'replenish-receipt.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+
   const { total_items: totalItems, low_stock_count: lowStockCount, out_of_stock_count: outOfStockCount, pending_request_count: pendingRequestCount } = stats;
 
   const showBranch = selectedLocationId === "all";
+  const visibleData = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    const pageParents = inventory.slice(start, end);
+    if (!showVarieties) return pageParents;
+    const flat = [];
+    for (const item of pageParents) {
+      flat.push({ ...item, _rowType: 'parent' });
+      if (item.varietiesList && item.varietiesList.length > 0) {
+        for (const v of item.varietiesList) {
+          flat.push({ ...v, _rowType: 'variety' });
+        }
+      }
+    }
+    return flat;
+  }, [inventory, currentPage, pageSize, showVarieties]);
   const receiptItems = Object.values(restockCart).filter((e) => e.quantity > 0);
   const receiptTotalQty = receiptItems.reduce((sum, e) => sum + (e.quantity || 0), 0);
   const receiptRef = `RS-${Date.now().toString(36).toUpperCase()}`;
+  const replenishReceiptItems = Object.values(replenishCart).filter((e) => e.quantity > 0);
+  const replenishReceiptTotalQty = replenishReceiptItems.reduce((sum, e) => sum + (e.quantity || 0), 0);
+  const replenishReceiptRef = `RP-${Date.now().toString(36).toUpperCase()}`;
 
   const columns = [
     {
       title: 'Product Name', dataIndex: 'product_name', key: 'product_name',
-      sorter: true,
-      defaultSortOrder: sortBy === 'product_name' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
+      sorter: (a, b) => 0,
+      sortOrder: sortBy === 'product_name' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
+      render: (text, record) => {
+        if (record._rowType === 'variety') {
+          return (
+            <div style={{ paddingLeft: 28, display: 'flex', alignItems: 'center', gap: 8 }}>
+              {record.color && (
+                <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: record.color === 'White' ? '#ddd' : record.color, display: 'inline-block', border: '1px solid #d9d9d9', flexShrink: 0 }} />
+              )}
+              <span style={{ fontWeight: 500 }}>{record.pattern || 'Default'}</span>
+              {record.color && <span style={{ color: '#888' }}>{record.color}</span>}
+            </div>
+          );
+        }
+        return text;
+      },
     },
     ...(showBranch ? [{
       title: 'Branch', dataIndex: 'location_name', key: 'location_name',
-      sorter: true,
+      sorter: (a, b) => 0,
+      sortOrder: sortBy === 'location_name' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
     }] : []),
     {
       title: 'Current Stock Quantity', dataIndex: 'quantity', key: 'quantity',
-      render: (qty, record) => {
-        const varieties = record.varietiesList;
-        if (varieties && varieties.length > 0) {
-          const isExpanded = expandedRowKeys.includes(record.inventory_id);
-          return (
-            <span>
-              <span style={{ fontSize: 10, marginRight: 4, cursor: 'pointer' }} onClick={() => {
-                setExpandedRowKeys((prev) =>
-                  isExpanded ? prev.filter((id) => id !== record.inventory_id) : [...prev, record.inventory_id]
-                );
-              }}>{isExpanded ? '▼' : '▶'}</span>
-              {fmtQty(qty, record.category === FABRIC_CATEGORY)}
-            </span>
-          );
-        }
-        return fmtQty(qty, record.category === FABRIC_CATEGORY);
+      sorter: (a, b) => 0,
+      sortOrder: sortBy === 'quantity' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
+      onCell: (record) => {
+        const n = Number(record.quantity);
+        return {
+          className: n === 0 ? 'qty-oos' : n <= 10 ? 'qty-low' : 'qty-normal',
+        };
       },
-      sorter: true,
+      render: (qty, record) => {
+        const val = fmtQty(qty, record.category === FABRIC_CATEGORY);
+        return <span>{val}</span>;
+      },
     },
     {
       title: 'Stock Status',
       dataIndex: 'quantity',
       key: 'stockStatus',
+      sorter: (a, b) => 0,
+      sortOrder: sortBy === 'stockStatus' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
       render: (qty, record) => {
+        if (record._rowType === 'variety') return getStockStatus(qty).tag;
         const varieties = record.varietiesList;
         if (varieties && varieties.length > 0) {
           const n = Number(qty);
@@ -931,65 +976,60 @@ const StockManagement = () => {
     },
     {
       title: 'Reorder Level', dataIndex: 'reorder_level', key: 'reorder_level',
-      render: (val) => (val ? Number(val).toLocaleString() : '-'),
-      sorter: true,
-    },
-    {
-      title: 'Auto-Restock',
-      key: 'autoRestock',
-      render: (_, record) => {
-        const level = Number(record.reorder_level) || 0;
-        const sourceId = record.auto_restock_source_id;
-        const source = locations.find((l) => l.location_id === sourceId);
-        return level > 0 && sourceId
-          ? <Tag color="green">{source?.name || 'Source Set'}</Tag>
-          : <Tag>{sourceId ? 'Inactive' : 'No Source Set'}</Tag>;
+      sorter: (a, b) => 0,
+      sortOrder: sortBy === 'reorder_level' ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null,
+      render: (val, record) => {
+        if (record._rowType === 'variety') return null;
+        return val ? Number(val).toLocaleString() : '-';
       },
     },
     {
       title: '',
       key: 'actions',
       width: 60,
-      render: (_, record) => (
-        <Dropdown
-          menu={{
-            items: [
-              ...(can('update') ? [{
-                key: 'request',
-                label: 'Request',
-                disabled: selectedLocationId === 'all',
-                onClick: () => handleRequestStock(record),
-              }] : []),
-              ...(can('update') ? [{
-                key: 'reorder',
-                label: 'Reorder',
-                disabled: selectedLocationId === 'all',
-                onClick: () => handleSetReorder(record),
-              }] : []),
-              ...(can('update') ? [{
-                key: 'adjust',
-                label: 'Adjust',
-                disabled: selectedLocationId === 'all',
-                onClick: () => handleAdjustStock(record),
-              }] : []),
-              ...(can('update') ? [{
-                key: 'transfer',
-                label: 'Transfer',
-                disabled: selectedLocationId === 'all' || record.quantity === 0,
-                onClick: () => handleTransferStock(record),
-              }] : []),
-              {
-                key: 'details',
-                label: 'Details',
-                onClick: () => handleViewDetails(record),
-              },
-            ],
-          }}
-          trigger={['click']}
-        >
-          <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
-        </Dropdown>
-      ),
+      render: (_, record) => {
+        if (record.varietiesList && record.varietiesList.length > 0 && record._rowType !== 'variety') return null;
+        return (
+          <Dropdown
+            menu={{
+              items: [
+                ...(can('update') ? [{
+                  key: 'request',
+                  label: 'Request',
+                  disabled: selectedLocationId === 'all',
+                  onClick: () => handleRequestStock(record),
+                }] : []),
+                ...(can('update') ? [{
+                  key: 'reorder',
+                  label: 'Reorder',
+                  disabled: selectedLocationId === 'all',
+                  onClick: () => handleSetReorder(record),
+                }] : []),
+                ...(can('update') ? [{
+                  key: 'adjust',
+                  label: 'Adjust',
+                  disabled: selectedLocationId === 'all',
+                  onClick: () => handleAdjustStock(record),
+                }] : []),
+                ...(can('update') ? [{
+                  key: 'transfer',
+                  label: 'Transfer',
+                  disabled: selectedLocationId === 'all' || record.quantity === 0,
+                  onClick: () => handleTransferStock(record),
+                }] : []),
+                {
+                  key: 'details',
+                  label: 'Details',
+                  onClick: () => handleViewDetails(record),
+                },
+              ],
+            }}
+            trigger={['click']}
+          >
+            <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
+          </Dropdown>
+        );
+      },
     },
   ];
 
@@ -1113,7 +1153,7 @@ const StockManagement = () => {
       {storehouse && (
         <Card size="small" style={{ marginBottom: 16, background: 'rgba(82, 196, 26, 0.08)', borderColor: 'rgba(82, 196, 26, 0.3)' }}>
           <Space>
-            <Tag color="green">Storehouse</Tag>
+            <Tag color="green">Auto Stock</Tag>
             <span><strong>{storehouse.name}</strong></span>
           </Space>
         </Card>
@@ -1156,8 +1196,8 @@ const StockManagement = () => {
                   </Button>
                 </Dropdown>
               )}
-              {can('update') && (
-                <Button type="primary" ghost onClick={handleOpenReplenish} disabled={selectedLocationId === "all"}>
+              {isStorehouse && can('update') && (
+                <Button type="primary" onClick={handleOpenReplenish} disabled={selectedLocationId === "all"}>
                   Replenish
                 </Button>
               )}
@@ -1181,47 +1221,28 @@ const StockManagement = () => {
               { label: `Low Stock (${stats.low_stock_count})`, value: 'low_stock' },
               { label: `Out of Stock (${stats.out_of_stock_count})`, value: 'out_of_stock' },
             ]}
-            onChange={(val) => setStatusFilter(val === 'all' ? '' : val)}
+            onChange={(val) => { setStatusFilter(val === 'all' ? '' : val); setCurrentPage(1); }}
           />
+          <Switch checked={showVarieties} onChange={setShowVarieties} />
+          <span style={{ fontSize: 13, color: '#888' }}>Show varieties</span>
         </Space>
         <Table
-          dataSource={inventory}
+          dataSource={visibleData}
           columns={visibleColumns}
-          rowKey="inventory_id"
+          rowKey={(record) => record._rowType === 'variety' ? `v-${record.inventory_id}` : record.inventory_id}
           loading={loading}
           scroll={{ x: 'max-content' }}
           rowClassName={(record) => {
+            if (record._rowType === 'variety') {
+              const q = Number(record.quantity);
+              if (q === 0) return 'row-variety row-out-of-stock';
+              if (q <= 10) return 'row-variety row-low-stock';
+              return 'row-variety';
+            }
             const q = Number(record.quantity);
             if (q === 0) return 'row-out-of-stock';
             if (q <= 10) return 'row-low-stock';
             return '';
-          }}
-          expandable={{
-            expandedRowRender: (record) => {
-              const varieties = record.varietiesList;
-              if (!varieties || varieties.length === 0) return null;
-              return (
-                <div style={{ padding: '8px 0 8px 40px' }}>
-                  {varieties.map((v) => (
-                    <div key={v.variety_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0', fontSize: 13 }}>
-                      {v.color && (
-                        <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', border: '1px solid #d9d9d9' }} />
-                      )}
-                      <span style={{ width: 100 }}>{v.pattern || 'Default'}</span>
-                      <span style={{ color: '#888' }}>{v.color || ''}</span>
-                      <Tag>{fmtQty(v.quantity, record.category === FABRIC_CATEGORY)}</Tag>
-                    </div>
-                  ))}
-                </div>
-              );
-            },
-            expandedRowKeys,
-            onExpand: (expanded, record) => {
-              setExpandedRowKeys((prev) =>
-                expanded ? [...prev, record.inventory_id] : prev.filter((id) => id !== record.inventory_id)
-              );
-            },
-            showExpandColumn: false,
           }}
           onChange={(pagination, filters, sorter) => {
             if (sorter.field) {
@@ -1229,22 +1250,18 @@ const StockManagement = () => {
               const newSortOrder = sorter.order === 'descend' ? 'desc' : 'asc';
               setSortBy(newSortBy);
               setSortOrder(newSortOrder);
+              setCurrentPage(1);
               fetchData(1);
             }
           }}
           pagination={{
-            current: currentPage, pageSize, total: totalCount,
+            current: currentPage,
+            pageSize,
+            total: totalCount,
             showSizeChanger: true,
             pageSizeOptions: [10, 25, 50, 100],
-            onShowSizeChange: (_, size) => {
-              setPageSize(size);
-              setCurrentPage(1);
-              fetchData(1, size);
-            },
-            onChange: (p) => {
-              setCurrentPage(p);
-              fetchData(p);
-            },
+            onChange: (p) => setCurrentPage(p),
+            onShowSizeChange: (_, size) => { setPageSize(size); setCurrentPage(1); },
           }}
         />
       </>
@@ -1637,7 +1654,7 @@ const StockManagement = () => {
       <Modal
         title="Replenish Inventory"
         open={replenishVisible}
-        onCancel={() => { setReplenishVisible(false); setReplenishCart({}); }}
+        onCancel={() => { setReplenishVisible(false); setReplenishCart({}); setReplenishRemark(''); }}
         width={1100}
         centered
         styles={{ body: { padding: '16px 24px', maxHeight: '80vh', overflowY: 'auto' } }}
@@ -1748,6 +1765,24 @@ const StockManagement = () => {
                 <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid #e8e8e8' }}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>
                     Total: {Object.values(replenishCart).filter((e) => e.quantity > 0).length} item(s)
+                  </div>
+                  <Input.TextArea
+                    placeholder="Add a remark..."
+                    value={replenishRemark}
+                    onChange={(e) => setReplenishRemark(e.target.value)}
+                    rows={2}
+                    style={{ marginTop: 8, fontSize: 12 }}
+                  />
+                  <div style={{ marginTop: 8 }}>
+                    <Button
+                      type="default"
+                      size="small"
+                      icon={<DownloadOutlined />}
+                      onClick={handlePrintReplenishSummary}
+                      block
+                    >
+                      Download Receipt
+                    </Button>
                   </div>
                 </div>
               )}
@@ -1942,6 +1977,66 @@ const StockManagement = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 600 }}>
               <span>Total Quantity:</span>
               <span>{qtyLabel(receiptTotalQty)}</span>
+            </div>
+          </div>
+          <div className="receipt-footer" style={{ textAlign: 'center', marginTop: 20, paddingTop: 12, borderTop: '2px dashed #888', fontSize: 13, color: '#555' }}>
+            Thank you!
+          </div>
+        </div>
+      </div>
+
+      <div id="replenish-receipt-print" ref={replenishReceiptCaptureRef} style={{ position: 'absolute', left: '-9999px', top: 0, width: 550, background: '#fff', zIndex: -1, padding: 32 }}>
+        <div className="receipt-inner" style={{ width: '100%', padding: '24px 24px', fontFamily: "'Courier New', monospace", fontSize: 14, color: '#222', background: '#fff', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            <img src={logoImage} alt="Logo" style={{ height: 60, width: 'auto', display: 'block', margin: '0 auto 6px' }} />
+            <div className="receipt-header" style={{ fontSize: 18, fontWeight: 700, letterSpacing: 1 }}>{receiptConfig.companyName}</div>
+          </div>
+          <div className="receipt-section" style={{ textAlign: 'center', fontSize: 15, fontWeight: 600, padding: '6px 0', borderTop: '2px dashed #888', borderBottom: '2px dashed #888', marginBottom: 12 }}>
+            REPLENISH RECEIPT
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 13 }}>
+            <tbody>
+              {[['Date:', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })],
+                ['Ref No:', replenishReceiptRef],
+                ['Branch:', user?.location_name || `Branch #${user?.location_id}`],
+                ['Prepared by:', user?.username || '-']].map(([label, value], i) => (
+                <tr key={i}>
+                  <td className="receipt-label" style={{ padding: '2px 4px', color: '#666' }}>{label}</td>
+                  <td className="receipt-label" style={{ padding: '2px 4px', textAlign: 'right' }}>{value}</td>
+                </tr>
+              ))}
+              {replenishRemark && (
+                <tr>
+                  <td className="receipt-label" style={{ padding: '2px 4px', color: '#666', verticalAlign: 'top' }}>Remark:</td>
+                  <td className="receipt-label" style={{ padding: '2px 4px', textAlign: 'right', color: '#333' }}>{replenishRemark}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          <div style={{ borderTop: '1px dashed #aaa', borderBottom: '1px dashed #aaa', padding: '6px 0', marginBottom: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: 13 }}>
+            <span>Item</span>
+            <span>Qty</span>
+          </div>
+          {replenishReceiptItems.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '16px 0', color: '#999' }}>No items selected</div>
+          ) : (
+            replenishReceiptItems.map((item) => (
+              <div key={item.key} className="receipt-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, borderBottom: '1px dotted #ddd' }}>
+                <span style={{ flex: 1, paddingRight: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.product_name}{item.variety_label ? ` (${item.variety_label})` : ''}
+                </span>
+                <span style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtQty(item.quantity, item.is_fabric)}</span>
+              </div>
+            ))
+          )}
+          <div className="receipt-totals" style={{ borderTop: '2px dashed #888', marginTop: 8, paddingTop: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+              <span>Total Items:</span>
+              <span>{replenishReceiptItems.length}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 600 }}>
+              <span>Total Quantity:</span>
+              <span>{qtyLabel(replenishReceiptTotalQty)}</span>
             </div>
           </div>
           <div className="receipt-footer" style={{ textAlign: 'center', marginTop: 20, paddingTop: 12, borderTop: '2px dashed #888', fontSize: 13, color: '#555' }}>

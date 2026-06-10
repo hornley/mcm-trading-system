@@ -37,6 +37,15 @@
 .row-low-stock:hover td {
   background-color: rgba(250, 140, 22, 0.12) !important;
 }
+td.qty-oos {
+  background-color: rgba(255, 77, 79, 0.15) !important;
+}
+td.qty-low {
+  background-color: rgba(250, 140, 22, 0.15) !important;
+}
+.row-variety td {
+  font-size: 13px;
+}
 
 .page-enter {
   animation: fadeInUp 0.35s ease-out both;

@@ -502,7 +502,7 @@ const Sales = () => {
             (order.items || []).forEach((item) => {
               const key = item.product_id;
               if (!groups[key]) groups[key] = { product: item, varieties: [], totalQty: 0, totalAmount: 0 };
-              if (item.variety_id && (item.color || item.pattern)) {
+              if (item.variety_id) {
                 groups[key].varieties.push(item);
               }
               groups[key].totalQty += item.quantity;

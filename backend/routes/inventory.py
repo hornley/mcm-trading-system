@@ -624,10 +624,6 @@ def list_inventory():
         "reorder_level": Product.reorder_level,
     }
     sort_col = sort_map.get(sort_by, Product.name)
-    if sort_order == "desc":
-        query = query.order_by(sort_col.desc())
-    else:
-        query = query.order_by(sort_col.asc())
 
     page = request.args.get("page", 1, type=int)
     limit = request.args.get("limit", 20, type=int)
@@ -635,11 +631,51 @@ def list_inventory():
     limit = max(1, min(1000, limit))
 
     if status_filter == "out_of_stock":
-        query = query.filter(Inventory.quantity == 0)
-    elif status_filter == "low_stock":
-        query = query.filter(Inventory.quantity > 0, Inventory.quantity <= 10)
-    elif status_filter == "in_stock":
-        query = query.filter(Inventory.quantity > 10)
+        from sqlalchemy import exists as sa_exists
+        total_subq = db.session.query(
+            Inventory.product_id.label('t_pid'),
+            Inventory.location_id.label('t_lid'),
+            db.func.coalesce(db.func.sum(Inventory.quantity), 0).label('t_qty'),
+        ).group_by(Inventory.product_id, Inventory.location_id).subquery()
+        IA = db.aliased(Inventory)
+        has_out = sa_exists().where(db.and_(
+            IA.quantity == 0,
+            IA.product_id == Inventory.product_id,
+            IA.location_id == Inventory.location_id,
+        ))
+        query = query.filter(has_out)
+        query = query.outerjoin(total_subq, db.and_(
+            Inventory.product_id == total_subq.c.t_pid,
+            Inventory.location_id == total_subq.c.t_lid,
+        ))
+        fully_out = total_subq.c.t_qty == 0
+        if sort_order == "desc":
+            query = query.order_by(fully_out.desc(), sort_col.desc())
+        else:
+            query = query.order_by(fully_out.desc(), sort_col.asc())
+    elif status_filter in ("low_stock", "in_stock"):
+        total_subq = db.session.query(
+            Inventory.product_id.label('t_pid'),
+            Inventory.location_id.label('t_lid'),
+            db.func.coalesce(db.func.sum(Inventory.quantity), 0).label('t_qty'),
+        ).group_by(Inventory.product_id, Inventory.location_id).subquery()
+        query = query.join(total_subq, db.and_(
+            Inventory.product_id == total_subq.c.t_pid,
+            Inventory.location_id == total_subq.c.t_lid,
+        ))
+        if status_filter == "low_stock":
+            query = query.filter(total_subq.c.t_qty > 0, total_subq.c.t_qty <= 10)
+        else:
+            query = query.filter(total_subq.c.t_qty > 10)
+        if sort_order == "desc":
+            query = query.order_by(sort_col.desc())
+        else:
+            query = query.order_by(sort_col.asc())
+    else:
+        if sort_order == "desc":
+            query = query.order_by(sort_col.desc())
+        else:
+            query = query.order_by(sort_col.asc())
 
     total_count = query.count()
 
@@ -1048,17 +1084,22 @@ def restock_selected():
             errors.append(f"Product ID {product_id} (not found)")
             continue
 
-        store_inv = Inventory.query.filter_by(
-            product_id=product_id,
-            location_id=storehouse.location_id,
-        ).first()
+        store_filters = {
+            "product_id": product_id,
+            "location_id": storehouse.location_id,
+        }
+        if variety_id:
+            store_filters["variety_id"] = variety_id
+        store_inv = Inventory.query.filter_by(**store_filters).first()
 
         if not store_inv or store_inv.quantity <= 0:
-            errors.append(f"{product.name} (no stock at storehouse)")
+            label = f"{product.name} ({variety_id})" if variety_id else product.name
+            errors.append(f"{label} (no stock at storehouse)")
             continue
 
         if store_inv.quantity < requested_qty:
-            errors.append(f"{product.name} (only {store_inv.quantity:.0f} available, requested {requested_qty:.0f})")
+            label = f"{product.name} ({variety_id})" if variety_id else product.name
+            errors.append(f"{label} (only {store_inv.quantity:.0f} available, requested {requested_qty:.0f})")
             continue
 
         valid_items.append({
@@ -1095,6 +1136,16 @@ def restock_selected():
             "quantity": vi["quantity"],
         })
 
+    location_name = location.name or f"Location {location_id}"
+    requester = User.query.get(user_id)
+    requester_name = requester.username if requester else location_name
+    item_summary = f"{len(created)} item(s)"
+    notif = Notification(
+        location_id=storehouse.location_id,
+        type="restock_pending",
+        message=f"{requester_name} requested bulk restock ({item_summary})",
+    )
+    db.session.add(notif)
     db.session.commit()
 
     return success_response(
@@ -1563,19 +1614,25 @@ def accept_request(request_id):
     if stock_request.status != "pending":
         return error_response("Request already processed", "ALREADY_PROCESSED", 400)
 
-    inventory = Inventory.query.filter_by(
-        product_id=stock_request.product_id,
-        location_id=stock_request.from_location_id,
-    ).first()
+    inv_filters = {
+        "product_id": stock_request.product_id,
+        "location_id": stock_request.from_location_id,
+    }
+    dest_filters = {
+        "product_id": stock_request.product_id,
+        "location_id": stock_request.to_location_id,
+    }
+    if stock_request.variety_id:
+        inv_filters["variety_id"] = stock_request.variety_id
+        dest_filters["variety_id"] = stock_request.variety_id
+
+    inventory = Inventory.query.filter_by(**inv_filters).first()
     if not inventory or inventory.quantity < stock_request.quantity:
         return error_response("Insufficient stock at source location", "INSUFFICIENT_STOCK", 400)
 
     inventory.quantity -= stock_request.quantity
 
-    dest_inv = Inventory.query.filter_by(
-        product_id=stock_request.product_id,
-        location_id=stock_request.to_location_id,
-    ).first()
+    dest_inv = Inventory.query.filter_by(**dest_filters).first()
     if dest_inv:
         dest_inv.quantity = (dest_inv.quantity or 0) + stock_request.quantity
     else:
@@ -1584,26 +1641,72 @@ def accept_request(request_id):
             location_id=stock_request.to_location_id,
             quantity=stock_request.quantity,
         )
+        if stock_request.variety_id:
+            dest_inv.variety_id = stock_request.variety_id
         db.session.add(dest_inv)
 
     stock_request.status = "accepted"
 
-    product_name = stock_request.product.name if stock_request.product else "Unknown"
-    variety_label = ""
-    if stock_request.variety:
-        parts = [stock_request.variety.color, stock_request.variety.pattern]
-        variety_label = " (" + " ".join(filter(None, parts)) + ")"
+    db.session.commit()
+
+    from_loc = Location.query.get(stock_request.from_location_id)
+    if from_loc and not from_loc.is_storehouse:
+        check_and_auto_restock(stock_request.from_location_id)
+
+    return success_response({"message": "Request accepted"})
+
+
+@inventory_bp.route("/api/inventory/notify-accepted", methods=["POST"])
+def notify_accepted():
+    data = request.get_json() or {}
+    request_ids = data.get("request_ids", [])
+    if not request_ids:
+        return error_response("request_ids is required", "MISSING_PARAM", 400)
+
+    stock_requests = StockRequest.query.filter(StockRequest.request_id.in_(request_ids)).all()
+    if not stock_requests:
+        return error_response("No requests found", "NOT_FOUND", 404)
+
+    to_location_id = stock_requests[0].to_location_id
+    requester_name = stock_requests[0].requester.username if stock_requests[0].requester else "A branch"
+    total_qty = sum(r.quantity for r in stock_requests)
+
+    item_lines = []
+    seen = set()
+    for sr in stock_requests:
+        pname = sr.product.name if sr.product else "Unknown"
+        label = pname
+        if sr.variety:
+            parts = [sr.variety.color, sr.variety.pattern]
+            label += " (" + " ".join(filter(None, parts)) + ")"
+        if label not in seen:
+            seen.add(label)
+            item_lines.append(label)
+
+    def trunc(s, n=80):
+        return s if len(s) <= n else s[:n-3] + "..."
+
+    items_str = ", ".join(item_lines)
+    message = f"{requester_name}'s restock request ({total_qty:.0f} units: {items_str}) has been accepted"
+
+    if len(message) > 255:
+        short_items = ", ".join(
+            (pname if len(pname) <= 40 else pname[:37] + "...")
+            for pname in item_lines
+        )
+        message = f"{requester_name}'s restock request ({total_qty:.0f} units: {short_items}) has been accepted"
+        if len(message) > 255:
+            message = message[:252] + "..."
+
     notif = Notification(
-        location_id=stock_request.to_location_id,
+        location_id=to_location_id,
         type="restock_accepted",
-        message=f"Your restock request for {stock_request.quantity:.0f} {product_name}{variety_label} has been accepted",
-        request_id=stock_request.request_id,
+        message=message,
     )
     db.session.add(notif)
-
     db.session.commit()
-    check_and_auto_restock(stock_request.from_location_id)
-    return success_response({"message": "Request accepted"})
+
+    return success_response({"message": "Bundled notification sent", "notification_id": notif.notification_id})
 
 
 @inventory_bp.route("/api/inventory/request-stock/<int:request_id>/decline", methods=["PUT"])

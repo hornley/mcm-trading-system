@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Avatar, Button, Modal, Descriptions, Tag } from 'antd'
+import { Avatar, Button, Modal, Descriptions, Tag, message } from 'antd'
 import {
   CloseOutlined,
   CheckOutlined,
@@ -107,17 +107,36 @@ const NotificationModal = ({ open, onClose, onUpdate }) => {
 
   const handleAction = async (requestIds, action) => {
     const ids = Array.isArray(requestIds) ? requestIds : [requestIds]
-    try {
-      await Promise.all(ids.map((rid) =>
+    const results = await Promise.allSettled(
+      ids.map((rid) =>
         fetch(`/api/inventory/request-stock/${rid}/${action}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ usertype: user.usertype }),
+        }).then((r) => {
+          if (!r.ok) throw new Error(`Server returned ${r.status}`)
+          return r.json()
         })
-      ))
-      setRequests((prev) => prev.filter((r) => !ids.includes(r.request_id)))
-      onUpdate?.()
-    } catch {}
+      )
+    )
+    const failed = results.filter((r) => r.status === 'rejected')
+    if (failed.length > 0) {
+      message.error(`Failed to ${action} ${failed.length} item(s)`)
+      return
+    }
+    if (action === 'accept') {
+      const res = await fetch('/api/inventory/notify-accepted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ request_ids: ids }),
+      })
+      if (!res.ok) {
+        message.error('Failed to send acceptance notification')
+        return
+      }
+    }
+    setRequests((prev) => prev.filter((r) => !ids.includes(r.request_id)))
+    onUpdate?.()
   }
 
   const timeAgo = (iso) => {
