@@ -72,7 +72,7 @@ const Manager = () => {
       value: stats.sales_today,
       icon: <ShoppingCartOutlined />,
       trend: computeTrend(stats.sales_today),
-      route: '/dashboard/sales',
+      route: '/dashboard/sales?period=today',
     },
     {
       title: 'Low Stock Alerts',

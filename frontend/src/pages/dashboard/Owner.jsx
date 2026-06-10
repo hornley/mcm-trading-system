@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useDashboardQuery } from '../../hooks/useQueries'
 import { FABRIC_CATEGORY, fmtQty, qtyLabel } from '../../utils/format.js'
+import { useNavigate } from 'react-router-dom'
 
 const { Title, Text } = Typography
 const COLORS = ['#5b7ff0', '#aac4f5']
@@ -21,6 +22,7 @@ const computeTrend = (current) => {
 
 const Owner = () => {
   const { user, selectedLocationId } = useAuth()
+  const navigate = useNavigate()
   const { data: rawData, isLoading } = useDashboardQuery(selectedLocationId)
   const [lastUpdated, setLastUpdated] = useState(null)
 
@@ -67,7 +69,7 @@ const Owner = () => {
       title: 'Sales Today',
       value: `₱${stats.sales_today}`,
       trend: computeTrend(stats.sales_today),
-      action: () => fetchSalesToday(),
+      action: () => navigate('/dashboard/sales?period=today'),
     },
     {
       title: 'Low Stock Alerts',

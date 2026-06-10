@@ -9,6 +9,7 @@ import {
   PlusOutlined, DownloadOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import POSModal from '../../components/POSModal.jsx';
 import receiptConfig from '../../config/receipt.json';
@@ -21,11 +22,14 @@ import { FABRIC_CATEGORY, qtyLabel, fmtQty } from '../../utils/format.js';
 import logoImage from '../../../images/Logo.png';
 
 const Sales = () => {
+  const [searchParams] = useSearchParams();
   const { user, selectedLocationId, setSelectedLocationId, setIsStorehouse } = useAuth();
   const branchName = user?.location_name || 'Main Store';
   const isOwner = user?.role === 'owner';
   const isManager = user?.role === 'manager';
   const defaultTotalBranch = isOwner || user?.role === 'admin' ? 'All' : branchName;
+  const periodLoadedRef = useRef(false);
+  const periodAppliedRef = useRef(false);
 
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
@@ -103,8 +107,8 @@ const Sales = () => {
       const p = page || currentPage;
       let url = `/api/orders?${apiParams}&page=${p}&limit=${pageSize}`;
       if (statusFilter) url += `&status=${statusFilter}`;
-      if (dateRange && dateRange[0]) url += `&date_from=${dateRange[0].toISOString()}`;
-      if (dateRange && dateRange[1]) url += `&date_to=${dateRange[1].toISOString()}`;
+      if (dateRange && dateRange[0]) url += `&date_from=${dateRange[0].format('YYYY-MM-DDTHH:mm:ss')}`;
+      if (dateRange && dateRange[1]) url += `&date_to=${dateRange[1].format('YYYY-MM-DDTHH:mm:ss')}`;
       if (searchText) url += `&q=${searchText}`;
       const res = await fetch(url);
       const json = await res.json();
@@ -163,16 +167,29 @@ const Sales = () => {
   const fetchDashboardStats = async () => {
     try {
       let url = `/api/dashboard/summary?${apiParams}`;
-      if (dateRange && dateRange[0]) url += `&date_from=${dateRange[0].toISOString()}`;
-      if (dateRange && dateRange[1]) url += `&date_to=${dateRange[1].toISOString()}`;
+      if (dateRange && dateRange[0]) url += `&date_from=${dateRange[0].format('YYYY-MM-DDTHH:mm:ss')}`;
+      if (dateRange && dateRange[1]) url += `&date_to=${dateRange[1].format('YYYY-MM-DDTHH:mm:ss')}`;
       const res = await fetch(url);
       const json = await res.json();
       if (json.success) setDashboardStats(json.data.stats || {});
     } catch (e) { /* ignore */ }
   };
 
-  useEffect(() => { fetchSales(1); fetchDashboardStats(); }, [searchText, dateRange, statusFilter, selectedLocationId, branchFilter]);
   useEffect(() => { fetchProducts(); fetchLocations(); }, []);
+  useEffect(() => {
+    const period = searchParams.get('period');
+    if (period) {
+      handlePeriodPresetChange(period);
+      periodLoadedRef.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (periodLoadedRef.current && !dateRange) return;
+    if (periodLoadedRef.current && dateRange) periodLoadedRef.current = false;
+    fetchSales(1);
+    fetchDashboardStats();
+  }, [searchText, dateRange, statusFilter, selectedLocationId, branchFilter]);
 
   const fetchTotalSalesData = useCallback(async (branch, dateFrom, dateTo) => {
     setTotalSalesLoading(true);
@@ -180,8 +197,8 @@ const Sales = () => {
       const loc = branch && branch !== 'All' ? locations.find((l) => l.name === branch)?.location_id : undefined;
       const params = new URLSearchParams({ usertype, user_id: userId, include_items: 'true', limit: '999', status: 'completed' });
       if (loc) params.set('location_id', loc);
-      if (dateFrom) params.set('date_from', dateFrom.toISOString());
-      if (dateTo) params.set('date_to', dateTo.toISOString());
+      if (dateFrom) params.set('date_from', dateFrom.format('YYYY-MM-DDTHH:mm:ss'));
+      if (dateTo) params.set('date_to', dateTo.format('YYYY-MM-DDTHH:mm:ss'));
       const res = await fetch(`/api/orders?${params}`);
       const json = await res.json();
       if (json.success) setAllSalesFull(json.data.orders || []);
@@ -472,19 +489,52 @@ const Sales = () => {
             <span style={{ flex: 1, paddingLeft: 4 }}>ITEM</span>
             <span style={{ width: '5.5em', textAlign: 'right' }}>AMOUNT</span>
           </div>
-          {(order.items || []).map((item) => (
-            <div key={item.order_item_id} style={{ display: 'flex', fontSize: 11, padding: '2px 0' }}>
-              <span style={{ width: '65px', textAlign: 'center', fontFamily: "'Courier New', monospace" }}>
-                {fmtQty(item.quantity, item.category === FABRIC_CATEGORY)}
-              </span>
-              <span style={{ flex: 1, paddingLeft: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Courier New', monospace" }}>
-                {item.product_name}{item.color ? ` (${[item.color, item.pattern].filter(Boolean).join(', ')})` : ''}
-              </span>
-              <span style={{ width: '5.5em', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>
-                ₱{(item.line_total || (item.quantity * item.price)).toLocaleString()}
-              </span>
-            </div>
-          ))}
+          {(() => {
+            const groups = {};
+            (order.items || []).forEach((item) => {
+              const key = item.product_id;
+              if (!groups[key]) groups[key] = { product: item, varieties: [], totalQty: 0, totalAmount: 0 };
+              if (item.variety_id && (item.color || item.pattern)) {
+                groups[key].varieties.push(item);
+              }
+              groups[key].totalQty += item.quantity;
+              groups[key].totalAmount += item.line_total || (item.quantity * item.price);
+            });
+            return Object.values(groups).flatMap((g) => {
+              const showSub = g.varieties.length > 1;
+              const rows = [(
+                <div key={g.product.product_id} style={{ display: 'flex', fontSize: 11, padding: '2px 0', fontWeight: showSub ? 600 : 400 }}>
+                  <span style={{ width: '65px', textAlign: 'center', fontFamily: "'Courier New', monospace" }}>
+                    {fmtQty(g.totalQty, g.product.category === FABRIC_CATEGORY)}
+                  </span>
+                  <span style={{ flex: 1, paddingLeft: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Courier New', monospace" }}>
+                    {g.product.product_name}{!showSub && g.varieties.length === 1 ? ` (${[g.varieties[0].color, g.varieties[0].pattern].filter(Boolean).join(', ')})` : ''}
+                  </span>
+                  <span style={{ width: '5.5em', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>
+                    ₱{g.totalAmount.toLocaleString()}
+                  </span>
+                </div>
+              )];
+              if (showSub) {
+                g.varieties.forEach((v) => {
+                  rows.push(
+                    <div key={v.order_item_id} style={{ display: 'flex', fontSize: 10, padding: '1px 0 1px 0', color: '#555', fontFamily: "'Courier New', monospace" }}>
+                      <span style={{ width: '65px', textAlign: 'center' }}>
+                        {fmtQty(v.quantity, v.category === FABRIC_CATEGORY)}
+                      </span>
+                      <span style={{ flex: 1, paddingLeft: 32, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {[v.color, v.pattern].filter(Boolean).join(', ')}
+                      </span>
+                      <span style={{ width: '5.5em', textAlign: 'right' }}>
+                        ₱{(v.line_total || (v.quantity * v.price)).toLocaleString()}
+                      </span>
+                    </div>
+                  );
+                });
+              }
+              return rows;
+            });
+          })()}
         </div>
 
         <div style={{ marginBottom: 8 }}>
