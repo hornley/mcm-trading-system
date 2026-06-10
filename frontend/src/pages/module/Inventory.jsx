@@ -613,7 +613,7 @@ const Inventory = () => {
             next[editingVarietyIndex] = {
               ...existing,
               color: colors[0],
-              pattern: existing.pattern || colorName || '',
+              pattern: colorName || existing.pattern || '',
             };
             setVarieties(next);
           }
