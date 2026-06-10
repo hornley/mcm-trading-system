@@ -1233,7 +1233,12 @@ const StockManagement = () => {
                       )}
                       <span style={{ width: 100 }}>{v.pattern || 'Default'}</span>
                       <span style={{ color: '#888' }}>{v.color || ''}</span>
-                      <Tag>{fmtQty(v.quantity, record.category === FABRIC_CATEGORY)}</Tag>
+                      <span style={{ minWidth: 50 }}>{fmtQty(v.quantity, record.category === FABRIC_CATEGORY)}</span>
+                      {Number(v.quantity) === 0
+                        ? <Tag color="red">Out of Stock</Tag>
+                        : Number(v.quantity) <= 10
+                          ? <Tag color="orange">Low Stock</Tag>
+                          : null}
                     </div>
                   ))}
                 </div>

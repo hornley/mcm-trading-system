@@ -624,10 +624,6 @@ def list_inventory():
         "reorder_level": Product.reorder_level,
     }
     sort_col = sort_map.get(sort_by, Product.name)
-    if sort_order == "desc":
-        query = query.order_by(sort_col.desc())
-    else:
-        query = query.order_by(sort_col.asc())
 
     page = request.args.get("page", 1, type=int)
     limit = request.args.get("limit", 20, type=int)
@@ -635,11 +631,49 @@ def list_inventory():
     limit = max(1, min(1000, limit))
 
     if status_filter == "out_of_stock":
-        query = query.filter(Inventory.quantity == 0)
-    elif status_filter == "low_stock":
-        query = query.filter(Inventory.quantity > 0, Inventory.quantity <= 10)
-    elif status_filter == "in_stock":
-        query = query.filter(Inventory.quantity > 10)
+        from sqlalchemy import exists as sa_exists
+        IA = db.aliased(Inventory)
+        has_out = sa_exists().where(db.and_(
+            IA.quantity == 0,
+            IA.product_id == Inventory.product_id,
+            IA.location_id == Inventory.location_id,
+        ))
+        query = query.filter(has_out)
+
+        zero_count = db.session.query(
+            Inventory.product_id.label('z_pid'),
+            Inventory.location_id.label('z_lid'),
+            db.func.count(Inventory.inventory_id).label('z_count'),
+        ).filter(Inventory.quantity == 0).group_by(
+            Inventory.product_id, Inventory.location_id
+        ).subquery()
+        query = query.outerjoin(zero_count, db.and_(
+            Inventory.product_id == zero_count.c.z_pid,
+            Inventory.location_id == zero_count.c.z_lid,
+        )).order_by(zero_count.c.z_count.desc(), sort_col.asc())
+    elif status_filter in ("low_stock", "in_stock"):
+        total_subq = db.session.query(
+            Inventory.product_id.label('t_pid'),
+            Inventory.location_id.label('t_lid'),
+            db.func.coalesce(db.func.sum(Inventory.quantity), 0).label('t_qty'),
+        ).group_by(Inventory.product_id, Inventory.location_id).subquery()
+        query = query.join(total_subq, db.and_(
+            Inventory.product_id == total_subq.c.t_pid,
+            Inventory.location_id == total_subq.c.t_lid,
+        ))
+        if status_filter == "low_stock":
+            query = query.filter(total_subq.c.t_qty > 0, total_subq.c.t_qty <= 10)
+        else:
+            query = query.filter(total_subq.c.t_qty > 10)
+        if sort_order == "desc":
+            query = query.order_by(sort_col.desc())
+        else:
+            query = query.order_by(sort_col.asc())
+    else:
+        if sort_order == "desc":
+            query = query.order_by(sort_col.desc())
+        else:
+            query = query.order_by(sort_col.asc())
 
     total_count = query.count()
 
