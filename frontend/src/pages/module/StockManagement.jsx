@@ -1253,23 +1253,29 @@ const StockManagement = () => {
                 },
               ];
               return (
-                <div style={{ padding: '8px 0 8px 40px' }}>
+                <div style={{ padding: '4px 0 4px 40px' }}>
                   {varieties.map((v) => (
-                    <div key={v.variety_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0', fontSize: 13 }}>
-                      {v.color && (
-                        <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', border: '1px solid #d9d9d9' }} />
-                      )}
-                      <span style={{ width: 100 }}>{v.pattern || 'Default'}</span>
-                      <span style={{ color: '#888' }}>{v.color || ''}</span>
-                      <span style={{ minWidth: 50 }}>{fmtQty(v.quantity, record.category === FABRIC_CATEGORY)}</span>
-                      {Number(v.quantity) === 0
-                        ? <Tag color="red">Out of Stock</Tag>
-                        : Number(v.quantity) <= 10
-                          ? <Tag color="orange">Low Stock</Tag>
-                          : null}
-                      <Dropdown menu={{ items: varietyActions(v) }} trigger={['click']}>
-                        <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
-                      </Dropdown>
+                    <div key={v.variety_id} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 110px 60px', padding: '4px 0', fontSize: 13, alignItems: 'center', borderBottom: '1px solid #f0f0f0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {v.color && (
+                          <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: v.color === 'White' ? '#ddd' : v.color, display: 'inline-block', border: '1px solid #d9d9d9', flexShrink: 0 }} />
+                        )}
+                        <span style={{ fontWeight: 500 }}>{v.pattern || 'Default'}</span>
+                        {v.color && <span style={{ color: '#888' }}>{v.color}</span>}
+                      </div>
+                      <div style={{ textAlign: 'right', paddingRight: 16, fontVariantNumeric: 'tabular-nums' }}>{fmtQty(v.quantity, record.category === FABRIC_CATEGORY)}</div>
+                      <div>
+                        {Number(v.quantity) === 0
+                          ? <Tag color="red" style={{ margin: 0 }}>Out of Stock</Tag>
+                          : Number(v.quantity) <= 10
+                            ? <Tag color="orange" style={{ margin: 0 }}>Low Stock</Tag>
+                            : null}
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <Dropdown menu={{ items: varietyActions(v) }} trigger={['click']}>
+                          <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
+                        </Dropdown>
+                      </div>
                     </div>
                   ))}
                 </div>
