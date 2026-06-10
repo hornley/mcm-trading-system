@@ -1245,7 +1245,7 @@ const StockManagement = () => {
                         <span style={{ fontWeight: 500 }}>{v.pattern || 'Default'}</span>
                         {v.color && <span style={{ color: '#888' }}>{v.color}</span>}
                       </div>
-                      <div style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtQty(v.quantity, isFab)}</div>
+                      <div style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', marginRight: -1 }}>{fmtQty(v.quantity, isFab)}</div>
                       <div>
                         {Number(v.quantity) === 0
                           ? <Tag color="red" style={{ margin: 0 }}>Out of Stock</Tag>
