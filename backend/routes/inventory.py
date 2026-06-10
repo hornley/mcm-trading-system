@@ -632,6 +632,11 @@ def list_inventory():
 
     if status_filter == "out_of_stock":
         from sqlalchemy import exists as sa_exists
+        total_subq = db.session.query(
+            Inventory.product_id.label('t_pid'),
+            Inventory.location_id.label('t_lid'),
+            db.func.coalesce(db.func.sum(Inventory.quantity), 0).label('t_qty'),
+        ).group_by(Inventory.product_id, Inventory.location_id).subquery()
         IA = db.aliased(Inventory)
         has_out = sa_exists().where(db.and_(
             IA.quantity == 0,
@@ -639,10 +644,15 @@ def list_inventory():
             IA.location_id == Inventory.location_id,
         ))
         query = query.filter(has_out)
+        query = query.outerjoin(total_subq, db.and_(
+            Inventory.product_id == total_subq.c.t_pid,
+            Inventory.location_id == total_subq.c.t_lid,
+        ))
+        fully_out = total_subq.c.t_qty == 0
         if sort_order == "desc":
-            query = query.order_by(sort_col.desc())
+            query = query.order_by(fully_out.desc(), sort_col.desc())
         else:
-            query = query.order_by(sort_col.asc())
+            query = query.order_by(fully_out.desc(), sort_col.asc())
     elif status_filter in ("low_stock", "in_stock"):
         total_subq = db.session.query(
             Inventory.product_id.label('t_pid'),
