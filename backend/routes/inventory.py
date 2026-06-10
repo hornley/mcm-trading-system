@@ -1095,6 +1095,16 @@ def restock_selected():
             "quantity": vi["quantity"],
         })
 
+    location_name = location.name or f"Location {location_id}"
+    requester = User.query.get(user_id)
+    requester_name = requester.username if requester else location_name
+    item_summary = f"{len(created)} item(s)"
+    notif = Notification(
+        location_id=storehouse.location_id,
+        type="restock_pending",
+        message=f"{requester_name} requested bulk restock ({item_summary})",
+    )
+    db.session.add(notif)
     db.session.commit()
 
     return success_response(
@@ -1589,7 +1599,11 @@ def accept_request(request_id):
     stock_request.status = "accepted"
 
     db.session.commit()
-    check_and_auto_restock(stock_request.from_location_id)
+
+    from_loc = Location.query.get(stock_request.from_location_id)
+    if from_loc and not from_loc.is_storehouse:
+        check_and_auto_restock(stock_request.from_location_id)
+
     return success_response({"message": "Request accepted"})
 
 
@@ -1605,7 +1619,7 @@ def notify_accepted():
         return error_response("No requests found", "NOT_FOUND", 404)
 
     to_location_id = stock_requests[0].to_location_id
-    requester_name = stock_requests[0].requester_name or "A branch"
+    requester_name = stock_requests[0].requester.username if stock_requests[0].requester else "A branch"
     total_qty = sum(r.quantity for r in stock_requests)
 
     item_lines = []
