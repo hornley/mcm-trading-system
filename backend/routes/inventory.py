@@ -781,8 +781,17 @@ def get_inventory_by_product(product_id):
     query = Inventory.query.filter_by(product_id=product_id)
     if resolved_location_id and resolved_location_id != "all":
         query = query.filter_by(location_id=resolved_location_id)
+    variety_id = request.args.get("variety_id", type=int)
+    if variety_id:
+        query = query.filter_by(variety_id=variety_id)
 
     inventory = query.all()
+
+    if not inventory and variety_id:
+        query = Inventory.query.filter_by(product_id=product_id)
+        if resolved_location_id and resolved_location_id != "all":
+            query = query.filter_by(location_id=resolved_location_id)
+        inventory = query.all()
 
     return success_response([
         {
@@ -846,7 +855,10 @@ def adjust_inventory():
     inventory = Inventory.query.filter_by(
         product_id=data["product_id"],
         location_id=data["location_id"]
-    ).first()
+    )
+    if data.get("variety_id"):
+        inventory = inventory.filter_by(variety_id=data["variety_id"])
+    inventory = inventory.first()
 
     if not inventory:
         return error_response("Inventory record not found", "NOT_FOUND", 404)
@@ -863,6 +875,7 @@ def adjust_inventory():
         user_id=data.get("user_id"),
         quantity_change=quantity_change,
         reason=data.get("reason"),
+        variety_id=data.get("variety_id"),
     )
     db.session.add(adjustment)
     db.session.commit()
@@ -1091,6 +1104,9 @@ def restock_selected():
         if variety_id:
             store_filters["variety_id"] = variety_id
         store_inv = Inventory.query.filter_by(**store_filters).first()
+        if not store_inv and variety_id:
+            store_filters.pop("variety_id", None)
+            store_inv = Inventory.query.filter_by(**store_filters).first()
 
         if not store_inv or store_inv.quantity <= 0:
             label = f"{product.name} ({variety_id})" if variety_id else product.name
@@ -1383,7 +1399,10 @@ def transfer_stock():
     from_inventory = Inventory.query.filter_by(
         product_id=data["product_id"],
         location_id=data["from_location_id"]
-    ).first()
+    )
+    if data.get("variety_id"):
+        from_inventory = from_inventory.filter_by(variety_id=data["variety_id"])
+    from_inventory = from_inventory.first()
 
     if not from_inventory or from_inventory.quantity < quantity:
         return error_response("Insufficient stock at source location", "INSUFFICIENT_STOCK", 400)
@@ -1391,7 +1410,10 @@ def transfer_stock():
     to_inventory = Inventory.query.filter_by(
         product_id=data["product_id"],
         location_id=data["to_location_id"]
-    ).first()
+    )
+    if data.get("variety_id"):
+        to_inventory = to_inventory.filter_by(variety_id=data["variety_id"])
+    to_inventory = to_inventory.first()
 
     from_inventory.quantity -= quantity
 
@@ -1402,6 +1424,7 @@ def transfer_stock():
             product_id=data["product_id"],
             location_id=data["to_location_id"],
             quantity=quantity,
+            variety_id=data.get("variety_id"),
         )
         db.session.add(to_inventory)
 
@@ -1412,6 +1435,7 @@ def transfer_stock():
         user_id=data.get("user_id"),
         quantity=quantity,
         remarks=data.get("remarks"),
+        variety_id=data.get("variety_id"),
     )
     if data.get("transfer_date"):
         try:
@@ -1496,6 +1520,7 @@ def request_stock():
         quantity=quantity,
         description=data.get("description"),
         status="pending",
+        variety_id=data.get("variety_id"),
     )
     db.session.add(stock_request)
     db.session.commit()
@@ -1538,6 +1563,7 @@ def get_inventory_movements():
 
     product_id = request.args.get("product_id", type=int)
     location_id = request.args.get("location_id")
+    variety_id = request.args.get("variety_id", type=int)
 
     if not product_id:
         return error_response("product_id query parameter is required", "MISSING_PARAM", 400)
@@ -1558,6 +1584,11 @@ def get_inventory_movements():
         adjustments = adjustments.filter_by(location_id=location_id)
         transfers_from = transfers_from.filter_by(from_location_id=location_id)
         transfers_to = transfers_to.filter_by(to_location_id=location_id)
+
+    if variety_id:
+        adjustments = adjustments.filter_by(variety_id=variety_id)
+        transfers_from = transfers_from.filter_by(variety_id=variety_id)
+        transfers_to = transfers_to.filter_by(variety_id=variety_id)
 
     movements = []
 
@@ -1627,12 +1658,18 @@ def accept_request(request_id):
         dest_filters["variety_id"] = stock_request.variety_id
 
     inventory = Inventory.query.filter_by(**inv_filters).first()
+    if not inventory and stock_request.variety_id:
+        inv_filters.pop("variety_id", None)
+        inventory = Inventory.query.filter_by(**inv_filters).first()
     if not inventory or inventory.quantity < stock_request.quantity:
         return error_response("Insufficient stock at source location", "INSUFFICIENT_STOCK", 400)
 
     inventory.quantity -= stock_request.quantity
 
     dest_inv = Inventory.query.filter_by(**dest_filters).first()
+    if not dest_inv and stock_request.variety_id:
+        dest_filters.pop("variety_id", None)
+        dest_inv = Inventory.query.filter_by(**dest_filters).first()
     if dest_inv:
         dest_inv.quantity = (dest_inv.quantity or 0) + stock_request.quantity
     else:
