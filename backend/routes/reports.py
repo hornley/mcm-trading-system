@@ -146,6 +146,8 @@ def low_stock():
                     "location_name": inv.location.name if inv.location else "Unknown",
                     "quantity": inv.quantity,
                     "reorder_level": rl,
+                    "variety_id": inv.variety_id,
+                    "variety_sku": inv.variety.variety_sku if inv.variety else None,
                     "color": inv.variety.color if inv.variety else None,
                     "pattern": inv.variety.pattern if inv.variety else None,
                 })

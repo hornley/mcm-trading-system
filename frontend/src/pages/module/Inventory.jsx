@@ -12,6 +12,64 @@ import ColorPickerModal from '../../components/ColorPickerModal.jsx';
 const { Search } = Input;
 const { TextArea } = Input;
 
+const NAMED_COLORS = {
+  '#000000': 'Black', '#FFFFFF': 'White', '#FF0000': 'Red', '#00FF00': 'Green',
+  '#0000FF': 'Blue', '#FFFF00': 'Yellow', '#FF00FF': 'Magenta', '#00FFFF': 'Cyan',
+  '#C0C0C0': 'Silver', '#808080': 'Gray', '#800000': 'Maroon', '#808000': 'Olive',
+  '#008000': 'Dark Green', '#800080': 'Purple', '#008080': 'Teal', '#000080': 'Navy',
+  '#FF4500': 'Orange Red', '#FF6347': 'Tomato', '#FFD700': 'Gold', '#FFA500': 'Orange',
+  '#FF69B4': 'Hot Pink', '#FFC0CB': 'Pink', '#FF1493': 'Deep Pink', '#DC143C': 'Crimson',
+  '#8B0000': 'Dark Red', '#B22222': 'Firebrick', '#A0522D': 'Sienna', '#D2691E': 'Chocolate',
+  '#8B4513': 'Saddle Brown', '#A52A2A': 'Brown', '#DAA520': 'Goldenrod', '#556B2F': 'Dark Olive Green',
+  '#006400': 'Dark Green', '#228B22': 'Forest Green', '#32CD32': 'Lime Green',
+  '#90EE90': 'Light Green', '#98FB98': 'Pale Green', '#7CFC00': 'Lawn Green',
+  '#00FF7F': 'Spring Green', '#2E8B57': 'Sea Green', '#66CDAA': 'Medium Aquamarine',
+  '#8FBC8F': 'Dark Sea Green', '#20B2AA': 'Light Sea Green', '#00CED1': 'Dark Turquoise',
+  '#40E0D0': 'Turquoise', '#48D1CC': 'Medium Turquoise', '#7FFFD4': 'Aquamarine',
+  '#87CEEB': 'Sky Blue', '#87CEFA': 'Light Sky Blue', '#00BFFF': 'Deep Sky Blue',
+  '#ADD8E6': 'Light Blue', '#B0C4DE': 'Light Steel Blue', '#4682B4': 'Steel Blue',
+  '#6495ED': 'Cornflower Blue', '#1E90FF': 'Dodger Blue', '#4169E1': 'Royal Blue',
+  '#0000CD': 'Medium Blue', '#191970': 'Midnight Blue', '#6A5ACD': 'Slate Blue',
+  '#7B68EE': 'Medium Slate Blue', '#9370DB': 'Medium Purple', '#8A2BE2': 'Blue Violet',
+  '#9400D3': 'Dark Violet', '#9932CC': 'Dark Orchid', '#BA55D3': 'Medium Orchid',
+  '#DDA0DD': 'Plum', '#EE82EE': 'Violet', '#DA70D6': 'Orchid', '#C71585': 'Medium Violet Red',
+  '#DB7093': 'Pale Violet Red', '#F5F5DC': 'Beige', '#FFEBCD': 'Blanched Almond',
+  '#FFDAB9': 'Peach Puff', '#FFE4C4': 'Bisque', '#FAEBD7': 'Antique White',
+  '#F5DEB3': 'Wheat', '#DEB887': 'Burlywood', '#D2B48C': 'Tan', '#BC8F8F': 'Rosy Brown',
+  '#F4A460': 'Sandy Brown', '#CD853F': 'Peru', '#E9967A': 'Dark Salmon', '#FA8072': 'Salmon',
+  '#FFA07A': 'Light Salmon', '#FF7F50': 'Coral', '#F08080': 'Light Coral',
+  '#CD5C5C': 'Indian Red', '#FFE4E1': 'Misty Rose', '#FFF0F5': 'Lavender Blush',
+  '#E6E6FA': 'Lavender', '#D8BFD8': 'Thistle', '#F0F8FF': 'Alice Blue', '#F0FFFF': 'Azure',
+  '#F5FFFA': 'Mint Cream', '#FFFFF0': 'Ivory', '#FFFACD': 'Lemon Chiffon',
+  '#FAFAD2': 'Light Goldenrod Yellow', '#FFFAF0': 'Floral White', '#FDF5E6': 'Old Lace',
+  '#2F4F4F': 'Dark Slate Gray', '#696969': 'Dim Gray', '#778899': 'Light Slate Gray',
+  '#A9A9A9': 'Dark Gray', '#D3D3D3': 'Light Gray', '#F5F5F5': 'White Smoke',
+  '#F0E68C': 'Khaki', '#BDB76B': 'Dark Khaki', '#EEE8AA': 'Pale Goldenrod',
+  '#8B008B': 'Dark Magenta', '#4B0082': 'Indigo', '#FFF8DC': 'Cornsilk',
+  '#FFDEAD': 'Navajo White', '#FFEFD5': 'Papaya Whip',
+};
+
+const hexToRgb = (hex) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+};
+
+const findClosestColorName = (hex) => {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return null;
+  const upperHex = hex.toUpperCase();
+  if (NAMED_COLORS[upperHex]) return NAMED_COLORS[upperHex];
+  let closestName = null;
+  let minDistance = Infinity;
+  for (const [namedHex, name] of Object.entries(NAMED_COLORS)) {
+    const namedRgb = hexToRgb(namedHex);
+    if (!namedRgb) continue;
+    const distance = Math.sqrt((rgb.r - namedRgb.r) ** 2 + (rgb.g - namedRgb.g) ** 2 + (rgb.b - namedRgb.b) ** 2);
+    if (distance < minDistance) { minDistance = distance; closestName = name; }
+  }
+  return closestName;
+};
+
 const getStockStatus = (qty, reorderLevel) => {
   const n = Number(qty);
   if (n === 0) return { tag: <Tag color="red">Out of Stock</Tag>, color: '#ff4d4f' };
@@ -551,7 +609,12 @@ const Inventory = () => {
           if (editingVarietyIndex != null && colors.length > 0) {
             const next = [...varieties];
             const existing = next[editingVarietyIndex] || {};
-            next[editingVarietyIndex] = { ...existing, color: colors[0] };
+            const colorName = findClosestColorName(colors[0]);
+            next[editingVarietyIndex] = {
+              ...existing,
+              color: colors[0],
+              pattern: colorName || existing.pattern || '',
+            };
             setVarieties(next);
           }
           setVarietyColorPickerVisible(false);
