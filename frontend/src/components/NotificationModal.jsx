@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
-import { Avatar, Button } from 'antd'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { Avatar, Button, Modal, Descriptions, Tag } from 'antd'
 import {
   CloseOutlined,
   CheckOutlined,
   CloseCircleOutlined,
   InboxOutlined,
   DeleteOutlined,
+  EyeOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../context/AuthContext.jsx'
 import { qtyLabel } from '../utils/format.js'
@@ -61,6 +62,28 @@ const NotificationModal = ({ open, onClose, onUpdate }) => {
     fetchData()
   }, [open, user])
 
+  const groupedRequests = useMemo(() => {
+    const groups = {}
+    requests.forEach((r) => {
+      const key = `${r.from_location_id}|${r.to_location_id}|${r.requester_name}|${r.description || ''}`
+      if (!groups[key]) {
+        groups[key] = {
+          key,
+          requester_name: r.requester_name,
+          from_location_name: r.from_location_name,
+          to_location_name: r.to_location_name,
+          created_at: r.created_at,
+          description: r.description,
+          items: [],
+        }
+      }
+      groups[key].items.push(r)
+    })
+    return Object.values(groups).sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    )
+  }, [requests])
+
   const handleDelete = async (notificationId) => {
     try {
       const res = await fetch(`/api/notifications/${notificationId}`, { method: 'DELETE' })
@@ -82,15 +105,17 @@ const NotificationModal = ({ open, onClose, onUpdate }) => {
     } catch {}
   }
 
-  const handleAction = async (requestId, action) => {
+  const handleAction = async (requestIds, action) => {
+    const ids = Array.isArray(requestIds) ? requestIds : [requestIds]
     try {
-      const res = await fetch(`/api/inventory/request-stock/${requestId}/${action}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usertype: user.usertype }),
-      })
-      if (!res.ok) { return }
-      setRequests((prev) => prev.filter((r) => r.request_id !== requestId))
+      await Promise.all(ids.map((rid) =>
+        fetch(`/api/inventory/request-stock/${rid}/${action}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usertype: user.usertype }),
+        })
+      ))
+      setRequests((prev) => prev.filter((r) => !ids.includes(r.request_id)))
       onUpdate?.()
     } catch {}
   }
@@ -110,6 +135,18 @@ const NotificationModal = ({ open, onClose, onUpdate }) => {
   const fmtQty = (qty, isFabric) => {
     if (isFabric) return qtyLabel(qty)
     return qty
+  }
+
+  const [viewGroup, setViewGroup] = useState(null)
+
+  const handleOpenView = (g) => {
+    setViewGroup(g)
+  }
+
+  const descStyle = {
+    label: { color: '#8c8c8c', fontSize: 13, lineHeight: '24px' },
+    content: { color: '#262626', fontSize: 14, fontWeight: 500, lineHeight: '24px' },
+    container: { margin: 0 },
   }
 
   if (!mounted) return null
@@ -236,60 +273,101 @@ const NotificationModal = ({ open, onClose, onUpdate }) => {
           {(tab === null || tab === 'pending') && (
             <>
               {requests.length > 0 ? (
-                requests.map((r) => (
-                  <div
-                    key={r.request_id}
-                    style={{ padding: '16px 24px', borderBottom: '1px solid #f5f5f5' }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#fafafa'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <div style={{ display: 'flex', gap: 12 }}>
-                      <Avatar size={44} style={{ background: '#1677ff', fontSize: 19, fontWeight: 600, flexShrink: 0 }}>
-                        {r.requester_name?.[0]?.toUpperCase() || '?'}
-                      </Avatar>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 16, color: '#333', lineHeight: 1.4 }}>
-                          <strong>{r.requester_name}</strong> requested{' '}
-                          <strong>{fmtQty(r.quantity, r.is_fabric)} {r.product_name}</strong>
-                        </div>
-                        <div style={{ fontSize: 15, color: '#8c8c8c', marginTop: 4 }}>
-                          {r.from_location_name} → {r.to_location_name} · {timeAgo(r.created_at)}
-                        </div>
-                        {r.description && (
-                          <div style={{ fontSize: 15, color: '#666', marginTop: 6, fontStyle: 'italic' }}>
-                            "{r.description}"
+                groupedRequests.map((g) => {
+                  const isBulk = g.items.length > 1
+                  return (
+                    <div
+                      key={g.key}
+                      style={{ padding: '16px 24px', borderBottom: '1px solid #f5f5f5' }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#fafafa'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <Avatar size={44} style={{ background: '#1677ff', fontSize: 19, fontWeight: 600, flexShrink: 0 }}>
+                          {g.requester_name?.[0]?.toUpperCase() || '?'}
+                        </Avatar>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 16, color: '#333', lineHeight: 1.4 }}>
+                            <strong>{g.requester_name}</strong>{' '}
+                            {isBulk ? (
+                              <>requested <strong>bulk restock ({g.items.length} items)</strong></>
+                            ) : (
+                              <>requested{' '}
+                                <strong>{fmtQty(g.items[0].quantity, g.items[0].is_fabric)} {g.items[0].product_name}</strong>
+                                {(() => {
+                                  const sv = [g.items[0].variety_color, g.items[0].variety_pattern].filter(Boolean).join(' ')
+                                  return sv ? <span style={{ color: '#8c8c8c', fontWeight: 400 }}> ({sv})</span> : null
+                                })()}
+                              </>
+                            )}
                           </div>
-                        )}
-                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                          <Button
-                            size="small"
-                            icon={<CloseCircleOutlined />}
-                            onClick={() => handleAction(r.request_id, 'decline')}
-                            style={{
-                              borderRadius: 8, fontSize: 15, height: 36,
-                              border: '1px solid #ff4d4f', color: '#ff4d4f',
-                              background: '#fff', padding: '0 18px',
-                            }}
-                          >
-                            Decline
-                          </Button>
-                          <Button
-                            size="small"
-                            icon={<CheckOutlined />}
-                            onClick={() => handleAction(r.request_id, 'accept')}
-                            style={{
-                              borderRadius: 8, fontSize: 15, height: 36,
-                              background: '#52c41a', borderColor: '#52c41a',
-                              color: '#fff', boxShadow: 'none', padding: '0 18px',
-                            }}
-                          >
-                            Accept
-                          </Button>
+                          <div style={{ fontSize: 15, color: '#8c8c8c', marginTop: 4 }}>
+                            {g.from_location_name} → {g.to_location_name} · {timeAgo(g.created_at)}
+                          </div>
+                          {!isBulk && g.items[0].description && (
+                            <div style={{ fontSize: 15, color: '#666', marginTop: 6, fontStyle: 'italic' }}>
+                              "{g.items[0].description}"
+                            </div>
+                          )}
+                          {isBulk && (
+                            <div style={{ fontSize: 14, color: '#666', marginTop: 6 }}>
+                              {g.items.slice(0, 3).map((i) => {
+                                const iVariety = [i.variety_color, i.variety_pattern].filter(Boolean).join(' ')
+                                return (
+                                  <div key={i.request_id} style={{ lineHeight: 1.6 }}>
+                                    · {fmtQty(i.quantity, i.is_fabric)} {i.product_name}
+                                    {iVariety ? <span style={{ color: '#8c8c8c' }}> ({iVariety})</span> : null}
+                                  </div>
+                                )
+                              })}
+                              {g.items.length > 3 && (
+                                <div style={{ color: '#8c8c8c' }}>and {g.items.length - 3} more...</div>
+                              )}
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                            <Button
+                              size="small"
+                              icon={<CloseCircleOutlined />}
+                              onClick={() => handleAction(g.items.map((i) => i.request_id), 'decline')}
+                              style={{
+                                borderRadius: 8, fontSize: 15, height: 36,
+                                border: '1px solid #ff4d4f', color: '#ff4d4f',
+                                background: '#fff', padding: '0 18px',
+                              }}
+                            >
+                              Decline
+                            </Button>
+                            <Button
+                              size="small"
+                              icon={<EyeOutlined />}
+                              onClick={() => handleOpenView(g)}
+                              style={{
+                                borderRadius: 8, fontSize: 15, height: 36,
+                                border: '1px solid #1677ff', color: '#1677ff',
+                                background: '#fff', padding: '0 18px',
+                              }}
+                            >
+                              View
+                            </Button>
+                            <Button
+                              size="small"
+                              icon={<CheckOutlined />}
+                              onClick={() => handleAction(g.items.map((i) => i.request_id), 'accept')}
+                              style={{
+                                borderRadius: 8, fontSize: 15, height: 36,
+                                background: '#52c41a', borderColor: '#52c41a',
+                                color: '#fff', boxShadow: 'none', padding: '0 18px',
+                              }}
+                            >
+                              Accept
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               ) : null}
             </>
           )}
@@ -301,6 +379,119 @@ const NotificationModal = ({ open, onClose, onUpdate }) => {
           )}
         </div>
       </div>
+
+      <Modal
+        title={
+          <span style={{ fontSize: 18, fontWeight: 600 }}>
+            <EyeOutlined style={{ marginRight: 8, color: '#1677ff' }} />
+            {viewGroup && viewGroup.items.length > 1
+              ? 'Bulk Restock Details'
+              : 'Stock Request Details'}
+          </span>
+        }
+        open={!!viewGroup}
+        onCancel={() => setViewGroup(null)}
+        footer={[
+          <Button key="close" onClick={() => setViewGroup(null)}>
+            Close
+          </Button>,
+        ]}
+        width={520}
+        zIndex={1060}
+      >
+        {viewGroup && (
+          <div style={{ padding: '8px 0' }}>
+            <div
+              style={{
+                background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 10,
+                padding: '16px 20px', marginBottom: 20,
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 13, color: '#666' }}>Status</div>
+                <Tag color="orange" style={{ marginTop: 4, fontSize: 13, padding: '2px 10px', borderRadius: 6 }}>
+                  Pending
+                </Tag>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 13, color: '#666' }}>Requested</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#262626', marginTop: 2 }}>
+                  {timeAgo(viewGroup.created_at)}
+                </div>
+              </div>
+            </div>
+
+            <Descriptions
+              column={1}
+              labelStyle={descStyle.label}
+              contentStyle={descStyle.content}
+              style={descStyle.container}
+            >
+              <Descriptions.Item label="From">
+                <span style={{ color: '#262626' }}>{viewGroup.from_location_name}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="To">
+                <span style={{ color: '#262626' }}>{viewGroup.to_location_name}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Requested by">
+                <span style={{ color: '#262626' }}>{viewGroup.requester_name}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Date">
+                <span style={{ color: '#262626' }}>
+                  {new Date(viewGroup.created_at).toLocaleString()}
+                </span>
+              </Descriptions.Item>
+            </Descriptions>
+
+            <div style={{ marginTop: 20, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
+                Items ({viewGroup.items.length})
+              </div>
+              {viewGroup.items.map((item, idx) => {
+                const varietyLabel = [item.variety_color, item.variety_pattern].filter(Boolean).join(' ')
+                return (
+                  <div
+                    key={item.request_id}
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '10px 12px', borderRadius: 8,
+                      background: idx % 2 === 0 ? '#fafafa' : 'transparent',
+                      marginBottom: 4,
+                    }}
+                  >
+                    <div style={{ fontSize: 14, color: '#333', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {item.variety_color && (
+                        <span
+                          style={{
+                            display: 'inline-block', width: 14, height: 14, borderRadius: 3,
+                            background: item.variety_color, border: '1px solid #d9d9d9', flexShrink: 0,
+                          }}
+                        />
+                      )}
+                      <span>{item.product_name}</span>
+                      {varietyLabel && (
+                        <span style={{ color: '#8c8c8c', fontWeight: 400, fontSize: 13 }}>
+                          ({varietyLabel})
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#1677ff' }}>
+                      {fmtQty(item.quantity, item.is_fabric)}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {viewGroup.description && viewGroup.items.length === 1 && (
+              <div style={{ marginTop: 16, fontSize: 14, color: '#666', fontStyle: 'italic', borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
+                Note: "{viewGroup.description}"
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </>
   )
 }
