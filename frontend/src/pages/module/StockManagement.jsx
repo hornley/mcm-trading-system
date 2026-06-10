@@ -962,46 +962,49 @@ const StockManagement = () => {
       title: '',
       key: 'actions',
       width: 60,
-      render: (_, record) => (
-        <Dropdown
-          menu={{
-            items: [
-              ...(can('update') ? [{
-                key: 'request',
-                label: 'Request',
-                disabled: selectedLocationId === 'all',
-                onClick: () => handleRequestStock(record),
-              }] : []),
-              ...(can('update') ? [{
-                key: 'reorder',
-                label: 'Reorder',
-                disabled: selectedLocationId === 'all',
-                onClick: () => handleSetReorder(record),
-              }] : []),
-              ...(can('update') ? [{
-                key: 'adjust',
-                label: 'Adjust',
-                disabled: selectedLocationId === 'all',
-                onClick: () => handleAdjustStock(record),
-              }] : []),
-              ...(can('update') ? [{
-                key: 'transfer',
-                label: 'Transfer',
-                disabled: selectedLocationId === 'all' || record.quantity === 0,
-                onClick: () => handleTransferStock(record),
-              }] : []),
-              {
-                key: 'details',
-                label: 'Details',
-                onClick: () => handleViewDetails(record),
-              },
-            ],
-          }}
-          trigger={['click']}
-        >
-          <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
-        </Dropdown>
-      ),
+      render: (_, record) => {
+        if (record.varietiesList && record.varietiesList.length > 0) return null;
+        return (
+          <Dropdown
+            menu={{
+              items: [
+                ...(can('update') ? [{
+                  key: 'request',
+                  label: 'Request',
+                  disabled: selectedLocationId === 'all',
+                  onClick: () => handleRequestStock(record),
+                }] : []),
+                ...(can('update') ? [{
+                  key: 'reorder',
+                  label: 'Reorder',
+                  disabled: selectedLocationId === 'all',
+                  onClick: () => handleSetReorder(record),
+                }] : []),
+                ...(can('update') ? [{
+                  key: 'adjust',
+                  label: 'Adjust',
+                  disabled: selectedLocationId === 'all',
+                  onClick: () => handleAdjustStock(record),
+                }] : []),
+                ...(can('update') ? [{
+                  key: 'transfer',
+                  label: 'Transfer',
+                  disabled: selectedLocationId === 'all' || record.quantity === 0,
+                  onClick: () => handleTransferStock(record),
+                }] : []),
+                {
+                  key: 'details',
+                  label: 'Details',
+                  onClick: () => handleViewDetails(record),
+                },
+              ],
+            }}
+            trigger={['click']}
+          >
+            <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
+          </Dropdown>
+        );
+      },
     },
   ];
 
@@ -1224,6 +1227,31 @@ const StockManagement = () => {
             expandedRowRender: (record) => {
               const varieties = record.varietiesList;
               if (!varieties || varieties.length === 0) return null;
+              const varietyActions = (v) => [
+                ...(can('update') ? [{
+                  key: 'request',
+                  label: 'Request',
+                  disabled: selectedLocationId === 'all',
+                  onClick: () => handleRequestStock({ ...record, ...v }),
+                }] : []),
+                ...(can('update') ? [{
+                  key: 'adjust',
+                  label: 'Adjust',
+                  disabled: selectedLocationId === 'all',
+                  onClick: () => handleAdjustStock({ ...record, ...v }),
+                }] : []),
+                ...(can('update') ? [{
+                  key: 'transfer',
+                  label: 'Transfer',
+                  disabled: selectedLocationId === 'all' || v.quantity === 0,
+                  onClick: () => handleTransferStock({ ...record, ...v }),
+                }] : []),
+                {
+                  key: 'details',
+                  label: 'Details',
+                  onClick: () => handleViewDetails({ ...record, ...v }),
+                },
+              ];
               return (
                 <div style={{ padding: '8px 0 8px 40px' }}>
                   {varieties.map((v) => (
@@ -1239,6 +1267,9 @@ const StockManagement = () => {
                         : Number(v.quantity) <= 10
                           ? <Tag color="orange">Low Stock</Tag>
                           : null}
+                      <Dropdown menu={{ items: varietyActions(v) }} trigger={['click']}>
+                        <Button type="text" icon={<EllipsisOutlined style={{ fontSize: 18, transform: 'rotate(90deg)' }} />} />
+                      </Dropdown>
                     </div>
                   ))}
                 </div>
