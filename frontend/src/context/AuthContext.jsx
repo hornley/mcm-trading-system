@@ -7,6 +7,7 @@ const PERMISSIONS = {
   1: { list: true, view: true, create: true, delete: true, update: true },
   2: { list: true, view: true, create: false, delete: false, update: true },
   3: { list: true, view: true, create: true, delete: true, update: true },
+  4: { list: true, view: true, create: false, delete: false, update: false },
 };
 
 export const AuthProvider = ({children}) => {

@@ -36,6 +36,7 @@ with app.app_context():
         ('Stock_Transfers', 'variety_id', 'INTEGER REFERENCES "Product_Varieties"(variety_id)'),
         ('Stock_Adjustments', 'variety_id', 'INTEGER REFERENCES "Product_Varieties"(variety_id)'),
         ('Stock_Requests', 'variety_id', 'INTEGER REFERENCES "Product_Varieties"(variety_id)'),
+        ('Products', 'image_url', 'VARCHAR'),
     ]
 
     for table_name, col_name, col_def in migrations:
@@ -47,5 +48,19 @@ with app.app_context():
                 print(f"Added {col_name} to {table_name}")
             else:
                 print(f"Column {col_name} already exists in {table_name}")
+
+    # Clean up orphaned variety_id references (from previous bugs)
+    orphan_tables = [
+        "Inventory", "Order_Items", "Stock_Transfers",
+        "Stock_Adjustments", "Stock_Requests",
+    ]
+    for tbl in orphan_tables:
+        if tbl in tables:
+            result = db.session.execute(sa.text(
+                f'UPDATE "{tbl}" SET variety_id = NULL WHERE variety_id IS NOT NULL AND variety_id NOT IN (SELECT variety_id FROM "Product_Varieties")'
+            ))
+            db.session.commit()
+            if result.rowcount > 0:
+                print(f"Cleaned {result.rowcount} orphaned variety_id references in {tbl}")
 
     print("Migrations complete")

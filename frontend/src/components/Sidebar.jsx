@@ -62,6 +62,13 @@ const adminModules = mapModules([
   { key: '6', label: 'About', path: '/dashboard/about' },
 ])
 
+const staffModules = mapModules([
+  { key: '1', label: 'Inventory', path: '/dashboard/inventory' },
+  { key: '2', label: 'Settings', path: '/dashboard/settings' },
+  { key: '3', label: 'Help', path: '/dashboard/help' },
+  { key: '4', label: 'About', path: '/dashboard/about' },
+])
+
 const Sidebar = () => {
   const { user, isStorehouse, theme } = useAuth()
   const navigate = useNavigate()
@@ -73,6 +80,7 @@ const Sidebar = () => {
     user?.role === 'owner' ? ownerModules :
     user?.role === 'admin' ? adminModules :
     user?.role === 'manager' ? managerModules :
+    user?.role === 'staff' ? staffModules :
     []
 
   const modules = baseModules

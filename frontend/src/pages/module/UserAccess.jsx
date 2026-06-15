@@ -7,6 +7,7 @@ const USERTYPE_MAP = {
   1: { label: 'Owner', color: 'gold' },
   2: { label: 'Manager', color: 'blue' },
   3: { label: 'Admin', color: 'purple' },
+  4: { label: 'Staff', color: 'green' },
 };
 
 const typeOptions = Object.entries(USERTYPE_MAP).map(([key, val]) => ({

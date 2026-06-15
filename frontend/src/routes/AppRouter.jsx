@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Spin } from 'antd'
-import { Route, 
+import { Route, Navigate,
   createBrowserRouter, 
   createRoutesFromElements, 
   RouterProvider 
@@ -47,7 +47,7 @@ const router = createBrowserRouter (
         <Route path="reset-with-code" element={<ResetWithCode />} />
       </Route>
 
-      <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "admin"]} />}>
+      <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "admin", "staff"]} />}>
         <Route path="/dashboard" element={<DashboardLayout />}>
 
           {/* role dashboards */}
@@ -63,14 +63,23 @@ const router = createBrowserRouter (
             <Route path="admin" element={<Lazy><Admin /></Lazy>} />
           </Route>
 
-          {/* shared - owner and manager */}
-          <Route element={<ProtectedRoute allowedRoles={["owner", "manager"]} />}>
+          {/* staff redirect to inventory */}
+          <Route element={<ProtectedRoute allowedRoles={["staff"]} />}>
+            <Route path="staff" element={<Navigate to="/dashboard/inventory" replace />} />
+          </Route>
+
+          {/* inventory - owner, manager, staff */}
+          <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "staff"]} />}>
             <Route path="inventory" element={<Lazy><Inventory /></Lazy>} />
+          </Route>
+
+          {/* sales and stock management - owner and manager only */}
+          <Route element={<ProtectedRoute allowedRoles={["owner", "manager"]} />}>
             <Route path="sales" element={<Lazy><Sales /></Lazy>} />
             <Route path="stock-management" element={<Lazy><StockManagement /></Lazy>} />
           </Route>
 
-          {/* report - all roles */}
+          {/* report - owner, manager, admin */}
           <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "admin"]} />}>
             <Route path="report" element={<Lazy><Report /></Lazy>} />
           </Route>
@@ -85,13 +94,13 @@ const router = createBrowserRouter (
             <Route path="maintenance" element={<Lazy><Maintenance /></Lazy>} />
           </Route>
 
-          {/* settings - all roles */}
-          <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "admin"]} />}>
+          {/* settings - all roles including staff */}
+          <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "admin", "staff"]} />}>
             <Route path="settings" element={<Lazy><SettingsPage /></Lazy>} />
           </Route>
 
-          {/* help and about - all roles */}
-          <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "admin"]} />}>
+          {/* help, about, manual - all roles including staff */}
+          <Route element={<ProtectedRoute allowedRoles={["owner", "manager", "admin", "staff"]} />}>
             <Route path="help" element={<Lazy><Help /></Lazy>} />
             <Route path="about" element={<Lazy><About /></Lazy>} />
             <Route path="manual" element={<Lazy><Manual /></Lazy>} />
