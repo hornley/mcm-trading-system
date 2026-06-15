@@ -1,18 +1,30 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Typography, Button, Badge } from 'antd'
+import { Typography, Button, Badge, Grid } from 'antd'
 import { LogoutOutlined, BellOutlined } from '@ant-design/icons'
 import { useAuth } from '../context/AuthContext.jsx'
 import NotificationModal from './NotificationModal.jsx'
 
 const { Title } = Typography
+const { useBreakpoint } = Grid
 
 const Topbar = () => {
   const { user, logout, theme } = useAuth()
+  const screens = useBreakpoint()
   const [notifOpen, setNotifOpen] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [notifCount, setNotifCount] = useState(0)
   const [resetCount, setResetCount] = useState(0)
   const isDark = theme === 'dark'
+
+  const spacerWidth = screens.xl || screens.lg ? 240 : screens.md ? 120 : screens.sm ? 48 : 0
+  const rightGap = screens.sm ? 8 : 4
+
+  const [showTitle, setShowTitle] = useState(window.innerWidth >= 800)
+  useEffect(() => {
+    const check = () => setShowTitle(window.innerWidth >= 800)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   const fetchCounts = useCallback(() => {
     if (!user) return
@@ -55,11 +67,13 @@ const Topbar = () => {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-      <div style={{ width: 240 }} />
-      <Title level={4} style={{ margin: 0, color: isDark ? 'rgba(255,255,255,0.85)' : '#262626', textAlign: 'center', flex: 1 }}>
-        Manco (MCM) Trading
-      </Title>
-      <div style={{ width: 240, textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+      <div style={{ width: spacerWidth, flexShrink: 0 }} />
+      {showTitle && (
+        <Title level={4} ellipsis={{ tooltip: 'Manco (MCM) Trading' }} style={{ margin: 0, color: isDark ? 'rgba(255,255,255,0.85)' : '#262626', textAlign: 'center', flex: 1, minWidth: 0 }}>
+          Manco (MCM) Trading
+        </Title>
+      )}
+      <div style={{ width: spacerWidth, textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: rightGap, flexShrink: 0 }}>
         <Badge count={(pendingCount || 0) + (notifCount || 0) + (resetCount || 0)} size="small" offset={[-2, 2]}>
           <Button
             icon={<BellOutlined />}
