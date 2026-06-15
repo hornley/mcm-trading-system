@@ -80,6 +80,7 @@ class Product(db.Model):
     sku = db.Column(db.String, unique=True)
     unit = db.Column(db.String)
     is_active = db.Column(db.Boolean, default=True)
+    image_url = db.Column(db.String, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
     category = db.relationship("Category", backref="products")

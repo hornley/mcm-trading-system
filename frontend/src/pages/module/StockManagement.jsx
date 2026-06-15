@@ -108,16 +108,18 @@ const StockManagement = () => {
 
       if (invData.success) {
         const raw = invData.data.data || [];
-        const groups = {};
-        for (const row of raw) {
-          const key = `${row.product_id}-${row.location_id}`;
-          if (!groups[key]) groups[key] = { parent: null, varieties: [] };
-          if (row.variety_id) {
-            groups[key].varieties.push(row);
-          } else {
-            groups[key].parent = row;
+          const groups = {};
+          for (const row of raw) {
+            const key = `${row.product_id}-${row.location_id}`;
+            if (!groups[key]) groups[key] = { parent: null, varieties: [] };
+            if (row.variety_id) {
+              groups[key].varieties.push(row);
+            } else if (!groups[key].parent) {
+              groups[key].parent = row;
+            } else {
+              groups[key].parent.quantity += row.quantity || 0;
+            }
           }
-        }
         const merged = [];
         for (const g of Object.values(groups)) {
           if (g.parent) {

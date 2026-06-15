@@ -70,7 +70,7 @@ def seed(skip_drop=False):
         storehouse = locs[0]
 
         # ── 2. USERS ──
-        # usertype: 0=Staff(no access), 1=Owner, 2=Manager, 3=Admin
+        # usertype: 1=Owner, 2=Manager, 3=Admin, 4=Staff
         print("Seeding Users...")
         users_data = [
             (1, "owner",    "owner@mcm.com",    "260512001", 0),

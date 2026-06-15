@@ -4,7 +4,7 @@ import {
   Tag, Modal, Form, Space, Popconfirm, InputNumber, Spin,
   Dropdown,
 } from 'antd';
-import { PlusOutlined, EditOutlined, CloseOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, CloseOutlined, EyeOutlined } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { FABRIC_CATEGORY, qtyLabel } from '../../utils/format.js';
 import ColorPickerModal from '../../components/ColorPickerModal.jsx';
@@ -94,6 +94,10 @@ const Inventory = () => {
   const [varietyColorPickerVisible, setVarietyColorPickerVisible] = useState(false);
   const [editingVarietyIndex, setEditingVarietyIndex] = useState(null);
   const [activeColorProductId, setActiveColorProductId] = useState(null);
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+  const [imageRemoved, setImageRemoved] = useState(false);
+  const [viewImageProduct, setViewImageProduct] = useState(null);
 
   const toggleColorBubble = (productId) => {
     setActiveColorProductId((prev) => (prev === productId ? null : productId));
@@ -151,6 +155,9 @@ const Inventory = () => {
     setIsFabricCategory(false);
     setVarieties([]);
     setEditingVarietyIndex(null);
+    setSelectedImageFile(null);
+    setImagePreviewUrl(null);
+    setImageRemoved(false);
     setProductModalVisible(true);
   };
 
@@ -166,6 +173,9 @@ const Inventory = () => {
     const cat = categories.find(c => c.category_id === record.category_id);
     setIsFabricCategory(cat?.name === FABRIC_CATEGORY);
     setVarieties((record.varieties || []).map(v => ({ color: v.color, pattern: v.pattern || '', variety_sku: v.variety_sku })));
+    setSelectedImageFile(null);
+    setImagePreviewUrl(record.image_url || null);
+    setImageRemoved(false);
     setProductModalVisible(true);
   };
 
@@ -233,27 +243,64 @@ const Inventory = () => {
       const url = isEdit ? `/api/products/${selectedRecord.product_id}` : '/api/products';
       const method = isEdit ? 'PUT' : 'POST';
 
+      const payload = {
+        ...values,
+        usertype: user.usertype,
+        user_id: user.user_id,
+      };
+      if (isFabricCategory) {
+        payload.varieties = varieties.map(v => ({ color: v.color, pattern: v.pattern, variety_sku: v.variety_sku }));
+      }
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...values,
-          usertype: user.usertype,
-          user_id: user.user_id,
-          varieties: isFabricCategory ? varieties.map(v => ({ color: v.color, pattern: v.pattern, variety_sku: v.variety_sku })) : [],
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (data.success) {
-        Modal.success({ title: 'Success', content: isEdit ? 'Product updated' : 'Product created', centered: true });
-        setProductModalVisible(false);
-        productForm.resetFields();
-        setIsFabricCategory(false);
-        setVarieties([]);
-        fetchData();
-      } else {
+      if (!data.success) {
         Modal.error({ title: 'Error', content: data.message, centered: true });
+        return;
       }
+
+      const productId = data.data?.product_id || selectedRecord?.product_id;
+
+      if (imageRemoved && productId) {
+        const delRes = await fetch(`/api/products/${productId}/image`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usertype: user.usertype, user_id: user.user_id }),
+        });
+        const delData = await delRes.json();
+        if (!delData.success) {
+          Modal.warning({ title: 'Warning', content: 'Product saved but image removal failed: ' + (delData.message || delData.error || 'Unknown error'), centered: true });
+        }
+      }
+
+      if (selectedImageFile && productId) {
+        const formData = new FormData();
+        formData.append('image', selectedImageFile);
+        formData.append('usertype', String(user.usertype));
+        formData.append('user_id', String(user.user_id));
+
+        const imgRes = await fetch(`/api/products/${productId}/image`, {
+          method: 'POST',
+          body: formData,
+        });
+        const imgData = await imgRes.json();
+        if (!imgData.success) {
+          Modal.warning({ title: 'Warning', content: 'Product saved but image upload failed: ' + (imgData.message || imgData.error || 'Unknown error'), centered: true });
+        }
+      }
+
+      Modal.success({ title: 'Success', content: isEdit ? 'Product updated' : 'Product created', centered: true });
+      setProductModalVisible(false);
+      productForm.resetFields();
+      setIsFabricCategory(false);
+      setVarieties([]);
+      setSelectedImageFile(null);
+      setImagePreviewUrl(null);
+      setImageRemoved(false);
+      fetchData();
     } catch {
       if (!selectedRecord) Modal.error({ title: 'Error', content: 'Failed to save product', centered: true });
     }
@@ -448,6 +495,11 @@ const Inventory = () => {
                     )}
                   </div>
                 )}
+                {product.image_url && (
+                  <Button size="small" icon={<EyeOutlined />} onClick={() => setViewImageProduct(product)}>
+                    View
+                  </Button>
+                )}
                 {can('update') && product.is_active && (
                   <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(product)}>
                     Edit
@@ -493,11 +545,11 @@ const Inventory = () => {
       <Modal
         title={selectedRecord ? 'Edit Product' : 'Add Product'}
         open={productModalVisible}
-        onCancel={() => { setProductModalVisible(false); productForm.resetFields(); setIsFabricCategory(false); setVarieties([]); }}
+        onCancel={() => { setProductModalVisible(false); productForm.resetFields(); setIsFabricCategory(false); setVarieties([]); setSelectedImageFile(null); setImagePreviewUrl(null); setImageRemoved(false); }}
         centered
         width={520}
         footer={[
-          <Button key="cancel" onClick={() => { setProductModalVisible(false); productForm.resetFields(); setIsFabricCategory(false); setVarieties([]); }}>Cancel</Button>,
+          <Button key="cancel" onClick={() => { setProductModalVisible(false); productForm.resetFields(); setIsFabricCategory(false); setVarieties([]); setSelectedImageFile(null); setImagePreviewUrl(null); setImageRemoved(false); }}>Cancel</Button>,
           <Button key="save" type="primary" onClick={handleSaveProduct}>Save</Button>,
         ]}
       >
@@ -599,7 +651,69 @@ const Inventory = () => {
           <Form.Item name="description" label="Description">
             <TextArea rows={3} placeholder="Enter description" />
           </Form.Item>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13 }}>Product Image</div>
+            {(imagePreviewUrl) ? (
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <img src={imagePreviewUrl} alt="Preview" style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 8, border: '1px solid #d9d9d9' }} />
+                <Button
+                  size="small"
+                  danger
+                  type="text"
+                  icon={<CloseOutlined />}
+                  onClick={() => {
+                    if (selectedImageFile) {
+                      setSelectedImageFile(null);
+                      setImagePreviewUrl(selectedRecord?.image_url || null);
+                    } else {
+                      setImageRemoved(true);
+                      setImagePreviewUrl(null);
+                    }
+                  }}
+                  style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(255,255,255,0.8)' }}
+                />
+              </div>
+            ) : (
+              <div style={{ border: '1px dashed #d9d9d9', borderRadius: 8, padding: '24px 16px', textAlign: 'center', cursor: 'pointer' }}
+                onClick={() => document.getElementById('product-image-input')?.click()}
+              >
+                <Typography.Text type="secondary">Click to upload image (jpg, png, gif, webp, max 5MB)</Typography.Text>
+              </div>
+            )}
+            <input
+              id="product-image-input"
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setSelectedImageFile(file);
+                  setImagePreviewUrl(URL.createObjectURL(file));
+                }
+              }}
+            />
+          </div>
         </Form>
+      </Modal>
+
+      <Modal
+        title={viewImageProduct?.name || 'Product Image'}
+        open={!!viewImageProduct}
+        onCancel={() => setViewImageProduct(null)}
+        footer={null}
+        centered
+        width={600}
+        closable
+        closeIcon={<CloseOutlined style={{ fontSize: 18 }} />}
+      >
+        {viewImageProduct?.image_url && (
+          <img
+            src={viewImageProduct.image_url}
+            alt={viewImageProduct.name}
+            style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 8 }}
+          />
+        )}
       </Modal>
 
       <ColorPickerModal

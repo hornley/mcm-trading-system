@@ -6,7 +6,7 @@ from models import db, User, Location, PasswordResetToken, PasswordResetRequest
 
 auth_bp = Blueprint("auth", __name__)
 
-ROLE_MAP = {1: "owner", 2: "manager", 3: "admin"}
+ROLE_MAP = {1: "owner", 2: "manager", 3: "admin", 4: "staff"}
 
 
 @auth_bp.route("/api/auth/login", methods=["POST"])

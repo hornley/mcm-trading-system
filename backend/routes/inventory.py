@@ -1,4 +1,5 @@
 import math
+import os
 from flask import Blueprint, request
 from datetime import datetime
 from sqlalchemy.orm import selectinload, joinedload
@@ -7,6 +8,7 @@ from utils.response import success_response, error_response
 from utils.validation import validate_required, validate_quantity, is_fabric_category
 from utils.activity_logger import log_activity
 from utils.sorting import quick_sort
+from utils.image_storage import upload_product_image, delete_product_image, download_product_image
 
 inventory_bp = Blueprint("inventory", __name__)
 
@@ -122,6 +124,7 @@ def _serialize_product(product, include_inventory=False, location_id=None, varie
         "description": product.description,
         "sku": product.sku,
         "unit": product.unit,
+        "image_url": f"/api/images/product-image?path={product.image_url}" if product.image_url else None,
         "is_active": product.is_active,
         "created_at": product.created_at.isoformat() if product.created_at else None,
         "updated_at": product.updated_at.isoformat() if product.updated_at else None,
@@ -390,24 +393,46 @@ def update_product(product_id):
         product.sku = new_sku
 
     if "varieties" in data:
-        ProductVariety.query.filter_by(product_id=product_id).delete()
+        existing = ProductVariety.query.filter_by(product_id=product_id).all()
+        existing_by_sku = {v.variety_sku: v for v in existing}
+        seen_skus = set()
+
         for v in data["varieties"]:
             color = v.get("color")
             pattern = v.get("pattern")
             vs = v.get("variety_sku", "").strip()
             if not vs:
                 vs = f"{product.sku}-{ProductVariety.query.count() + 1:02d}"
-            existing_v = ProductVariety.query.filter_by(variety_sku=vs).first()
-            if existing_v and existing_v.product_id != product_id:
+
+            dup = ProductVariety.query.filter(ProductVariety.variety_sku == vs, ProductVariety.product_id != product_id).first()
+            if dup:
                 return error_response(f"Variety SKU {vs} already exists", "DUPLICATE_VARIETY_SKU", 409)
-            db.session.add(ProductVariety(
-                product_id=product_id,
-                variety_sku=vs,
-                color=color or None,
-                pattern=pattern or None,
-            ))
+
+            seen_skus.add(vs)
+
+            if vs in existing_by_sku:
+                pv = existing_by_sku[vs]
+                pv.color = color or None
+                pv.pattern = pattern or None
+            else:
+                db.session.add(ProductVariety(
+                    product_id=product_id,
+                    variety_sku=vs,
+                    color=color or None,
+                    pattern=pattern or None,
+                ))
+
+        for pv in existing:
+            if pv.variety_sku not in seen_skus:
+                for tbl in (Inventory, OrderItem, StockTransfer, StockAdjustment, StockRequest):
+                    tbl.query.filter_by(variety_id=pv.variety_id).update({"variety_id": None})
+                db.session.delete(pv)
 
     db.session.commit()
+    product = Product.query.options(
+        selectinload(Product.varieties),
+        selectinload(Product.category),
+    ).get(product_id)
 
     log_activity(
         user_id=data.get("user_id"),
@@ -488,6 +513,98 @@ def restore_product(product_id):
     return success_response(_serialize_product(product), "Product restored successfully")
 
 
+@inventory_bp.route("/api/products/<int:product_id>/image", methods=["POST"])
+def upload_image(product_id):
+    usertype = request.form.get("usertype", type=int)
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+
+    if not _can_update(usertype):
+        return error_response("You don't have permission to update products", "FORBIDDEN", 403)
+
+    product = Product.query.get(product_id)
+    if not product:
+        return error_response("Product not found", "NOT_FOUND", 404)
+
+    if "image" not in request.files:
+        return error_response("No image file provided", "MISSING_FILE", 400)
+
+    file = request.files["image"]
+    if file.filename == "":
+        return error_response("No image file selected", "MISSING_FILE", 400)
+
+    allowed_extensions = {"jpg", "jpeg", "png", "gif", "webp"}
+    extension = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if extension not in allowed_extensions:
+        return error_response("Invalid file type. Allowed: jpg, jpeg, png, gif, webp", "INVALID_FILE_TYPE", 400)
+
+    file.seek(0, os.SEEK_END)
+    file_size = file.tell()
+    file.seek(0)
+    max_size = 5 * 1024 * 1024
+    if file_size > max_size:
+        return error_response("File size exceeds 5MB limit", "FILE_TOO_LARGE", 400)
+
+    file_bytes = file.read()
+
+    try:
+        if product.image_url:
+            delete_product_image(product.image_url)
+
+        public_url = upload_product_image(
+            product_id=product_id,
+            file_bytes=file_bytes,
+            content_type=file.content_type or "image/jpeg",
+            extension=extension,
+        )
+        product.image_url = public_url
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f"Image upload failed: {str(e)}", "UPLOAD_ERROR", 500)
+
+    log_activity(
+        user_id=request.form.get("user_id", type=int),
+        module="products",
+        action_type="upload_image",
+        action=f"Uploaded image for product {product.name}",
+        details={"product_id": product_id, "image_url": public_url},
+    )
+
+    return success_response({"image_url": f"/api/images/product-image?path={public_url}"}, "Image uploaded successfully")
+
+
+@inventory_bp.route("/api/products/<int:product_id>/image", methods=["DELETE"])
+def delete_image(product_id):
+    data = request.get_json()
+    if not data:
+        return error_response("Request body is required", "MISSING_BODY", 400)
+
+    usertype = data.get("usertype")
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+
+    if not _can_update(usertype):
+        return error_response("You don't have permission to update products", "FORBIDDEN", 403)
+
+    product = Product.query.get(product_id)
+    if not product:
+        return error_response("Product not found", "NOT_FOUND", 404)
+
+    if not product.image_url:
+        return error_response("Product has no image", "NO_IMAGE", 400)
+
+    try:
+        delete_product_image(product.image_url)
+    except RuntimeError:
+        pass
+
+    product.image_url = None
+    db.session.commit()
+
+    return success_response(message="Image deleted successfully")
+
+
 @inventory_bp.route("/api/products/<int:product_id>", methods=["DELETE"])
 def delete_product(product_id):
     data = request.get_json()
@@ -508,6 +625,12 @@ def delete_product(product_id):
     product_name = product.name
 
     try:
+        if product.image_url:
+            try:
+                delete_product_image(product.image_url)
+            except RuntimeError:
+                pass
+
         OrderItem.query.filter_by(product_id=product_id).delete()
         StockTransfer.query.filter_by(product_id=product_id).delete()
         StockAdjustment.query.filter_by(product_id=product_id).delete()
@@ -1801,6 +1924,20 @@ def list_pending_requests():
         "status": r.status,
         "created_at": r.created_at.isoformat() if r.created_at else None,
     } for r in requests])
+
+
+@inventory_bp.route("/api/images/product-image", methods=["GET"])
+def serve_product_image():
+    path = request.args.get("path", "").strip()
+    if not path:
+        return error_response("path query parameter is required", "MISSING_PARAM", 400)
+
+    try:
+        data, content_type = download_product_image(path)
+        from flask import Response
+        return Response(data, mimetype=content_type)
+    except Exception as e:
+        return error_response(f"Image not found: {str(e)}", "NOT_FOUND", 404)
 
 
 @inventory_bp.route("/api/inventory/request-logs", methods=["GET"])
