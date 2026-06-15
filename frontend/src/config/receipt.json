@@ -3,10 +3,7 @@
   "companyAddress": "",
   "vatRegTin": "123-456-789-000",
   "minNo": "2024-0001",
-  "salesInvoiceNo": "SI-2024-0001",
   "tin": "000-000-000-000",
   "accredNo": "AC-2024-001",
-  "dateIssued": "2026-01-01",
-  "posPermit": "PERMIT-24-0001",
-  "vatRate": 12
+  "posPermit": "PERMIT-24-0001"
 }
