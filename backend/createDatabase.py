@@ -716,7 +716,7 @@ After confirming, a receipt modal appears with:
 - Line items with quantities and amounts
 - Total amount, payment received, and change
 - VAT breakdown (Vatable Sales, VAT 12%)
-- BIR-mandated fields (MIN No., Sales Invoice No., POS Permit)
+- BIR-mandated fields (MIN No., DR No., POS Permit)
 
 Click **Print Receipt** or **Close**.
 

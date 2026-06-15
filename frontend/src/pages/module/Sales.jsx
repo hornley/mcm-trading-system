@@ -477,6 +477,8 @@ const Sales = () => {
     const total = order.total_amount || 0;
     const payment = pmt?.price || 0;
     const change = Math.max(0, payment - total);
+    const drYear = dayjs(order.order_date).format('YYYY');
+    const drNo = `DR-${drYear}-${String(order.order_id).padStart(6, '0')}`;
     const vatableSales = total / 1.12;
     const vatAmount = total - vatableSales;
     const cfg = receiptConfig;
@@ -488,7 +490,7 @@ const Sales = () => {
           {cfg.companyAddress && <div style={{ fontSize: 11 }}>{cfg.companyAddress}</div>}
           <div style={{ fontSize: 10, marginTop: 4 }}>VAT REG TIN: {cfg.vatRegTin}</div>
           <div style={{ fontSize: 10 }}>MIN NO: {cfg.minNo}</div>
-          <div style={{ fontSize: 10 }}>SALES INVOICE NO: {cfg.salesInvoiceNo}</div>
+          <div style={{ fontSize: 10 }}>DR NO: {drNo}</div>
         </div>
 
         <div style={{ borderTop: '1px dashed #333', borderBottom: '1px dashed #333', padding: '4px 0', marginBottom: 8 }}>
@@ -597,7 +599,7 @@ const Sales = () => {
         <div style={{ fontSize: 11, marginBottom: 8 }}>
           <div>TIN: {cfg.tin}</div>
           <div>ACCRED NO: {cfg.accredNo}</div>
-          <div>DATE ISSUED: {cfg.dateIssued}</div>
+          <div>DATE ISSUED: {dayjs(order.order_date).format('YYYY-MM-DD')}</div>
           <div>POS PERMIT: {cfg.posPermit}</div>
         </div>
 
