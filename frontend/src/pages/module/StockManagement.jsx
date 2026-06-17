@@ -21,7 +21,7 @@ const getStockStatus = (qty) => {
   return { tag: <Tag color="green">In Stock</Tag>, label: 'in' };
 };
 
-const adjustmentReasons = ['Restock', 'Damaged', 'Correction', 'Sample', 'Sales Return'];
+const adjustmentReasons = ['Restock', 'Damaged', 'Correction', 'Sample', 'Sales Return', 'Return to Supplier']; 
 
 const StockManagement = () => {
   const { user, can, selectedLocationId, isStorehouse, setSelectedLocationId, setIsStorehouse } = useAuth();
@@ -48,6 +48,10 @@ const StockManagement = () => {
   const [showVarieties, setShowVarieties] = useState(false);
   const [movementsCache, setMovementsCache] = useState({});
   const [stats, setStats] = useState({ total_items: 0, low_stock_count: 0, out_of_stock_count: 0, pending_request_count: 0 });
+  const [suppliers, setSuppliers] = useState([]);
+  const [supplierModalVisible, setSupplierModalVisible] = useState(false);
+  const [supplierEditRecord, setSupplierEditRecord] = useState(null);
+  const [supplierSaving, setSupplierSaving] = useState(false);
   const [sortBy, setSortBy] = useState('quantity');
   const [sortOrder, setSortOrder] = useState('asc');
   const [statusFilter, setStatusFilter] = useState('');
@@ -58,6 +62,7 @@ const StockManagement = () => {
   const [orderSummaryVisible, setOrderSummaryVisible] = useState(false);
   const [restockSubmitting, setRestockSubmitting] = useState(false);
   const [adjustSubmitting, setAdjustSubmitting] = useState(false);
+  const [adjustReason, setAdjustReason] = useState(null);
   const [requestLogVisible, setRequestLogVisible] = useState(false);
   const [requestLogs, setRequestLogs] = useState([]);
   const [requestLogLoading, setRequestLogLoading] = useState(false);
@@ -79,6 +84,9 @@ const StockManagement = () => {
   const [replenishCart, setReplenishCart] = useState({});
   const [replenishSearchText, setReplenishSearchText] = useState('');
   const [replenishSubmitting, setReplenishSubmitting] = useState(false);
+  const [replenishSupplierId, setReplenishSupplierId] = useState(null);
+  const [inlineSupplierModalVisible, setInlineSupplierModalVisible] = useState(false);
+  const [inlineSupplierName, setInlineSupplierName] = useState('');
   const [repVarietyModalVisible, setRepVarietyModalVisible] = useState(false);
   const [repVarietyModalProduct, setRepVarietyModalProduct] = useState(null);
   const [repVarietyModalQtys, setRepVarietyModalQtys] = useState({});
@@ -175,6 +183,51 @@ const StockManagement = () => {
     setStorehousePendingLoading(false);
   };
 
+  const fetchSuppliers = async () => {
+    try {
+      const res = await fetch(`/api/suppliers?usertype=${user.usertype}&active_only=true`);
+      const data = await res.json();
+      if (data.success) setSuppliers(data.data || []);
+    } catch {}
+  };
+
+  const handleOpenSupplierModal = (record = null) => {
+    setSupplierEditRecord(record);
+    setSupplierModalVisible(true);
+  };
+
+  const handleSaveSupplier = async (values) => {
+    setSupplierSaving(true);
+    try {
+      const url = supplierEditRecord
+        ? `/api/suppliers/${supplierEditRecord.supplier_id}`
+        : '/api/suppliers';
+      const method = supplierEditRecord ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...values,
+          usertype: user.usertype,
+          user_id: user.user_id,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        Modal.success({ title: 'Success', content: `Supplier ${supplierEditRecord ? 'updated' : 'created'}`, centered: true });
+        setSupplierModalVisible(false);
+        setSupplierEditRecord(null);
+        fetchSuppliers();
+      } else {
+        Modal.error({ title: 'Error', content: data.message, centered: true });
+      }
+    } catch {
+      Modal.error({ title: 'Error', content: 'Failed to save supplier', centered: true });
+    } finally {
+      setSupplierSaving(false);
+    }
+  };
+
   const handleAcceptRequest = async (requestId) => {
     try {
       const res = await fetch(`/api/inventory/request-stock/${requestId}/accept`, {
@@ -252,8 +305,10 @@ const StockManagement = () => {
     }
     setSelectedRecord(record);
     setRequestPreset(false);
+    setAdjustReason(null);
     adjustForm.resetFields();
     setAdjustVisible(true);
+    fetchSuppliers();
   };
 
   const handleRequestStock = (record) => {
@@ -385,6 +440,7 @@ const StockManagement = () => {
             quantity_change: quantityChange,
             reason,
             variety_id: selectedRecord.variety_id || null,
+            supplier_id: values.supplier_id || null,
           }),
         });
         const data = await res.json();
@@ -709,6 +765,7 @@ const StockManagement = () => {
       Modal.warning({ title: 'Warning', content: 'Select a specific branch from the top bar to replenish', centered: true });
       return;
     }
+    fetchSuppliers();
     try {
       const res = await fetch(`/api/inventory?usertype=${user.usertype}&location_id=${selectedLocationId}&user_id=${user.user_id}&limit=1000`);
       const json = await res.json();
@@ -851,6 +908,7 @@ const StockManagement = () => {
           usertype: user.usertype,
           user_id: user.user_id,
           location_id: selectedLocationId,
+          supplier_id: replenishSupplierId || undefined,
           items,
         }),
       });
@@ -991,6 +1049,15 @@ const StockManagement = () => {
       render: (val, record) => {
         if (record._rowType === 'variety') return null;
         return val ? Number(val).toLocaleString() : '-';
+      },
+    },
+    {
+      title: 'Supplier', dataIndex: 'suppliers', key: 'supplier_name',
+      render: (suppliers) => {
+        if (!suppliers || suppliers.length === 0) return '—';
+        const names = [...new Set(suppliers.filter(s => !s.variety_id).map(s => s.supplier_name))];
+        const varietyNames = suppliers.filter(s => s.variety_id).map(s => s.supplier_name);
+        return [...names, ...varietyNames].join(', ');
       },
     },
     {
@@ -1216,6 +1283,11 @@ const StockManagement = () => {
                   Select Restock
                 </Button>
               )}
+              {can('update') && (
+                <Button onClick={() => { fetchSuppliers(); handleOpenSupplierModal(); }}>
+                  Suppliers
+                </Button>
+              )}
             </>
           </Space>
         </Col>
@@ -1343,7 +1415,7 @@ const StockManagement = () => {
           <Button key="save" type="primary" loading={adjustSubmitting} onClick={handleAdjustSave}>{requestPreset ? 'Submit Request' : 'Save'}</Button>,
         ]}
       >
-        <Form form={adjustForm} layout="vertical">
+        <Form form={adjustForm} layout="vertical" onValuesChange={(changed) => { if (changed.reason) setAdjustReason(changed.reason); }}>
           {requestPreset ? (
             <>
               <Typography.Text style={{ display: 'block', marginBottom: 16 }}>
@@ -1378,6 +1450,15 @@ const StockManagement = () => {
                   ))}
                 </Select>
               </Form.Item>
+              {['Damaged', 'Sales Return', 'Return to Supplier'].includes(adjustReason) && (
+                <Form.Item name="supplier_id" label="Supplier">
+                  <Select placeholder="Select supplier" allowClear>
+                    {[...new Map((selectedRecord?.suppliers || []).map(s => [s.supplier_id, s])).values()].map((s) => (
+                      <Select.Option key={s.supplier_id} value={s.supplier_id}>{s.supplier_name}</Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              )}
             </>
           )}
           <Form.Item label={`Quantity (${selectedRecord?.category === FABRIC_CATEGORY ? 'yards' : 'units'})`} required>
@@ -1387,6 +1468,47 @@ const StockManagement = () => {
           </Form.Item>
           <Form.Item name="remarks" label={requestPreset ? 'Description (optional)' : 'Remarks (optional)'}>
             <TextArea rows={2} placeholder={requestPreset ? 'Additional notes for the request' : 'Additional notes'} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={supplierEditRecord ? 'Edit Supplier' : 'Add Supplier'}
+        open={supplierModalVisible}
+        onCancel={() => { setSupplierModalVisible(false); setSupplierEditRecord(null); }}
+        centered
+        footer={null}
+        destroyOnClose
+      >
+        <Form
+          layout="vertical"
+          initialValues={supplierEditRecord || { name: '', contact_person: '', contact_number: '', email: '' }}
+          onFinish={handleSaveSupplier}
+        >
+          <Form.Item name="name" label="Supplier Name" rules={[{ required: true, message: 'Please enter supplier name' }]}>
+            <Input placeholder="Enter supplier name" />
+          </Form.Item>
+          <Form.Item name="contact_person" label="Contact Person">
+            <Input placeholder="Enter contact person" />
+          </Form.Item>
+          <Form.Item name="contact_number" label="Contact Number">
+            <Input placeholder="Enter contact number" />
+          </Form.Item>
+          <Form.Item name="email" label="Email">
+            <Input placeholder="Enter email" />
+          </Form.Item>
+          <Form.Item name="address" label="Address">
+            <Input.TextArea rows={2} placeholder="Enter address" />
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit" loading={supplierSaving}>
+                {supplierEditRecord ? 'Update' : 'Add'} Supplier
+              </Button>
+              <Button onClick={() => { setSupplierModalVisible(false); setSupplierEditRecord(null); }}>
+                Cancel
+              </Button>
+            </Space>
           </Form.Item>
         </Form>
       </Modal>
@@ -1664,7 +1786,7 @@ const StockManagement = () => {
       <Modal
         title="Replenish Inventory"
         open={replenishVisible}
-        onCancel={() => { setReplenishVisible(false); setReplenishCart({}); setReplenishRemark(''); }}
+        onCancel={() => { setReplenishVisible(false); setReplenishCart({}); setReplenishRemark(''); setReplenishSupplierId(null); }}
         width={1100}
         centered
         styles={{ body: { padding: '16px 24px', maxHeight: '80vh', overflowY: 'auto' } }}
@@ -1773,6 +1895,26 @@ const StockManagement = () => {
               )}
               {Object.values(replenishCart).length > 0 && (
                 <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid #e8e8e8' }}>
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4 }}>Supplier (optional)</div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <Select
+                        value={replenishSupplierId}
+                        onChange={setReplenishSupplierId}
+                        placeholder="Select supplier"
+                        allowClear
+                        style={{ flex: 1, minWidth: 0 }}
+                        size="small"
+                      >
+                        {suppliers.map((s) => (
+                          <Select.Option key={s.supplier_id} value={s.supplier_id}>{s.name}</Select.Option>
+                        ))}
+                      </Select>
+                      <Button size="small" onClick={() => { setInlineSupplierModalVisible(true); setInlineSupplierName(''); }}>
+                        +New
+                      </Button>
+                    </div>
+                  </div>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>
                     Total: {Object.values(replenishCart).filter((e) => e.quantity > 0).length} item(s)
                   </div>
@@ -1799,6 +1941,49 @@ const StockManagement = () => {
             </div>
           </Col>
         </Row>
+      </Modal>
+
+      <Modal
+        title="Add New Supplier"
+        open={inlineSupplierModalVisible}
+        onCancel={() => setInlineSupplierModalVisible(false)}
+        centered
+        footer={[
+          <Button key="cancel" onClick={() => setInlineSupplierModalVisible(false)}>Cancel</Button>,
+          <Button key="add" type="primary" onClick={async () => {
+            const name = inlineSupplierName.trim();
+            if (!name) return;
+            try {
+              const res = await fetch('/api/suppliers/inline', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, usertype: user.usertype }),
+              });
+              const data = await res.json();
+              if (data.success) {
+                fetchSuppliers();
+                setReplenishSupplierId(data.data.supplier_id);
+                setInlineSupplierModalVisible(false);
+                setInlineSupplierName('');
+              } else {
+                Modal.error({ title: 'Error', content: data.message, centered: true });
+              }
+            } catch {
+              Modal.error({ title: 'Error', content: 'Failed to create supplier', centered: true });
+            }
+          }}>Add</Button>,
+        ]}
+      >
+        <Input
+          placeholder="Enter supplier name"
+          value={inlineSupplierName}
+          onChange={(e) => setInlineSupplierName(e.target.value)}
+          onPressEnter={() => {
+            const btn = document.querySelector('.ant-modal-footer .ant-btn-primary');
+            if (btn) btn.click();
+          }}
+          autoFocus
+        />
       </Modal>
 
       {/* ── Replenish Variety Modal ── */}

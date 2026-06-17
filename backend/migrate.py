@@ -24,6 +24,37 @@ with app.app_context():
         db.session.commit()
         print("Created missing tables")
 
+    # Create Suppliers table if not exists
+    if 'Suppliers' not in tables:
+        db.session.execute(sa.text("""
+            CREATE TABLE "Suppliers" (
+                supplier_id INTEGER PRIMARY KEY,
+                name VARCHAR NOT NULL,
+                contact_person VARCHAR,
+                contact_number VARCHAR,
+                email VARCHAR,
+                address TEXT,
+                is_active BOOLEAN DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        db.session.commit()
+        print("Created Suppliers table")
+
+    # Create Product_Suppliers junction table if not exists
+    if 'Product_Suppliers' not in tables:
+        db.session.execute(sa.text("""
+            CREATE TABLE "Product_Suppliers" (
+                id INTEGER PRIMARY KEY,
+                product_id INTEGER NOT NULL REFERENCES "Products"(product_id),
+                supplier_id INTEGER NOT NULL REFERENCES "Suppliers"(supplier_id),
+                variety_id INTEGER REFERENCES "Product_Varieties"(variety_id)
+            )
+        """))
+        db.session.commit()
+        print("Created Product_Suppliers table")
+
     # Add missing columns
     migrations = [
         ('Locations', 'auto_restock_source_id', 'INTEGER REFERENCES "Locations"(location_id)'),
@@ -37,6 +68,7 @@ with app.app_context():
         ('Stock_Adjustments', 'variety_id', 'INTEGER REFERENCES "Product_Varieties"(variety_id)'),
         ('Stock_Requests', 'variety_id', 'INTEGER REFERENCES "Product_Varieties"(variety_id)'),
         ('Products', 'image_url', 'VARCHAR'),
+        ('Stock_Adjustments', 'supplier_id', 'INTEGER REFERENCES "Suppliers"(supplier_id)'),
     ]
 
     for table_name, col_name, col_def in migrations:
