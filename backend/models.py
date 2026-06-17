@@ -68,6 +68,19 @@ class Category(db.Model):
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
 
 
+class Supplier(db.Model):
+    __tablename__ = "Suppliers"
+    supplier_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, nullable=False)
+    contact_person = db.Column(db.String, nullable=True)
+    contact_number = db.Column(db.String, nullable=True)
+    email = db.Column(db.String, nullable=True)
+    address = db.Column(db.Text, nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.now)
+
+
 class Product(db.Model):
     __tablename__ = "Products"
     product_id = db.Column(db.Integer, primary_key=True)
@@ -84,6 +97,15 @@ class Product(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
     category = db.relationship("Category", backref="products")
+    supplier_links = db.relationship("ProductSupplier", backref="product", lazy="selectin")
+
+class ProductSupplier(db.Model):
+    __tablename__ = "Product_Suppliers"
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("Products.product_id"), nullable=False)
+    supplier_id = db.Column(db.Integer, db.ForeignKey("Suppliers.supplier_id"), nullable=False)
+    variety_id = db.Column(db.Integer, db.ForeignKey("Product_Varieties.variety_id"), nullable=True)
+    supplier = db.relationship("Supplier")
 
 
 class ProductVariety(db.Model):
@@ -170,11 +192,13 @@ class StockAdjustment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("Users.user_id"), nullable=False)
     quantity_change = db.Column(db.Float, nullable=False)
     reason = db.Column(db.String)
+    supplier_id = db.Column(db.Integer, db.ForeignKey("Suppliers.supplier_id"), nullable=True)
     date = db.Column(db.DateTime, nullable=False, default=datetime.now)
     product = db.relationship("Product")
     variety = db.relationship("ProductVariety")
     location = db.relationship("Location")
     user = db.relationship("User")
+    supplier = db.relationship("Supplier")
 
 
 class ActivityLog(db.Model):

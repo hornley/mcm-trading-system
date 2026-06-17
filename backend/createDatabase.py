@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from app import create_app
 from models import db, User, Location, Category, Product, Order, OrderItem
 from models import Payment, Inventory, StockTransfer, StockAdjustment, ActivityLog, ManualSection
-from models import StockRequest, StoreReport, Notification, ProductVariety
+from models import StockRequest, StoreReport, Notification, ProductVariety, Supplier, ProductSupplier
 from werkzeug.security import generate_password_hash
 
 # ── Configuration ──
@@ -104,6 +104,31 @@ def seed(skip_drop=False):
             cat_all.append(c)
         db.session.flush()
         cat_fabrics, cat_trims, cat_threads, cat_tools = cat_all
+
+        # ── 3b. SUPPLIERS ──
+        print("Seeding Suppliers...")
+        supplier_defs = [
+            ("Manila Fabric Trading Corp.", "Juan dela Cruz", "0917-111-2233", "juan@manilafabric.com", "123 Taft Ave, Manila"),
+            ("SouthStar Textiles Inc.", "Maria Santos", "0918-444-5566", "maria@southstartextiles.com", "456 Cebu Business Park, Cebu City"),
+            ("Evergreen Garment Supplies", "Pedro Reyes", "0922-777-8899", "pedro@evergreen.com", "789 Quezon Blvd, Quezon City"),
+            ("Goldilocks Trims & Accessories", "Ana Lopez", "0933-000-1122", "ana@goldilockstrims.com", "321 P. Gomez St, Makati"),
+            ("Cebu Pacific Threads Co.", "Carlos Tan", "0915-333-4455", "carlos@cebupacificthreads.com", "654 Mactan Ave, Lapu-Lapu City"),
+            ("Makati Industrial Tools Supply", "Linda Cruz", "0916-666-7788", "linda@makaitoolsupply.com", "987 Ayala Ave, Makati"),
+            ("Davao Premium Fabrics", "Jose Garcia", "0919-999-0001", "jose@davaopremiumfabrics.com", "555 Rizal St, Davao City"),
+        ]
+        all_suppliers = []
+        for name, contact_person, contact_number, email, address in supplier_defs:
+            s = Supplier(
+                name=name,
+                contact_person=contact_person,
+                contact_number=contact_number,
+                email=email,
+                address=address,
+                is_active=True,
+            )
+            db.session.add(s)
+            all_suppliers.append(s)
+        db.session.flush()
 
         # ── 4. PRODUCTS ──
         print("Seeding Products...")
@@ -201,6 +226,16 @@ def seed(skip_drop=False):
             )
             db.session.add(p)
             all_products.append(p)
+        db.session.flush()
+
+        # ── 4a. PRODUCT-SUPPLIER LINKS ──
+        print("Seeding Product-Supplier links...")
+        for p in all_products:
+            if random.random() < 0.7:
+                num_suppliers = random.choices([1, 2, 3], weights=[70, 25, 5])[0]
+                chosen = random.sample(all_suppliers, min(num_suppliers, len(all_suppliers)))
+                for s in chosen:
+                    db.session.add(ProductSupplier(product_id=p.product_id, supplier_id=s.supplier_id, variety_id=None))
         db.session.flush()
 
         # ── 4b. VARIETIES (for fabric products) ──
@@ -363,12 +398,15 @@ def seed(skip_drop=False):
                     "Quality check removal", "Supplier return", "Damaged in transit",
                     "Employee discount adjustment"]
         for _ in range(SEED_ADJUSTMENTS):
+            reason = random.choice(reasons)
+            supplier_id = random.choice(all_suppliers).supplier_id if reason in ["Supplier return", "Damaged in transit", "Damaged goods"] and random.random() < 0.6 else None
             db.session.add(StockAdjustment(
                 product_id=random.choice(all_products).product_id,
                 location_id=random.choice(locs).location_id,
                 user_id=random.choice(users).user_id,
                 quantity_change=random.choice([-50, -20, -10, -5, -3, 5, 10, 15, 25]),
-                reason=random.choice(reasons),
+                reason=reason,
+                supplier_id=supplier_id,
                 date=now - timedelta(days=random.randint(0, 180), hours=random.randint(0, 23)),
             ))
         db.session.flush()

@@ -3,7 +3,7 @@ import os
 from flask import Blueprint, request
 from datetime import datetime
 from sqlalchemy.orm import selectinload, joinedload
-from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer, StockRequest, OrderItem, Notification, ProductVariety
+from models import db, User, Product, Category, Location, Inventory, StockAdjustment, StockTransfer, StockRequest, OrderItem, Notification, ProductVariety, Supplier, ProductSupplier
 from utils.response import success_response, error_response
 from utils.validation import validate_required, validate_quantity, is_fabric_category
 from utils.activity_logger import log_activity
@@ -126,6 +126,15 @@ def _serialize_product(product, include_inventory=False, location_id=None, varie
         "unit": product.unit,
         "image_url": f"/api/images/product-image?path={product.image_url}" if product.image_url else None,
         "is_active": product.is_active,
+        "suppliers": [
+            {
+                "id": ps.id,
+                "supplier_id": ps.supplier_id,
+                "supplier_name": ps.supplier.name if ps.supplier else None,
+                "variety_id": ps.variety_id,
+            }
+            for ps in (product.supplier_links or [])
+        ],
         "created_at": product.created_at.isoformat() if product.created_at else None,
         "updated_at": product.updated_at.isoformat() if product.updated_at else None,
         "varieties": [
@@ -152,6 +161,20 @@ def _serialize_product(product, include_inventory=False, location_id=None, varie
             for inv in inventory
         ]
     return data
+
+
+def _serialize_supplier(supplier):
+    return {
+        "supplier_id": supplier.supplier_id,
+        "name": supplier.name,
+        "contact_person": supplier.contact_person,
+        "contact_number": supplier.contact_number,
+        "email": supplier.email,
+        "address": supplier.address,
+        "is_active": supplier.is_active,
+        "created_at": supplier.created_at.isoformat() if supplier.created_at else None,
+        "updated_at": supplier.updated_at.isoformat() if supplier.updated_at else None,
+    }
 
 
 @inventory_bp.route("/api/products", methods=["GET"])
@@ -311,6 +334,14 @@ def create_product():
     db.session.add(product)
     db.session.flush()
 
+    if data.get("suppliers"):
+        for s in data["suppliers"]:
+            db.session.add(ProductSupplier(
+                product_id=product.product_id,
+                supplier_id=s["supplier_id"],
+                variety_id=s.get("variety_id"),
+            ))
+
     locations = Location.query.filter_by(is_active=True).all()
     for location in locations:
         inventory = Inventory(
@@ -384,6 +415,15 @@ def update_product(product_id):
         product.description = data["description"]
     if "unit" in data:
         product.unit = data["unit"]
+
+    if "suppliers" in data:
+        ProductSupplier.query.filter_by(product_id=product_id).delete()
+        for s in data["suppliers"]:
+            db.session.add(ProductSupplier(
+                product_id=product_id,
+                supplier_id=s["supplier_id"],
+                variety_id=s.get("variety_id"),
+            ))
 
     new_sku = data.get("sku", "").strip()
     if new_sku and new_sku != product.sku:
@@ -655,6 +695,126 @@ def delete_product(product_id):
     return success_response(message="Product deleted successfully")
 
 
+@inventory_bp.route("/api/suppliers", methods=["GET"])
+def list_suppliers():
+    usertype = request.args.get("usertype", type=int)
+    if usertype is None:
+        return error_response("usertype query parameter is required", "MISSING_PARAM", 400)
+    if not _can_update(usertype):
+        return error_response("Permission denied", "FORBIDDEN", 403)
+
+    active_only = request.args.get("active_only", "true").lower() == "true"
+    query = Supplier.query
+    if active_only:
+        query = query.filter(Supplier.is_active == True)
+    suppliers = query.order_by(Supplier.name.asc()).all()
+    return success_response([_serialize_supplier(s) for s in suppliers])
+
+
+@inventory_bp.route("/api/suppliers", methods=["POST"])
+def create_supplier():
+    data = request.get_json()
+    if not data:
+        return error_response("Request body is required", "MISSING_BODY", 400)
+
+    usertype = data.get("usertype")
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+    if not _can_update(usertype):
+        return error_response("Permission denied", "FORBIDDEN", 403)
+
+    error = validate_required(data, ["name"])
+    if error:
+        return error
+
+    supplier = Supplier(
+        name=data["name"],
+        contact_person=data.get("contact_person"),
+        contact_number=data.get("contact_number"),
+        email=data.get("email"),
+        address=data.get("address"),
+    )
+    db.session.add(supplier)
+    db.session.commit()
+
+    log_activity(
+        user_id=data.get("user_id"),
+        module="suppliers",
+        action_type="create",
+        action=f"Created supplier {supplier.name}",
+    )
+
+    return success_response(_serialize_supplier(supplier), "Supplier created successfully")
+
+
+@inventory_bp.route("/api/suppliers/<int:supplier_id>", methods=["PUT"])
+def update_supplier(supplier_id):
+    data = request.get_json()
+    if not data:
+        return error_response("Request body is required", "MISSING_BODY", 400)
+
+    usertype = data.get("usertype")
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+    if not _can_update(usertype):
+        return error_response("Permission denied", "FORBIDDEN", 403)
+
+    supplier = Supplier.query.get(supplier_id)
+    if not supplier:
+        return error_response("Supplier not found", "NOT_FOUND", 404)
+
+    if "name" in data:
+        supplier.name = data["name"]
+    if "contact_person" in data:
+        supplier.contact_person = data.get("contact_person")
+    if "contact_number" in data:
+        supplier.contact_number = data.get("contact_number")
+    if "email" in data:
+        supplier.email = data.get("email")
+    if "address" in data:
+        supplier.address = data.get("address")
+    if "is_active" in data:
+        supplier.is_active = data["is_active"]
+
+    db.session.commit()
+
+    log_activity(
+        user_id=data.get("user_id"),
+        module="suppliers",
+        action_type="update",
+        action=f"Updated supplier {supplier.name}",
+    )
+
+    return success_response(_serialize_supplier(supplier), "Supplier updated successfully")
+
+
+@inventory_bp.route("/api/suppliers/inline", methods=["POST"])
+def create_supplier_inline():
+    data = request.get_json()
+    if not data:
+        return error_response("Request body is required", "MISSING_BODY", 400)
+
+    usertype = data.get("usertype")
+    if usertype is None:
+        return error_response("usertype is required", "MISSING_PARAM", 400)
+    if not _can_update(usertype):
+        return error_response("Permission denied", "FORBIDDEN", 403)
+
+    name = (data.get("name") or "").strip()
+    if not name:
+        return error_response("Supplier name is required", "MISSING_FIELD", 400)
+
+    supplier = Supplier(
+        name=name,
+        contact_person=data.get("contact_person"),
+        contact_number=data.get("contact_number"),
+    )
+    db.session.add(supplier)
+    db.session.commit()
+
+    return success_response(_serialize_supplier(supplier), "Supplier created")
+
+
 @inventory_bp.route("/api/inventory/counts", methods=["GET"])
 def inventory_counts():
     usertype = request.args.get("usertype", type=int)
@@ -804,6 +964,7 @@ def list_inventory():
 
     inventory = query.options(
         joinedload(Inventory.product).joinedload(Product.category),
+        joinedload(Inventory.product).selectinload(Product.supplier_links).joinedload(ProductSupplier.supplier),
         joinedload(Inventory.location),
         joinedload(Inventory.variety),
     ).offset((page - 1) * limit).limit(limit).all()
@@ -824,6 +985,15 @@ def list_inventory():
                 "quantity": inv.quantity,
                 "reorder_level": inv.product.reorder_level,
                 "auto_restock_source_id": inv.product.auto_restock_source_id,
+                "suppliers": [
+                    {
+                        "id": ps.id,
+                        "supplier_id": ps.supplier_id,
+                        "supplier_name": ps.supplier.name if ps.supplier else None,
+                        "variety_id": ps.variety_id,
+                    }
+                    for ps in (inv.product.supplier_links or [])
+                ],
                 "color": inv.variety.color if inv.variety else None,
                 "pattern": inv.variety.pattern if inv.variety else None,
                 "variety_sku": inv.variety.variety_sku if inv.variety else None,
@@ -872,6 +1042,15 @@ def get_inventory_by_location(location_id):
             "category": inv.product.category.name if inv.product.category else None,
             "unit": inv.product.unit,
             "quantity": inv.quantity,
+            "suppliers": [
+                {
+                    "id": ps.id,
+                    "supplier_id": ps.supplier_id,
+                    "supplier_name": ps.supplier.name if ps.supplier else None,
+                    "variety_id": ps.variety_id,
+                }
+                for ps in (inv.product.supplier_links or [])
+            ],
             "color": inv.variety.color if inv.variety else None,
             "pattern": inv.variety.pattern if inv.variety else None,
             "variety_sku": inv.variety.variety_sku if inv.variety else None,
@@ -999,6 +1178,7 @@ def adjust_inventory():
         quantity_change=quantity_change,
         reason=data.get("reason"),
         variety_id=data.get("variety_id"),
+        supplier_id=data.get("supplier_id"),
     )
     db.session.add(adjustment)
     db.session.commit()
@@ -1308,6 +1488,7 @@ def replenish_inventory():
 
     location_id = data.get("location_id")
     user_id = data.get("user_id")
+    supplier_id = data.get("supplier_id")
     items = data.get("items", [])
 
     if not items:
@@ -1353,6 +1534,17 @@ def replenish_inventory():
                 quantity=qty,
             )
             db.session.add(inv)
+
+        adjustment = StockAdjustment(
+            product_id=product_id,
+            variety_id=variety_id,
+            location_id=location_id,
+            user_id=user_id,
+            quantity_change=qty,
+            reason="Restock",
+            supplier_id=supplier_id,
+        )
+        db.session.add(adjustment)
 
         updated.append({
             "product_id": product_id,
@@ -1693,6 +1885,7 @@ def get_inventory_movements():
 
     adjustments = StockAdjustment.query.filter_by(product_id=product_id).options(
         joinedload(StockAdjustment.location),
+        joinedload(StockAdjustment.supplier),
     )
     transfers_from = StockTransfer.query.filter_by(product_id=product_id).options(
         joinedload(StockTransfer.from_location),
@@ -1724,6 +1917,8 @@ def get_inventory_movements():
             "location_name": adj.location.name if adj.location else None,
             "reason": adj.reason,
             "remarks": None,
+            "supplier_id": adj.supplier_id,
+            "supplier_name": adj.supplier.name if adj.supplier else None,
         })
 
     for t in transfers_from.all():

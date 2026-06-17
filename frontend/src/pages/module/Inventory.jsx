@@ -98,6 +98,8 @@ const Inventory = () => {
   const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
   const [imageRemoved, setImageRemoved] = useState(false);
   const [viewImageProduct, setViewImageProduct] = useState(null);
+  const [suppliers, setSuppliers] = useState([]);
+  const [productSuppliers, setProductSuppliers] = useState([]);
 
   const toggleColorBubble = (productId) => {
     setActiveColorProductId((prev) => (prev === productId ? null : productId));
@@ -118,15 +120,18 @@ const Inventory = () => {
       const locationParam = selectedLocationId !== "all" ? `&location_id=${selectedLocationId}` : '';
       const userIdParam = `&user_id=${user.user_id}`;
 
-      const [productsRes, categoriesRes] = await Promise.all([
+      const [productsRes, categoriesRes, suppliersRes] = await Promise.all([
         fetch(`/api/products?usertype=${user.usertype}${locationParam}${userIdParam}`),
         fetch(`/api/categories?usertype=${user.usertype}`),
+        fetch(`/api/suppliers?usertype=${user.usertype}&active_only=true`),
       ]);
       const productsData = await productsRes.json();
       const categoriesData = await categoriesRes.json();
+      const suppliersData = await suppliersRes.json();
 
       if (productsData.success) setProducts(productsData.data);
       if (categoriesData.success) setCategories(categoriesData.data);
+      if (suppliersData.success) setSuppliers(suppliersData.data);
     } catch {
       Modal.error({ title: 'Error', content: 'Failed to load data', centered: true });
     } finally {
@@ -158,6 +163,7 @@ const Inventory = () => {
     setSelectedImageFile(null);
     setImagePreviewUrl(null);
     setImageRemoved(false);
+    setProductSuppliers([]);
     setProductModalVisible(true);
   };
 
@@ -170,6 +176,7 @@ const Inventory = () => {
       unit: record.unit,
       description: record.description,
     });
+    setProductSuppliers((record.suppliers || []).map(s => ({ supplier_id: s.supplier_id, variety_id: s.variety_id || null })));
     const cat = categories.find(c => c.category_id === record.category_id);
     setIsFabricCategory(cat?.name === FABRIC_CATEGORY);
     setVarieties((record.varieties || []).map(v => ({ color: v.color, pattern: v.pattern || '', variety_sku: v.variety_sku })));
@@ -247,6 +254,10 @@ const Inventory = () => {
         ...values,
         usertype: user.usertype,
         user_id: user.user_id,
+        suppliers: productSuppliers.filter(s => s.supplier_id).map(s => ({
+          supplier_id: s.supplier_id,
+          variety_id: s.variety_id || null,
+        })),
       };
       if (isFabricCategory) {
         payload.varieties = varieties.map(v => ({ color: v.color, pattern: v.pattern, variety_sku: v.variety_sku }));
@@ -651,6 +662,32 @@ const Inventory = () => {
           <Form.Item name="description" label="Description">
             <TextArea rows={3} placeholder="Enter description" />
           </Form.Item>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontWeight: 500, marginBottom: 4, fontSize: 13 }}>Suppliers</div>
+            {productSuppliers.map((ps, i) => {
+              const s = suppliers.find(s => s.supplier_id === ps.supplier_id);
+              return (
+                <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 4, alignItems: 'center' }}>
+                  <Tag closable onClose={() => setProductSuppliers(prev => prev.filter((_, j) => j !== i))} style={{ margin: 0 }}>
+                    {s?.name || 'Unknown'}
+                  </Tag>
+                </div>
+              );
+            })}
+            <Select
+              placeholder="Add supplier..."
+              value={undefined}
+              onChange={(val) => {
+                setProductSuppliers(prev => [...prev, { supplier_id: val, variety_id: null }]);
+              }}
+              style={{ width: '100%', marginTop: productSuppliers.length > 0 ? 4 : 0 }}
+              notFoundContent={null}
+            >
+              {suppliers.filter(s => !productSuppliers.find(ps => ps.supplier_id === s.supplier_id)).map((s) => (
+                <Select.Option key={s.supplier_id} value={s.supplier_id}>{s.name}</Select.Option>
+              ))}
+            </Select>
+          </div>
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13 }}>Product Image</div>
             {(imagePreviewUrl) ? (
